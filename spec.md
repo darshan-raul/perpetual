@@ -19,7 +19,8 @@
 - Perpetual shows the whole computed graph, and the user can add, edit and delete edges and add nodes. Edits are stored as overrides that survive rescans (23, 82).
 - A stack cannot show DR READY while low-confidence edges on its required paths are unreviewed; it shows UNKNOWN (graph not reviewed). Simulation is always allowed (23).
 - Graph review comes before simulation in the workflow. YAML overrides work from the CLI phases; the graph editor is the first web UI (99, 100).
-- Perpetual is a local tool: one Python process serves the API and a static React UI, with SQLite by default. The UI moves from Next.js to Vite + React. PostgreSQL and Docker Compose are only for a later hosted version (18, 71, 71.1, 72, 73).
+- Added test environments (90.1): fixtures for the engine, moto and the Floci emulator for collectors, synthetic CloudTrail and flow-log files, and a small real-AWS contract suite at fixed checkpoints.
+- Perpetual is a local tool: one Python process serves the API and a static React UI, with SQLite by default. The UI moves from Next.js to Vite + React. PostgreSQL is for a later hosted version; Docker Compose only runs test dependencies such as Floci (18, 71, 71.1, 72, 73).
 
 ### Revision 2 changes
 
@@ -3211,6 +3212,10 @@ perpetual/
 |   +-- aws/
 |   +-- terraform/
 |   +-- kubernetes/
+|   +-- logs/            # synthetic CloudTrail and flow-log generator
+|
++-- tests/
+|   +-- contract/        # real-AWS contract suite (section 90.1)
 |
 +-- examples/
 |   +-- ecs-rds/
@@ -3220,7 +3225,7 @@ perpetual/
 |
 +-- docs/
 |
-+-- docker-compose.yml   # hosted / Postgres testing only; not needed to run locally
++-- docker-compose.yml   # Floci and Postgres for tests; not needed to run locally
 +-- Makefile
 +-- README.md
 ```
@@ -3850,6 +3855,95 @@ independently.
 
 ---
 
+# 90.1 Test Environments
+
+Development does not need a real AWS account until Phase 2, and after that only for a small contract suite.
+
+Four environments, from fastest to most real:
+
+```text
+fixtures     YAML normalized graph + DR overlay + overrides (section 104),
+             saved `terraform show -json` files, saved API responses (fixtures/aws/).
+             No network, no credentials.
+
+moto         in-process boto3 mocks for collector unit tests.
+
+Floci        local AWS emulator in Docker, for collector integration tests in CI.
+             The demo Terraform (sections 85-89) is applied to it, then scanned.
+
+real AWS     a sandbox account (plus a DR account for section 66 tests), used for
+             a small contract suite. Never a customer or production account.
+```
+
+Which environment each part uses:
+
+```text
+Phases 0-1    engine, simulator, recovery DAG, RTO        fixtures
+Phase 1b      API, UI, Terraform importer                 fixtures
+Phase 2       collectors                                  moto (unit), Floci (integration),
+                                                          real AWS (contract)
+Phase 2b      CloudTrail and flow-log readers             synthetic log files in Floci S3,
+                                                          real AWS (contract)
+Phases 3-8    stack discovery, rules, RPO, optimizer      fixtures
+Phase 9       Terraform compiler                          terraform validate; apply to Floci
+                                                          optional
+```
+
+### Synthetic logs
+
+Emulators do not produce real CloudTrail or VPC Flow Logs, because there is no real traffic. A generator in `fixtures/logs/` writes files in the real delivery formats (CloudTrail JSON in the trail's S3 key layout; flow-log records, versions 2 and 5) from a scenario description:
+
+```yaml
+scenario: checkout-observed
+window_days: 30
+calls:
+  - principal_role: checkout-task-role
+    action: secretsmanager:GetSecretValue
+    resource: checkout/db
+    count: 4200
+flows:
+  - from: ecs:checkout-api
+    to: rds:orders
+    port: 5432
+    count: 900
+  - from: ecs:checkout-api
+    to: 203.0.113.10       # unknown external destination
+    port: 443
+    count: 50
+```
+
+Generated files are uploaded to a Floci S3 bucket, so readers are tested through the same S3 path they use in production. The generator also produces the edge cases from section 14.1: reused Fargate ENIs, unresolvable addresses, observed-but-not-permitted flows.
+
+### What emulators cannot prove
+
+These need the real AWS contract suite:
+
+- cross-Region behaviour: S3 replication status, RDS cross-Region replica lag, ECR replication, multi-Region KMS keys;
+- Region facts: Service Quotas, `DescribeInstanceTypeOfferings`, Resource Explorer, AWS Config relationship data;
+- exact ARN and ID formats, Fargate task ENI descriptions, real IAM policy documents;
+- real CloudTrail and flow-log delivery, including data-event coverage detection;
+- cross-account access to a separate DR account (section 66).
+
+Emulator support is checked per service and operation before it is relied on. A passing Floci test proves the SDK calls work, not that behaviour matches AWS.
+
+### Real-AWS contract suite
+
+- lives in `tests/contract/`, marked so it never runs by default;
+- runs by hand or nightly with explicit sandbox credentials;
+- the reference environments (sections 85-89) are Terraform in `examples/`, applied to the sandbox for a test session and destroyed after it;
+- cross-Region RDS replicas and NAT gateways cost money while running, so the suite destroys them on exit, including on failure;
+- recorded responses from contract runs are redacted and saved to `fixtures/aws/`, so fixtures stay close to real AWS.
+
+Real-AWS checkpoints:
+
+```text
+Phase 2 exit      scan the sandbox account -> normalized graph
+Phase 2b exit     real CloudTrail and flow logs -> observed edges
+Sections 87-89    demo scenarios reproduced on real infrastructure
+```
+
+---
+
 # 91. Rule Test Example
 
 ```python
@@ -4146,6 +4240,8 @@ Add Resource Explorer and Config as supplementary sources.
 
 Dependency evidence in this phase: security groups, IAM policies and configuration references.
 
+Collectors are tested with moto and Floci, then checked against a real sandbox account (section 90.1).
+
 Exit criterion:
 
 ```text
@@ -4166,6 +4262,8 @@ Deliver:
 - coverage report (which trails, data events and flow logs existed).
 
 Kubernetes NetworkPolicy evidence arrives with the EKS slice (section 106).
+
+Readers are developed against synthetic log files (section 90.1), then checked against real logs in the sandbox account.
 
 Exit criterion:
 
