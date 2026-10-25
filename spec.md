@@ -2,11 +2,24 @@
 
 ## Cloud Disaster-Recovery Readiness, Simulation and Architecture Compiler
 
-**Status:** Engineering specification, revision 2  
+**Status:** Engineering specification, revision 3  
 **Initial cloud:** AWS  
-**Primary implementation target:** Local development first, deployable to AWS later  
+**Primary implementation target:** Local single-user tool first (section 71.1); a hosted version is possible later  
 **Primary user:** Cloud Architect / SRE / Platform Engineer / DevOps Engineer  
-**Primary objective:** Determine whether a real workload can survive a specified failure while satisfying its RTO, RPO and cost constraints.
+**Primary objective:** Determine whether a real stack can survive a specified failure while satisfying its RTO, RPO and cost constraints.
+
+### Revision 3 changes
+
+- The unit of DR is the **stack**: everything one product needs to serve its users, including its microservices, data stores, VPCs, load balancers and supporting services. "Workload" is renamed to "stack" throughout, except where it means Kubernetes objects such as Deployments (1, 24).
+- A stack groups its resources into services for display and explanation. Services have no DR targets, plans, RTO or RPO of their own (24).
+- Monitoring, logging and CI/CD resources are outside the stack's RTO scope. They are still shown and assessed but never block the stack or add time to its plan (24.1).
+- There is one recovery plan, one RTO and one RPO per stack and failure scenario. Per-resource estimates are inputs to that plan, never results on their own (47, 50, 55, 60).
+- Plan buffers are explicit: handoff time before manual actions, a stack-wide validation action and a contingency percentage (49.2).
+- New dependency sources: Kubernetes NetworkPolicies, CloudTrail and VPC Flow Logs. Every edge records whether its evidence says the dependency is permitted, referenced or observed (14.1, 16, 22).
+- Perpetual shows the whole computed graph, and the user can add, edit and delete edges and add nodes. Edits are stored as overrides that survive rescans (23, 82).
+- A stack cannot show DR READY while low-confidence edges on its required paths are unreviewed; it shows UNKNOWN (graph not reviewed). Simulation is always allowed (23).
+- Graph review comes before simulation in the workflow. YAML overrides work from the CLI phases; the graph editor is the first web UI (99, 100).
+- Perpetual is a local tool: one Python process serves the API and a static React UI, with SQLite by default. The UI moves from Next.js to Vite + React. PostgreSQL and Docker Compose are only for a later hosted version (18, 71, 71.1, 72, 73).
 
 ### Revision 2 changes
 
@@ -19,7 +32,7 @@
 - Added cross-cutting rules (28.1): control-plane dependencies, DR quotas, primary-Region references in config and IAM.
 - Added identity resolution across sources (15.1), external dependencies (15.2) and typed resource properties (15.3).
 - Evidence combination is pluggable and accounts for correlated evidence (22). Edge rejection uses evidence fingerprints (23).
-- Findings attach to resources and can belong to several workloads (29).
+- Findings attach to resources and can belong to several stacks (29).
 - The target Region lives only on `RecoveryRequirement` (24, 26).
 - Scan status includes `partial` (76).
 - The optimizer generates candidates per strategy (56).
@@ -32,13 +45,25 @@
 
 Perpetual is a disaster-recovery readiness and architecture system for AWS infrastructure.
 
-It discovers existing infrastructure from multiple sources, builds an evidence-backed dependency graph, groups infrastructure into workloads, evaluates those workloads against user-defined disaster-recovery objectives, simulates failures, recommends remediation, estimates resulting recovery characteristics and cost, and eventually generates deterministic infrastructure-as-code and recovery runbooks.
+It discovers existing infrastructure from multiple sources, builds an evidence-backed dependency graph, groups infrastructure into stacks, evaluates those stacks against user-defined disaster-recovery objectives, simulates failures, recommends remediation, estimates resulting recovery characteristics and cost, and eventually generates deterministic infrastructure-as-code and recovery runbooks.
 
 The central question Perpetual answers is:
 
-> If this workload loses its current AWS Region, can it continue operating within its promised RTO, RPO and budget?
+> If this stack loses its current AWS Region, can it continue operating within its promised RTO, RPO and budget?
 
-Perpetual MUST evaluate complete workloads rather than checking individual AWS resources independently.
+Perpetual MUST evaluate complete stacks rather than checking individual AWS resources independently.
+
+A stack is everything one product needs to serve its users. For example, an online store stack might contain:
+
+```text
+services       checkout-api, catalog-api, payments-api (ECS or EKS)
+data stores    orders RDS database, sessions DynamoDB table, assets S3 bucket
+networking     two VPCs, subnets, security groups, NAT, a Transit Gateway attachment
+traffic        Route 53 records, one ALB, CloudFront
+supporting     ECR repositories, Secrets Manager secrets, KMS keys, IAM roles
+```
+
+The DR plan, RTO and RPO are always calculated for the whole stack (sections 47 and 50).
 
 Example:
 
@@ -78,7 +103,7 @@ An RDS replica being healthy does not mean the application is DR-ready if:
 Therefore:
 
 ```text
-Resource readiness != Workload readiness
+Resource readiness != Stack readiness
 ```
 
 ---
@@ -148,7 +173,7 @@ Core positioning:
 
 Long-term positioning:
 
-> Continuous survivability verification for cloud workloads.
+> Continuous survivability verification for cloud stacks.
 
 Perpetual should eventually distinguish three important concepts:
 
@@ -494,7 +519,7 @@ Initially include awareness of:
 - VPC endpoints;
 - security groups;
 - AWS Backup;
-- Service Quotas (DR Region quotas for the services a workload uses);
+- Service Quotas (DR Region quotas for the services a stack uses);
 - Route 53 Application Recovery Controller (routing controls, readiness checks) where configured;
 - ACM certificates (including us-east-1 certificates used by CloudFront).
 
@@ -523,18 +548,26 @@ A recovery path that relies on a control-plane mutation MUST be flagged (see 28.
 Perpetual MUST support multiple discovery sources.
 
 ```text
-                 Discovery Sources
+                       Discovery Sources
 
- Terraform      AWS APIs       Resource Explorer
-     |              |                 |
-     +--------------+-----------------+
-                    |
-                 AWS Config
-                    |
-            optional Kubernetes
-                    |
-                    v
-             Normalized Model
+ Terraform      AWS APIs      Resource Explorer      AWS Config
+     |              |                |                    |
+     +--------------+-------+--------+--------------------+
+                            |
+     CloudTrail      VPC Flow Logs      optional Kubernetes
+         |                 |                    |
+         +-----------------+--------------------+
+                            |
+                            v
+                     Normalized Model
+```
+
+Sources play two roles:
+
+```text
+inventory    what exists          Terraform, AWS APIs, Resource Explorer, AWS Config, Kubernetes
+dependency   what depends on what security groups, NetworkPolicies, IAM policies, references,
+                                  CloudTrail, VPC Flow Logs (section 14.1)
 ```
 
 ---
@@ -703,6 +736,91 @@ class KubernetesCollector:
 
 ---
 
+# 14.1 Dependency Discovery Sources
+
+Perpetual computes the graph's edges itself. It does not rely on the user to draw them. The user reviews and corrects the result (section 23).
+
+Every piece of dependency evidence has a basis:
+
+```text
+permitted    configuration allows the connection or call
+             (security groups, NetworkPolicies, IAM policies)
+referenced   configuration names the dependency
+             (Terraform references, secret ARNs in task definitions, endpoint matches in
+             env vars and ConfigMaps, Kubernetes object references)
+observed     the connection or call was seen
+             (CloudTrail, VPC Flow Logs)
+asserted     the user said so (section 23)
+```
+
+Permitted evidence says a dependency is possible. Observed evidence says it is used. Both matter, and the UI shows them separately.
+
+### Security groups
+
+- An SG rule that references another SG creates candidate edges between the resources attached to the two groups (ECS task ENIs, EKS nodes or pods with security groups for pods, RDS, ALB, VPC endpoints).
+- CIDR rules resolve to subnets and the resources in them.
+- A rule open to `0.0.0.0/0`, or to a whole VPC CIDR, does not create an edge on its own. It can only support an edge that other evidence proposes.
+- The port types the edge: 3306 or 5432 to RDS is `connects_to` a database, 443 to a VPC endpoint is an AWS API path.
+
+### Kubernetes NetworkPolicies
+
+Requires Kubernetes access (section 14, Level 2).
+
+- `podSelector` and `namespaceSelector` rules create candidate edges between Kubernetes workloads, resolved through Services.
+- `ipBlock` egress rules are matched against AWS resource addresses (RDS ENIs, VPC endpoints, ElastiCache nodes).
+- A namespace with no NetworkPolicy allows all traffic. That proves nothing and creates no edges.
+- Policies only apply if the CNI enforces them (VPC CNI network policy agent, Calico, Cilium). If enforcement is not detected, NetworkPolicy evidence has reduced confidence.
+
+### IAM policies
+
+- Allow statements in task roles, IRSA and Pod Identity roles and instance profiles create candidate edges to the named resource ARNs (`reads_from`, `writes_to`, `uses_secret`, `encrypted_by`).
+- Resource-based policies (bucket, key, secret and queue policies) that name a principal create the same edges from the other side.
+- `Resource: "*"` or service-wide wildcards create no edge on their own.
+- This is evidence, not authorization. Perpetual does not need full policy evaluation here (SCPs, permission boundaries).
+
+### CloudTrail
+
+- Each relevant event gives a principal (an assumed-role session) and a resource (from `resources` or `requestParameters`).
+- The principal is mapped back to compute through its role: ECS task role, IRSA role, Pod Identity association, instance profile. The edge runs from that compute to the resource.
+- Perpetual reads an existing trail from its S3 bucket, from CloudTrail Lake, or from an Athena table over the trail. The `LookupEvents` API is a fallback only: it covers management events for 90 days at a low rate limit.
+- Management events are always recorded. S3 object-level and DynamoDB item-level calls are data events, which are off by default and billed. Perpetual MUST NOT enable trails or data events (section 65). It reports which coverage existed, so a missing S3 edge is explained by missing data events rather than read as "no dependency".
+- The lookback window is configurable, default 30 days.
+- CloudTrail only records AWS API calls. Database, cache and service-to-service connections never appear in it. VPC Flow Logs cover those.
+
+### VPC Flow Logs
+
+- Each accepted flow gives a source and destination address, destination port and protocol.
+- Addresses resolve to resources through their ENI (`interface-id`): ECS task ENIs, RDS ENIs, ALB ENIs, NAT gateways, VPC endpoints, EKS pod IPs.
+- Fargate tasks and pods are short-lived, so their ENIs and IPs are reused. Resolution uses the ENI as it was at the flow's timestamp: current ENIs first, then AWS Config or CloudTrail ENI history. Flows that cannot be resolved are dropped and counted, never guessed.
+- Version 5 fields (`pkt-srcaddr`, `pkt-dstaddr`, `flow-direction`) are used when present, to see through NAT gateways and load balancers.
+- Return traffic on ephemeral ports is folded into the originating flow.
+- Flows to addresses outside the scanned accounts are proposed as external nodes (section 15.2). The user confirms them; they are not created automatically.
+- Perpetual reads existing flow logs from S3 or CloudWatch Logs. It does not create flow logs.
+
+### Persistence of observations
+
+CloudTrail and flow-log data contain addresses, principals and request details. Perpetual persists only aggregates:
+
+```text
+from_resource_id, to_resource_id, action or port, count, first_seen, last_seen, source window
+```
+
+Raw events, request bodies and unresolved addresses are not persisted.
+
+### Contradictions
+
+```text
+permitted + observed       strong edge
+permitted, never observed  edge kept, flagged "unobserved in window" for review.
+                           Rarely used paths (DR-only, monthly jobs) look like this.
+observed, not permitted    flagged as a contradiction: stale configuration,
+                           a missed policy source, or wrong resolution
+```
+
+Absence of observations never removes an edge on its own.
+
+---
+
 # 15. Normalized Resource Model
 
 All sources MUST normalize into one generic model.
@@ -780,7 +898,7 @@ Conflicting attribute values from different sources are kept as separate evidenc
 
 ## 15.2 External Dependencies
 
-Workloads depend on things Perpetual cannot discover: third-party SaaS, on-premise systems, other clouds.
+Stacks depend on things Perpetual cannot discover: third-party SaaS, on-premise systems, other clouds.
 
 Users MUST be able to declare external nodes:
 
@@ -817,10 +935,20 @@ class Evidence(BaseModel):
         "resource_explorer",
         "terraform",
         "kubernetes",
+        "cloudtrail",
+        "vpc_flow_logs",
         "inference",
         "user_confirmation",
         "metric",
     ]
+
+    basis: Literal[
+        "permitted",
+        "referenced",
+        "observed",
+        "asserted",
+    ] | None
+    # Required for dependency evidence (section 14.1).
 
     source: str
 
@@ -833,6 +961,11 @@ class Evidence(BaseModel):
     confidence: float
 
     collected_at: datetime
+
+    observed_from: datetime | None
+    observed_to: datetime | None
+    observation_count: int | None
+    # Set for observed evidence: the window and the aggregated count.
 ```
 
 Never put credentials or secret values in evidence.
@@ -876,7 +1009,8 @@ NetworkX
 Persistence:
 
 ```text
-PostgreSQL
+SQLite (default, local)
+PostgreSQL (hosted, later)
 ```
 
 Do NOT deploy Neo4j/Memgraph initially.
@@ -888,7 +1022,7 @@ Possible future replacement with graph database is allowed.
 NetworkX is kept deliberately, not as heavy machinery. It provides tested implementations of the operations Perpetual needs:
 
 ```text
-descendants             workload dependency closure
+descendants             stack dependency closure
 ancestors               impacted dependents
 shortest_path           failure reason chains (section 46)
 dag_longest_path_length RTO critical path (section 50)
@@ -899,7 +1033,7 @@ Do not hand-roll recursive traversal.
 
 The dependency graph is NOT a tree and NOT a fixed number of layers:
 
-- shared nodes are normal (one KMS key, VPC or hosted zone used by many workloads);
+- shared nodes are normal (one KMS key, VPC or hosted zone used by many stacks);
 - cycles occur (security groups referencing each other, service-to-service calls);
 - paths are often deeper than four hops (StatefulSet -> PVC -> StorageClass -> EBS CSI add-on -> IRSA role -> KMS key).
 
@@ -926,6 +1060,18 @@ class DependencyEdge(BaseModel):
 
     inferred: bool
 
+    origin: Literal[
+        "discovered",
+        "user",
+    ]
+
+    review_state: Literal[
+        "unreviewed",
+        "confirmed",
+        "edited",
+        "rejected",
+    ]
+
     criticality: Literal[
         "required",
         "likely_required",
@@ -933,6 +1079,8 @@ class DependencyEdge(BaseModel):
         "unknown",
     ]
 ```
+
+The edge's bases (permitted, referenced, observed, asserted) are derived from its evidence and not stored separately.
 
 ---
 
@@ -1031,9 +1179,20 @@ IAM resource permission            0.80
 
 SG path + destination resource     0.75
 
+NetworkPolicy allow + Service match 0.70
+
 Endpoint string match              0.85
 
+CloudTrail call, mapped principal  0.95
+
+Flow-log flow, both ends resolved  0.90
+
 Name-only heuristic                0.40
+
+SG rule open to 0.0.0.0/0 or a     0.00  (supports other evidence only)
+whole VPC CIDR
+
+IAM statement with Resource "*"    0.00  (supports other evidence only)
 ```
 
 Multiple independent evidence sources should increase confidence.
@@ -1058,20 +1217,73 @@ Therefore:
 - within a group, take the maximum confidence;
 - across groups, apply the combination function.
 
+Initial groups: Terraform; AWS resource relationships; network permissions (security groups, NetworkPolicies); IAM permissions; configuration references; CloudTrail; flow logs. Observed sources are independent of configuration sources, so an edge that is both permitted and observed gains confidence.
+
 The combination function MUST be pluggable, so it can be tuned later against confirmed and rejected edges.
 
 Weights should be configuration, not hard-coded throughout the application.
 
 ---
 
-# 23. User-Confirmed Dependencies
+# 23. User Review and Editing of the Graph
 
-The UI must support:
+Perpetual computes the graph (section 14.1). The user reviews it and corrects it. Discovered data is never edited in place. User changes are stored as overrides and applied on top of every scan.
+
+The UI and CLI must support:
 
 ```text
-Confirm dependency
-Reject dependency
+Confirm edge          mark a discovered edge as correct
+Reject edge           remove a discovered edge (this is "delete" for discovered edges)
+Add edge              from, to, relationship_type, criticality, optional note
+Edit edge             change relationship_type or criticality
+Delete edge           remove a user-added edge
+Add node              an external node (section 15.2), or a placeholder for an AWS
+                      resource Perpetual could not discover
+Edit node             stack and service membership, RTO scope (section 24.1)
 ```
+
+```python
+class GraphOverride(BaseModel):
+    id: str
+    project_id: str
+
+    kind: Literal[
+        "confirm_edge",
+        "reject_edge",
+        "add_edge",
+        "edit_edge",
+        "add_node",
+        "edit_node",
+    ]
+
+    target: str
+    # Edge fingerprint, edge endpoints, or resource ID.
+
+    payload: dict[str, Any]
+    # Validated per kind.
+
+    reason: str | None
+    author: str
+    created_at: datetime
+
+    status: Literal["active", "orphaned"]
+```
+
+Rules on rescan:
+
+- a user-added edge stays until the user deletes it. If a scan later discovers the same edge, the two merge: the edge becomes `discovered` with the user's evidence attached;
+- an edit to a discovered edge stays applied while the edge exists;
+- if an override's target resource disappears, the override becomes `orphaned` and is shown to the user. It is never dropped silently;
+- a user-added edge has `confidence = 1.0` and evidence with `source_type = user_confirmation`, `basis = asserted`.
+
+Review state feeds results:
+
+- the user can always assess and simulate, including on an unreviewed graph;
+- simulation and RTO results report how many edges on required paths are `unreviewed`, and confidence is lowered when a result depends on unreviewed edges below the confidence threshold;
+- the stack cannot be shown as `READY` (DR READY) while any required-path edge below the confidence threshold is `unreviewed`. It is shown as `UNKNOWN` with the reason `graph_not_reviewed`, and the UI links to those edges in the review queue;
+- negative results are not held back. `BLOCKED`, `UNAVAILABLE` and `NOT_READY` are shown as computed, because a wrong edge is more likely to hide a problem than to invent one.
+
+Overrides can be exported to and applied from YAML, so they work in the CLI-only phases and can be kept in git (section 79).
 
 A user-confirmed edge becomes:
 
@@ -1090,12 +1302,12 @@ A rejection is stored against a fingerprint. If a later scan produces a differen
 
 ---
 
-# 24. Workloads
+# 24. Stacks
 
-A workload is the primary unit of assessment.
+A stack is the primary unit of assessment. It is everything one product needs to serve its users (section 1): its services, data stores, networking, traffic entry points and supporting services.
 
 ```python
-class Workload(BaseModel):
+class Stack(BaseModel):
     id: str
 
     name: str
@@ -1115,20 +1327,69 @@ class Workload(BaseModel):
 
     resource_ids: list[str]
 
+    service_ids: list[str]
+
     primary_region: str
 
     discovery_confidence: float
+
+
+class StackService(BaseModel):
+    id: str
+    stack_id: str
+
+    name: str
+    # e.g. "checkout-api"
+
+    resource_ids: list[str]
+    # Compute plus the resources only this service uses
+    # (its queue, its task role, its ECR repository).
 ```
 
-The DR target Region and account are defined only on `RecoveryRequirement` (section 26), never on the workload. A workload may have several requirements, for example one for `az` and one for `region` failure.
+Services exist for display, explanation and drill-down. They have no DR targets, recovery plans, RTO or RPO of their own. Resources shared by several services, such as the VPC, ALB or a shared database, belong to the stack directly.
 
-Resources may belong to several workloads. Shared foundations (VPC, KMS keys, hosted zones, NAT) are normal. Membership is many-to-many through `workload_resources`.
+The DR target Region and account are defined only on `RecoveryRequirement` (section 26), never on the stack. A stack may have several requirements, for example one for `az` and one for `region` failure.
+
+Resources may belong to several stacks. Shared foundations (VPC, KMS keys, hosted zones, NAT) are normal. Membership is many-to-many through `stack_resources`.
 
 ---
 
-# 25. Workload Discovery
+# 24.1 RTO Scope
 
-Perpetual should suggest workload groupings.
+Not every resource in a stack is on its recovery path. Each stack resource has an RTO scope:
+
+```text
+in_scope       needed for the product to serve users after failover
+out_of_scope   monitoring, logging and CI/CD
+```
+
+Out of scope by default:
+
+- monitoring: CloudWatch alarms and dashboards, Managed Prometheus, Managed Grafana, X-Ray;
+- logging: CloudWatch log groups, log-shipping pipelines, log buckets, OpenSearch domains used for logs;
+- CI/CD: CodePipeline, CodeBuild, CodeDeploy, self-hosted runners.
+
+Out-of-scope resources:
+
+- are shown in the graph and assessed. Their findings appear under the Observability dimension (section 30) and are never blocking;
+- do not affect the stack state in simulation (section 44);
+- add no actions to the recovery plan and no time to the RTO (sections 47 and 50);
+- are excluded from the stack RPO (section 51).
+
+Edges from in-scope resources to out-of-scope resources (for example, an ECS service writing to a log group) are treated as `optional` in the impact pass.
+
+Two exceptions keep this honest:
+
+- if the recovery plan itself uses a tool to deploy or configure the DR side, such as a pipeline or an Argo CD instance, that tool is in scope;
+- if an application cannot start without its log or metrics sink, the user marks that dependency `required` and the sink in scope.
+
+Rule packs propose the scope from resource type. The user can change it per resource (section 23).
+
+---
+
+# 25. Stack Discovery
+
+Perpetual should suggest stack groupings.
 
 Sources:
 
@@ -1140,7 +1401,10 @@ Sources:
 - ALB relationships;
 - database connectivity;
 - IAM references;
+- observed connectivity (CloudTrail, VPC Flow Logs);
 - user confirmation.
+
+Services inside a stack are suggested from ECS services, Kubernetes Deployments and StatefulSets, and Lambda functions, together with the resources only they use.
 
 Suggested tags to recognize:
 
@@ -1157,7 +1421,7 @@ Owner
 
 Do not assume tags are correct.
 
-Users must be able to modify workload membership.
+Users must be able to modify stack membership.
 
 ---
 
@@ -1165,7 +1429,7 @@ Users must be able to modify workload membership.
 
 ```python
 class RecoveryRequirement(BaseModel):
-    workload_id: str
+    stack_id: str
 
     failure_scope: Literal[
         "az",
@@ -1189,13 +1453,18 @@ class RecoveryRequirement(BaseModel):
     detection_and_decision_seconds: DurationEstimate | None
     # Time from failure to the decision to fail over. Always part of RTO (section 47.1).
     # None means Perpetual uses the catalog default and marks it low confidence.
+
+    buffer: BufferPolicy | None
+    # Handoff, validation and contingency (section 49.2). None uses catalog defaults.
 ```
+
+Targets exist only at stack level: one RTO target and one RPO target per stack and failure scope. There are no per-service or per-resource targets.
 
 ---
 
 # 27. DR Strategies
 
-Define five workload-level strategy families:
+Define five stack-level strategy families:
 
 ```text
 backup_restore
@@ -1210,7 +1479,7 @@ Do not assume every AWS service maps directly to these five terms.
 Instead:
 
 ```text
-workload strategy
+stack strategy
         |
         v
 service-specific recovery mechanism
@@ -1219,7 +1488,7 @@ service-specific recovery mechanism
 Example:
 
 ```text
-Warm standby workload
+Warm standby stack
 
 ECS:
 minimum tasks running
@@ -1246,7 +1515,7 @@ regional replication strategy
 
 The dependency graph describes the primary environment. That alone can only answer "what is impacted?" It cannot answer "what is recoverable?"
 
-For every resource in a workload, Perpetual MUST resolve how that resource is provided in the DR target. This mapping is the DR overlay.
+For every resource in a stack, Perpetual MUST resolve how that resource is provided in the DR target. This mapping is the DR overlay.
 
 ```python
 class RecoveryMechanism(BaseModel):
@@ -1377,8 +1646,8 @@ When reading environment variables or ConfigMaps, persist only the matched fact 
 class Finding(BaseModel):
     id: str
 
-    workload_ids: list[str]
-    # A finding on a shared resource belongs to every workload that includes it.
+    stack_ids: list[str]
+    # A finding on a shared resource belongs to every stack that includes it.
 
     resource_id: str | None
 
@@ -1423,7 +1692,7 @@ KMS-KEY-001
 
 # 30. Readiness Dimensions
 
-Calculate workload readiness separately across:
+Calculate stack readiness separately across:
 
 ```text
 Compute
@@ -1440,7 +1709,7 @@ Recoverability
 UI example:
 
 ```text
-Workload: checkout
+Stack: checkout
 
 Compute            88%
 Data               70%
@@ -1469,6 +1738,8 @@ NOT DR READY
 ```
 
 A dimension with no implemented rules, or no evidence, reports UNKNOWN. It does not report 100%. In v0.1, Observability and Recoverability may report UNKNOWN until their rules exist.
+
+Observability covers the out-of-scope resources from section 24.1. It is reported but never makes the stack NOT_READY.
 
 ---
 
@@ -1501,9 +1772,9 @@ Ordering, worst first, used when combining states:
 BLOCKED > UNKNOWN > RECOVERABLE > SURVIVES
 ```
 
-### Workload state
+### Stack state
 
-The workload takes the worst state over its required resources, then maps to:
+The stack takes the worst state over its required resources, then maps to:
 
 ```text
 SURVIVES / RECOVERABLE  ->  RECOVERABLE (application can operate after failover)
@@ -1550,7 +1821,7 @@ This is illustrative.
 
 Implement scoring weights as configuration.
 
-The binary workload result should be:
+The binary stack result should be:
 
 ```text
 READY
@@ -1631,7 +1902,7 @@ EKS readiness
 +-- Control plane
 +-- Compute
 +-- Add-ons
-+-- Workloads
++-- Stacks
 +-- Identity
 +-- Storage
 +-- Network
@@ -1667,7 +1938,7 @@ Check:
 - Karpenter configuration if visible;
 - capacity constraints.
 
-If a workload requires:
+If a stack requires:
 
 ```yaml
 nodeSelector:
@@ -1864,7 +2135,7 @@ Example API:
 
 ```python
 simulate_failure(
-    workload_id="payments",
+    stack_id="payments",
     failure=RegionFailure("ap-south-1"),
 )
 ```
@@ -1920,6 +2191,8 @@ unknown criticality                         -> affected, possible_impact = true
 
 Global and external nodes are seeded as affected only when the scenario or their declared posture says so.
 
+Out-of-scope resources (section 24.1) are evaluated and shown, but their state does not spread to in-scope resources and does not count toward the stack state.
+
 Thresholds come from configuration.
 
 ### Pass 2: Recovery
@@ -1950,11 +2223,11 @@ Unaffected nodes are SURVIVES.
 
 - States combine with `worst()` using the ordering in 30.1.
 - Recursion is memoised per node and cycle-safe. A node revisited on the current path is treated as UNKNOWN for that path, and the cycle is recorded as evidence.
-- The workload state is `worst()` over its required resources, mapped as in 30.1.
+- The stack state is `worst()` over its required, in-scope resources, mapped as in 30.1.
 
 ### Explanation
 
-For every BLOCKED or UNKNOWN workload, record the path from the workload root to the root cause.
+For every BLOCKED or UNKNOWN stack, record the path from the stack root to the root cause.
 
 The path crosses from the primary graph into the overlay where needed:
 
@@ -1968,27 +2241,30 @@ checkout -> checkout-api -> [mechanism: live_counterpart] -> DR ECR repo -> imag
 
 Example:
 
+The result leads with the stack. Resources appear underneath as the reasons for it.
+
 ```text
-Failure:
-ap-south-1 unavailable
+Failure:        ap-south-1 unavailable
+Stack:          payments
 
-Workload:
-payments
+Stack state:    UNAVAILABLE
+Root blocker:   Container image is not available in DR Region.
 
+Resources (in RTO scope):
 Route53              SURVIVES     (data-plane failover)
 ALB                  RECOVERABLE  (rebuild_from_iac)
-ECS                  BLOCKED      (DR dependency ECR BLOCKED)
+ECS payments-api     BLOCKED      (DR dependency ECR BLOCKED)
 RDS                  RECOVERABLE  (live_counterpart)
 S3                   RECOVERABLE  (live_counterpart)
 ECR                  BLOCKED      (mechanism: none)
 Secrets              RECOVERABLE  (live_counterpart)
 KMS                  RECOVERABLE  (live_counterpart, multi-Region key)
 
-Application state:
-UNAVAILABLE
+Out of RTO scope (not counted):
+CloudWatch log groups   UNKNOWN
+CodePipeline            BLOCKED
 
-Root blocker:
-Container image is not available in DR Region.
+Graph review:   2 unreviewed edges on required paths
 ```
 
 ---
@@ -2000,7 +2276,7 @@ Always expose the dependency path.
 Example:
 
 ```text
-checkout workload
+checkout stack
        |
        v
 checkout-api
@@ -2017,6 +2293,10 @@ This feature is critical.
 ---
 
 # 47. Recovery Planning Model
+
+There is one recovery plan per stack and failure scenario. It contains the actions for every in-scope resource of the stack: services, data stores, networking, traffic and supporting services, recovered together. Perpetual does not produce separate plans per service or per resource.
+
+A resource shared with other stacks, such as a VPC, appears once in each stack's plan and is marked shared, so a later multi-stack view can avoid counting it twice.
 
 A recovery plan is a DAG of actions.
 
@@ -2196,8 +2476,37 @@ The numbers above are illustrative.
 Rules:
 
 - every estimate records `catalog_version` and the matched bucket in `basis`;
-- values are heuristic until replaced by drill data (section 53). Drill-derived values take precedence for that workload and action;
+- values are heuristic until replaced by drill data (section 53). Drill-derived values take precedence for that stack and action;
 - an action with no catalog entry gets `expected_seconds = None`, which makes the RTO UNKNOWN. Never default it to zero.
+
+Catalog estimates cover the action only. They MUST NOT include buffer. Buffer is added once, in section 49.2.
+
+---
+
+# 49.2 Plan Buffer
+
+Real recoveries take longer than the sum of their steps: people hand work to each other, the whole stack has to be checked before traffic moves, and things go wrong. Perpetual models this as explicit buffer, shown separately, never hidden inside estimates.
+
+```python
+class BufferPolicy(BaseModel):
+    handoff: DurationEstimate | None
+    # Added before every manual or semi_automatic action.
+
+    stack_validation: DurationEstimate | None
+    # One stack-wide validation action: end-to-end checks across services,
+    # after compute and before the traffic switch.
+
+    contingency_percent: Decimal
+    # Applied to the low, expected and high critical-path totals.
+```
+
+Rules:
+
+- `handoff` becomes part of each manual or semi-automatic action's duration, so it counts only where that action is on the critical path;
+- `stack_validation` is a real action in phase 4. Every traffic-switch action requires it;
+- contingency is applied last, to the totals in section 50;
+- defaults come from the duration catalog (section 49.1), for example `handoff_default` and `stack_validation_default`, with a contingency default of 10%. A requirement may override them (section 26);
+- buffer has its own confidence and basis, like any estimate.
 
 ---
 
@@ -2225,6 +2534,27 @@ Calculate:
 low estimated RTO
 expected estimated RTO
 high estimated RTO
+```
+
+Each total is the critical path (including handoffs and stack validation) plus contingency (section 49.2).
+
+RTO is reported for the stack only. Resource and service durations appear only as their contribution to the stack's critical path. Example:
+
+```text
+Stack RTO (expected)                      52m
+
+  decide                                  20m
+  data: rds_promote_read_replica          10m
+  handoff before promotion (manual)        5m
+  handoff before DNS switch (manual)       5m
+  stack validation                         5m
+  traffic: Route 53 failover               2m
+  critical path                           47m
+  contingency 10%                          5m
+
+Off the critical path (runs in parallel):
+  compute: scale ECS payments-api          8m
+  compute: scale ECS checkout-api          6m
 ```
 
 ---
@@ -2271,7 +2601,9 @@ Never invent a number.
 
 RPO is a range, like RTO. It uses the same `DurationEstimate` model (low, expected, high, confidence, basis). Example: replica lag sampled over a window gives low = minimum, expected = median, high = maximum.
 
-Workload RPO is the worst (highest) RPO over the data stores that are required for the workload. If any required data store's RPO is UNKNOWN, the workload RPO is UNKNOWN.
+Stack RPO is the worst (highest) RPO over the data stores that are required for the stack. If any required data store's RPO is UNKNOWN, the stack RPO is UNKNOWN.
+
+Out-of-scope data stores (section 24.1), such as log buckets, are excluded. Per-store RPOs are shown only as contributors to the stack RPO.
 
 ---
 
@@ -2298,7 +2630,7 @@ Schema should support future DR drill results:
 ```python
 class DRDrill(BaseModel):
     id: str
-    workload_id: str
+    stack_id: str
 
     started_at: datetime
     completed_at: datetime
@@ -2366,6 +2698,8 @@ class RecoveryOption(BaseModel):
     properties: dict[str, Any]
 ```
 
+Recovery options are per-resource inputs to the optimizer. Their RTO, RPO and cost are never shown to the user as a result. The user sees whole-stack candidates only (section 56).
+
 ---
 
 # 56. MVP Optimizer
@@ -2376,7 +2710,7 @@ Do NOT start with a complex mathematical solver.
 
 For the first implementation:
 
-1. For each of the five workload strategies (section 27), ask each rule pack for its mechanism under that strategy, giving one candidate per strategy.
+1. For each of the five stack strategies (section 27), ask each rule pack for its mechanism under that strategy, giving one candidate per strategy.
 2. Add a bounded number of variants per strategy, where a rule pack offers alternatives. Example: warm standby with an RDS replica vs warm standby with Aurora Global. Limit: configurable, default 3 per strategy.
 3. Reject candidates that violate hard prerequisites.
 4. Calculate cost.
@@ -2385,9 +2719,11 @@ For the first implementation:
 7. Calculate risk/readiness.
 8. Determine Pareto-efficient candidates.
 
-Do NOT take the cross product of per-resource options. It grows exponentially with workload size.
+Do NOT take the cross product of per-resource options. It grows exponentially with stack size.
 
 Strategy-driven generation gives roughly 5–15 candidates, which is small enough to compare exhaustively. The current architecture is always included as a baseline candidate.
+
+Every candidate is a complete stack plan: a mechanism for every in-scope resource, one recovery DAG, and one stack-level cost, RTO and RPO.
 
 ---
 
@@ -2503,6 +2839,15 @@ RTO impact
 RPO impact
 prerequisites
 trade-offs
+```
+
+RTO, RPO and cost impact are always stack-level. Perpetual applies the change, re-plans the whole stack and reports the difference. A component can get much faster while the stack barely moves, and the explanation must say why:
+
+```text
+Change:      RDS snapshot restore -> cross-Region read replica
+RDS step:    60m -> 10m
+Stack RTO:   95m -> 70m
+Why:         ECS image pull from a non-replicated registry is now the critical path.
 ```
 
 ---
@@ -2628,6 +2973,8 @@ Do not retrieve application data.
 Do not send raw infrastructure state to LLMs unnecessarily.
 Redact credentials.
 Minimize persisted sensitive metadata.
+Never enable logging, trails or flow logs in customer accounts; read what exists.
+Persist only aggregates of CloudTrail and flow-log data (section 14.1).
 ```
 
 ---
@@ -2649,9 +2996,11 @@ Commercial/SaaS design should eventually use a customer-created read-only IAM ro
 
 Do not require write permissions for assessments.
 
+Reading CloudTrail and flow logs needs read access to where they are delivered: `s3:GetObject` and `s3:ListBucket` on the log buckets (plus `kms:Decrypt` if they are encrypted), `logs:FilterLogEvents` or Logs Insights queries for CloudWatch Logs destinations, or read-only Athena and CloudTrail Lake queries. These permissions are optional. Without them, Perpetual reports that observed evidence is unavailable.
+
 The DR target may be a separate AWS account. This is a common best practice, for example a dedicated DR or backup account.
 
-The MVP MUST support one primary account plus one DR account per workload, with separate credentials or role per account. Every resource ID already carries `account_id`, so cross-account counterparts need no model change.
+The MVP MUST support one primary account plus one DR account per stack, with separate credentials or role per account. Every resource ID already carries `account_id`, so cross-account counterparts need no model change.
 
 Organization-wide multi-account orchestration remains a non-goal (section 101).
 
@@ -2705,7 +3054,7 @@ LLM is an optional UX layer.
 Tools exposed to the LLM might include:
 
 ```text
-get_workload()
+get_stack()
 get_resource()
 get_dependency_path()
 get_findings()
@@ -2761,7 +3110,7 @@ FastAPI
 Pydantic
 SQLAlchemy
 Alembic
-PostgreSQL
+SQLite (default) / PostgreSQL (hosted)
 NetworkX
 boto3
 kubernetes Python client
@@ -2776,18 +3125,47 @@ For local development, synchronous or lightweight asyncio jobs are sufficient.
 
 ---
 
+# 71.1 Deployment Model
+
+Perpetual is a local, single-user tool. It needs no hosting.
+
+```text
+uv tool install perpetual
+perpetual ui              # serves API + UI on http://localhost:8000
+```
+
+- One Python process runs FastAPI. It serves the REST API and the pre-built UI as static files. Node.js is needed only to build the UI, never to run Perpetual.
+- The API binds to `127.0.0.1` by default. Binding to other interfaces requires an explicit flag and a warning, because there is no login in local mode.
+- Data lives in one SQLite file in the user's data directory (for example `~/.local/share/perpetual/perpetual.db`). Users can override the path per project.
+- AWS access uses the user's own credential chain (section 66). Discovery data, CloudTrail and flow-log aggregates and Terraform state never leave the machine, except for what the user chooses to send to an optional LLM (section 69).
+- The CLI and the UI use the same engine and the same database file.
+
+Keeping a hosted version possible:
+
+- the schema stays PostgreSQL-compatible: no SQLite-only features, and Alembic migrations are tested on both;
+- every row is scoped by `project_id`, so per-tenant separation can be added later;
+- a hosted version would add login, a PostgreSQL database, background workers if scans need them, and the cross-account read-only role with external ID (section 66). That is not part of the MVP (section 101).
+
+---
+
 # 72. Frontend Technology
 
 Recommended:
 
 ```text
-Next.js
+Vite
+React
 TypeScript
 shadcn/ui
 Tailwind
 React Flow
 TanStack Query
+TanStack Router (or React Router)
 ```
+
+The UI is a single-page app built to static files and served by the API process (section 71.1). It needs no server-side rendering.
+
+TypeScript API types are generated from the FastAPI OpenAPI schema into `packages/schemas`. They are not written by hand.
 
 React Flow should power dependency and recovery graphs.
 
@@ -2812,7 +3190,7 @@ perpetual/
 |   |       +-- collectors/
 |   |       +-- normalization/
 |   |       +-- graph/
-|   |       +-- workloads/
+|   |       +-- stacks/
 |   |       +-- rules/
 |   |       +-- simulator/
 |   |       +-- recovery/
@@ -2842,7 +3220,7 @@ perpetual/
 |
 +-- docs/
 |
-+-- docker-compose.yml
++-- docker-compose.yml   # hosted / Postgres testing only; not needed to run locally
 +-- Makefile
 +-- README.md
 ```
@@ -2898,7 +3276,7 @@ rules/
 
 # 75. Persistence Model
 
-Initial PostgreSQL entities:
+Initial entities (SQLite by default, PostgreSQL-compatible):
 
 ```text
 projects
@@ -2912,9 +3290,12 @@ resource_versions
 edges
 edge_evidence
 edge_feedback
+graph_overrides
+observations
 
-workloads
-workload_resources
+stacks
+stack_resources
+stack_services
 
 recovery_requirements
 
@@ -3015,28 +3396,42 @@ POST /projects/{id}/scans
 GET /projects/{id}/resources
 
 GET /projects/{id}/graph
+    # Whole project graph. Filters: stack, service, VPC, basis, confidence,
+    # review_state, rto_scope.
 
-GET /projects/{id}/workloads
+POST /projects/{id}/edges
+PATCH /edges/{id}
+DELETE /edges/{id}
+    # Rejects a discovered edge; deletes a user-added edge.
 
-POST /projects/{id}/workloads
+POST /projects/{id}/nodes
+PATCH /resources/{id}
+    # Stack and service membership, RTO scope.
 
-PATCH /workloads/{id}
+GET /projects/{id}/overrides
+POST /projects/{id}/overrides/import
 
-GET /workloads/{id}
+GET /projects/{id}/stacks
 
-POST /workloads/{id}/requirements
+POST /projects/{id}/stacks
 
-POST /workloads/{id}/assess
+PATCH /stacks/{id}
 
-GET /workloads/{id}/findings
+GET /stacks/{id}
 
-POST /workloads/{id}/simulate
+POST /stacks/{id}/requirements
+
+POST /stacks/{id}/assess
+
+GET /stacks/{id}/findings
+
+POST /stacks/{id}/simulate
 
 GET /simulations/{id}
 
-POST /workloads/{id}/optimize
+POST /stacks/{id}/optimize
 
-GET /workloads/{id}/recovery-plan
+GET /stacks/{id}/recovery-plan
 
 POST /edges/{id}/confirm
 
@@ -3046,9 +3441,9 @@ POST /edges/{id}/reject
 Later:
 
 ```text
-POST /workloads/{id}/terraform/generate
+POST /stacks/{id}/terraform/generate
 
-POST /workloads/{id}/runbook/generate
+POST /stacks/{id}/runbook/generate
 ```
 
 ---
@@ -3069,7 +3464,12 @@ perpetual scan \
 
 perpetual import-terraform ./terraform-show.json
 
-perpetual workloads
+perpetual graph
+perpetual graph --stack checkout --unreviewed
+perpetual graph overrides export > overrides.yaml
+perpetual graph overrides apply overrides.yaml
+
+perpetual stacks
 
 perpetual assess checkout
 
@@ -3095,7 +3495,7 @@ Perpetual
 
 Production
 
-Workloads             12
+Stacks                12
 DR Ready               7
 At Risk                3
 Not Ready              2
@@ -3105,7 +3505,7 @@ Critical blockers      8
 
 ---
 
-# 81. Workload Screen
+# 81. Stack Screen
 
 ```text
 checkout
@@ -3138,45 +3538,58 @@ Below:
 
 ---
 
-# 82. Architecture Graph
+# 82. Graph Editor
 
-Nodes should represent actual resources.
+The graph editor is the first web UI (section 99). It is deliberately small: view the computed graph, review it, and correct it.
 
-Use service icons where practical.
+### View
 
-Colors represent:
+- Shows every discovered node and every computed edge in the project, not only one stack.
+- Nodes represent real resources, with service icons where practical. They are grouped by stack, service and VPC, and the groups can be collapsed.
+- Filters: stack, service, VPC, resource type, evidence basis, confidence, review state, RTO scope.
+- Layout is automatic (for example ELK or dagre). Saving manual node positions is optional.
+- Out-of-scope resources (section 24.1) are shown muted.
 
-```text
-healthy
-degraded
-failed
-unknown
-```
-
-Edges show:
+Edge styles show the evidence basis:
 
 ```text
-dependency confidence
+solid     observed (CloudTrail or flow logs)
+dashed    permitted or referenced only
+dotted    heuristic only (name match)
 ```
 
-Selecting an edge shows evidence.
+Colors are only used for simulation state (section 83).
 
-Example:
+### Review
+
+A review queue lists unreviewed edges, ordered with edges on required paths first, then by lowest confidence. Contradictions (observed but not permitted) and "unobserved in window" edges are listed separately.
+
+Selecting an edge shows its evidence:
 
 ```text
 payments-api -> payments-db
 
-Confidence:
-94%
+Confidence:     94%
+Basis:          permitted + referenced + observed
+Last observed:  2026-10-24 (412 flows on 5432 in 30 days)
 
 Evidence:
-- security-group connectivity
-- secret reference
-- endpoint match
+- security-group rule sg-api -> sg-db on 5432
+- secret reference in task definition
+- endpoint match in env var DB_HOST
+- VPC flow logs
 
-[ Confirm ]
-[ Reject ]
+[ Confirm ]  [ Edit ]  [ Reject ]
 ```
+
+### Edit
+
+- add an edge by dragging from one node to another, then choosing relationship type and criticality;
+- edit or delete an edge;
+- add an external node or a placeholder node;
+- move a node between stacks and services, and change its RTO scope.
+
+Every edit is a `GraphOverride` (section 23) and asks for an optional reason.
 
 ---
 
@@ -3374,7 +3787,7 @@ ECS can scale.
 Route53 failover exists.
 ```
 
-Simulation should show workload recoverability.
+Simulation should show stack recoverability.
 
 ---
 
@@ -3411,7 +3824,7 @@ Reason:
 Persistent storage cannot be provisioned.
 ```
 
-This demonstrates Perpetual's workload-level reasoning.
+This demonstrates Perpetual's stack-level reasoning.
 
 ---
 
@@ -3456,13 +3869,13 @@ def test_rds_multiaz_not_equal_regional_dr():
 # 92. Graph Test Example
 
 ```python
-def test_missing_ecr_image_breaks_ecs_workload():
+def test_missing_ecr_image_breaks_ecs_stack():
 
     simulation = simulate_fixture(
         "ecs_missing_dr_image"
     )
 
-    assert simulation.workload_status == "unavailable"
+    assert simulation.stack_status == "unavailable"
 
     assert simulation.root_blocker.resource_type == "ecr_image"
 ```
@@ -3498,8 +3911,20 @@ Sum of all actions:                        48
 
 Tests MUST assert 40 for the refined DAG. A separate test asserts that phase-barrier defaults give 48, so the refinement behaviour stays covered.
 
+Buffer case (section 49.2), same refined DAG, database promotion is manual, handoff = 5, no stack validation, contingency = 10%:
+
+```text
+critical path = 5 + (5 + 30) + 3 + 2 = 45
+RTO           = 45 * 1.10          = 49.5
+```
+
 Additional simulation tests:
 
+- a BLOCKED out-of-scope resource (a log group) does not change the stack state or the RTO;
+- a user-added edge survives a rescan, and a user-rejected edge is not recreated unless its evidence fingerprint changes;
+- an edge that is permitted and observed has higher confidence than either alone;
+- a stack whose simulation would be READY, but which has an unreviewed low-confidence edge on a required path, reports UNKNOWN with reason `graph_not_reviewed`;
+- a flow log whose ENI cannot be resolved creates no edge;
 - a cycle in the dependency graph terminates, and produces UNKNOWN plus cycle evidence;
 - a counterpart that exists but whose DR KMS key is missing yields BLOCKED, not RECOVERABLE;
 - a mechanism of kind `unknown` never yields RECOVERABLE.
@@ -3576,7 +4001,7 @@ Include:
 ```text
 project_id
 scan_id
-workload_id
+stack_id
 duration
 resource counts
 ```
@@ -3642,9 +4067,10 @@ Deliver:
 
 - monorepo skeleton, `uv`, ruff, mypy, pytest;
 - Pydantic domain models (section 104);
-- fixture format: a normalized graph and DR overlay in YAML, loadable without collectors;
+- fixture format: a normalized graph, DR overlay and graph overrides in YAML, loadable without collectors;
 - SQLAlchemy persistence on SQLite (Postgres-compatible schema, no Postgres-only features yet);
 - NetworkX graph builder;
+- graph overrides (section 23) applied from YAML;
 - `perpetual` CLI that runs on fixtures.
 
 Exit criterion:
@@ -3685,16 +4111,16 @@ Deliver:
 - identity resolution (section 15.1);
 - mock AWS importer;
 - FastAPI;
-- PostgreSQL + Alembic;
-- Docker Compose;
-- graph API;
-- Next.js + shadcn + React Flow graph UI;
-- dependency confirmation/rejection.
+- Alembic migrations (SQLite, tested against PostgreSQL);
+- `perpetual ui`: API and static UI served by one local process (section 71.1);
+- graph API, including override endpoints;
+- Vite + React + shadcn + React Flow graph editor (section 82): whole graph, review queue, add, edit and delete edges and nodes;
+- simulation view on the reviewed graph.
 
 Exit criterion:
 
 ```text
-Import fixture -> view meaningful dependency graph and simulation in the UI.
+Import fixture -> review and correct the computed graph in the UI -> simulate on it.
 ```
 
 ---
@@ -3718,6 +4144,8 @@ EC2/VPC
 
 Add Resource Explorer and Config as supplementary sources.
 
+Dependency evidence in this phase: security groups, IAM policies and configuration references.
+
 Exit criterion:
 
 ```text
@@ -3726,19 +4154,41 @@ Scan AWS account -> normalized graph.
 
 ---
 
-## Phase 3 — Workload Discovery
+## Phase 2b — Observed Dependency Evidence
 
 Deliver:
 
-- heuristic workload grouping;
-- manual workload editing;
-- root resources;
-- workload dependency closure.
+- CloudTrail reader (S3, CloudTrail Lake or Athena; `LookupEvents` fallback);
+- VPC Flow Logs reader (S3 or CloudWatch Logs) with time-aware ENI resolution;
+- principal-to-compute mapping through task roles, IRSA and Pod Identity;
+- aggregated observations;
+- contradiction and "unobserved in window" flags;
+- coverage report (which trails, data events and flow logs existed).
+
+Kubernetes NetworkPolicy evidence arrives with the EKS slice (section 106).
 
 Exit criterion:
 
 ```text
-Perpetual understands "checkout" as a workload rather than unrelated AWS resources.
+Every edge shows its basis. Edges that are permitted but unobserved, and flows that
+are observed but not permitted, are listed for review.
+```
+
+---
+
+## Phase 3 — Stack Discovery
+
+Deliver:
+
+- heuristic stack grouping;
+- manual stack editing;
+- root resources;
+- stack dependency closure.
+
+Exit criterion:
+
+```text
+Perpetual understands "checkout" as a stack rather than unrelated AWS resources.
 ```
 
 ---
@@ -3762,7 +4212,7 @@ Route53
 Exit criterion:
 
 ```text
-Workload assessment produces evidence-backed findings.
+Stack assessment produces evidence-backed findings.
 ```
 
 ---
@@ -3810,7 +4260,7 @@ Implement resource-specific RPO estimates.
 Exit criterion:
 
 ```text
-RDS/S3/etc recovery posture contributes to workload RPO.
+RDS/S3/etc recovery posture contributes to stack RPO.
 ```
 
 ---
@@ -3875,37 +4325,42 @@ The first genuinely usable release is achieved when this workflow works:
    images
    DNS
 
-3. Perpetual groups resources into a workload.
+3. Perpetual shows the whole computed graph with its evidence.
+   User reviews it and adds, edits or rejects mappings.
 
-4. User enters:
+4. Perpetual groups resources into a stack and its services.
+   User adjusts membership and RTO scope.
+
+5. User enters, for the stack:
    target Region
    RTO
    RPO
    budget
 
-5. User clicks:
+6. User clicks:
    Simulate Region Failure
 
-6. Perpetual shows:
+7. Perpetual shows:
+   stack state
    what survives
    what fails
    dependency path
    blocking findings
 
-7. Perpetual calculates:
-   predicted recovery path
-   estimated RTO
+8. Perpetual calculates, for the whole stack:
+   recovery plan
+   estimated RTO with its breakdown and buffer
    estimated RPO
 
-8. Perpetual recommends:
-   DR remediation
+9. Perpetual recommends:
+   a whole-stack DR plan
 
-9. Perpetual compares:
-   current architecture
-   recommended architecture
-   additional cost
+10. Perpetual compares:
+    current architecture
+    recommended architecture
+    additional cost
 
-10. Perpetual generates:
+11. Perpetual generates:
     Terraform companion configuration
     failover runbook
     failback runbook
@@ -3932,9 +4387,12 @@ Do NOT initially build:
 - Z3;
 - dozens of AWS services;
 - organization-wide multi-account orchestration;
+- enabling CloudTrail trails, data events or VPC Flow Logs in customer accounts;
+- per-service or per-resource RTO and RPO targets;
 - fine-grained SaaS multi-tenancy;
 - billing/subscriptions;
-- elaborate user management.
+- elaborate user management;
+- hosting: login, PostgreSQL in production, background workers (section 71.1).
 
 Focus on correctness of the DR model.
 
@@ -4025,8 +4483,11 @@ Create:
 ResourceNode (+ typed properties for first-slice resource types)
 DependencyEdge
 Evidence
-Workload
+GraphOverride
+Stack
+StackService
 RecoveryRequirement
+BufferPolicy
 RecoveryMechanism
 FailureScenario / RegionFailure
 Finding
@@ -4045,8 +4506,10 @@ Persist (SQLite via SQLAlchemy):
 resources
 edges
 evidence
-workloads
-workload_resources
+graph_overrides
+stacks
+stack_resources
+stack_services
 recovery_mechanisms
 ```
 
@@ -4085,6 +4548,7 @@ The vertical slice must support:
 ```text
 discover
 graph
+review and correct the graph (YAML overrides, then the graph editor)
 assess
 simulate Region failure
 show blockers
@@ -4108,6 +4572,7 @@ AWS Load Balancer Controller
 ECR
 ServiceAccounts
 IRSA/Pod Identity
+NetworkPolicies
 RDS
 PVC/EBS
 EBS CSI
@@ -4136,7 +4601,9 @@ This distinction is a mandatory capability.
 
 The following statement should remain true throughout development:
 
-> Perpetual does not ask whether each AWS resource has DR. Perpetual asks whether the workload can operate after failure.
+> Perpetual does not ask whether each AWS resource has DR. Perpetual asks whether the stack can operate after failure.
+
+It follows that Perpetual produces one DR plan, one RTO and one RPO per stack and failure scenario.
 
 That is the architectural boundary around the entire product.
 
@@ -4179,7 +4646,7 @@ Prove
 Eventually Perpetual should continuously detect architectural drift and answer:
 
 ```text
-Could this workload still meet its DR promise today?
+Could this stack still meet its DR promise today?
 ```
 
 That is the long-term product.
@@ -4188,10 +4655,10 @@ That is the long-term product.
 
 # 109. Success Criteria
 
-Perpetual is successful when an engineer can connect/import a representative AWS workload and receive an answer resembling:
+Perpetual is successful when an engineer can connect/import a representative AWS stack and receive an answer resembling:
 
 ```text
-Workload
+Stack
 checkout
 
 Primary Region

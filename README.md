@@ -5,7 +5,7 @@
 <h1 align="center">Perpetual</h1>
 
 <p align="center">
-  <b>Can this workload survive losing its AWS Region, within its promised RTO, RPO and budget?</b>
+  <b>Can this stack survive losing its AWS Region, within its promised RTO, RPO and budget?</b>
 </p>
 
 <p align="center">
@@ -20,12 +20,12 @@ Perpetual is a disaster-recovery readiness, simulation and architecture tool for
 
 It does three things:
 
-1. **Finds what a workload depends on.** It discovers infrastructure from Terraform, AWS APIs, AWS Config, Resource Explorer and, optionally, Kubernetes. From that it builds a dependency graph where every link is backed by evidence.
+1. **Maps what a stack depends on.** A stack is everything one product needs: its microservices, databases, VPCs, load balancers and supporting services. Perpetual discovers infrastructure from Terraform, AWS APIs, AWS Config, Resource Explorer and, optionally, Kubernetes. It computes the dependencies from security groups, NetworkPolicies, IAM policies, CloudTrail and VPC Flow Logs, so every link is backed by evidence. You review the whole graph and add, edit or remove links where it is wrong.
 2. **Simulates a Region failure.** It tells you what survives, what can be recovered and what is blocked, with the dependency path that explains each result.
-3. **Plans the fix.** It estimates RTO and RPO from the recovery plan, compares DR architectures by cost, and later generates companion DR Terraform plus failover and failback runbooks.
+3. **Plans the fix for the whole stack.** It builds one recovery plan for the stack, estimates one RTO and one RPO from it (with explicit buffer), compares DR architectures by cost, and later generates companion DR Terraform plus failover and failback runbooks.
 
 > Perpetual does not ask whether each AWS resource has DR.
-> It asks whether the **workload** can operate after failure.
+> It asks whether the **stack** can operate after failure.
 
 ## Why
 
@@ -37,18 +37,21 @@ A healthy RDS replica does not make an application DR-ready. Failover still brea
 - a StatefulSet needs an EBS StorageClass, but the DR cluster has no EBS CSI driver;
 - Route 53 failover depends on editing records during the outage.
 
-Each resource passes its own check. The workload still fails. Perpetual checks the links between resources.
+Each resource passes its own check. The stack still fails. Perpetual checks the links between resources.
 
 ## How it works
 
 ```text
  Terraform · AWS APIs · AWS Config · Resource Explorer · Kubernetes (optional)
+     CloudTrail · VPC Flow Logs · security groups · NetworkPolicies · IAM
                                    │
                                    v
                      Normalization + evidence
                                    │
                                    v
             Dependency graph (dependent -> dependency)
+                                   │
+                    + your edits (confirm, add, edit, reject)
                                    │
                     + DR overlay: how each resource
                       is provided in the DR Region
@@ -59,7 +62,7 @@ Each resource passes its own check. The workload still fails. Perpetual checks t
        (evidence-backed findings)         (impact pass, then recovery pass)
                  └─────────────────┬─────────────────┘
                                    v
-                 Recovery DAG  ->  predicted RTO / RPO ranges
+          One stack recovery DAG  ->  stack RTO / RPO ranges
                                    │
                                    v
                  Optimizer  ->  cost vs RTO/RPO trade-offs
@@ -80,7 +83,7 @@ Core principles:
 ## Example output
 
 ```text
-Workload          checkout
+Stack             checkout
 Primary Region    ap-south-1
 DR Region         ap-south-2
 
@@ -102,6 +105,8 @@ Blocking findings 3
 
 **Second slice:** EKS, node groups, AWS Load Balancer Controller, IRSA/Pod Identity, PVC/EBS with EBS CSI. This slice demonstrates a cluster that is DR-ready while the application on it is not.
 
+**Not counted in the stack's RTO:** monitoring, logging and CI/CD. They are shown and checked, but they never block failover or add to the plan.
+
 **Not in the MVP:** multi-cloud, automatic failover, any write access to your AWS accounts, automated DR drills, graph databases, solvers.
 
 ## Status
@@ -114,8 +119,10 @@ The full engineering specification is in [`spec.md`](spec.md). The planned build
 |---|---|
 | 0 | Domain models, YAML fixtures, SQLite, NetworkX graph, `perpetual` CLI |
 | 1 | DR overlay, two-pass simulator, recovery DAG, RTO critical path (CLI) |
-| 1b | Terraform importer, FastAPI, Postgres, Next.js + React Flow UI |
-| 2–3 | Live AWS discovery, workload grouping |
+| 1b | Terraform importer, FastAPI, `perpetual ui`, graph editor (React + React Flow) |
+| 2 | Live AWS discovery, dependencies from security groups and IAM |
+| 2b | Observed dependencies from CloudTrail and VPC Flow Logs |
+| 3 | Stack and service grouping |
 | 4–7 | Rule packs, RPO estimation |
 | 8–10 | Optimizer, DR Terraform compiler, runbook generator |
 
@@ -125,7 +132,10 @@ The full engineering specification is in [`spec.md`](spec.md). The planned build
 perpetual import-terraform ./terraform-show.json
 perpetual scan --profile production --region ap-south-1 --dr-region ap-south-2
 
-perpetual workloads
+perpetual graph --stack checkout --unreviewed
+perpetual graph overrides apply overrides.yaml
+
+perpetual stacks
 perpetual assess checkout
 perpetual simulate checkout --failure region:ap-south-1
 perpetual optimize checkout --rto 30m --rpo 5m --budget 1200
@@ -133,8 +143,10 @@ perpetual optimize checkout --rto 30m --rpo 5m --budget 1200
 
 ## Tech stack (planned)
 
-**Backend:** Python 3.13+, `uv`, Pydantic, SQLAlchemy, NetworkX, boto3, the Kubernetes Python client, FastAPI, PostgreSQL (SQLite while early).
+**Backend:** Python 3.13+, `uv`, Pydantic, SQLAlchemy, NetworkX, boto3, the Kubernetes Python client, FastAPI, SQLite (PostgreSQL for a later hosted version).
 
-**Frontend:** Next.js, TypeScript, Tailwind, shadcn/ui, React Flow, TanStack Query.
+**Frontend:** Vite, React, TypeScript, Tailwind, shadcn/ui, React Flow, TanStack Query. Built to static files and served by the Python process.
+
+**Runs locally.** `perpetual ui` starts one process on `localhost:8000`. No hosting, no Node.js at runtime, no database server. Your AWS data stays on your machine.
 
 **Quality:** ruff, mypy, pytest, eslint, TypeScript strict mode.
