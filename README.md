@@ -29,49 +29,43 @@ It does three things:
 
 ## Why
 
-A healthy RDS replica does not make an application DR-ready. Failover still breaks if:
+Most teams find out whether their DR plan works during the outage. Four gaps cause that.
+
+### 1. The DR plan is a document. The infrastructure keeps changing.
+
+The plan was written once, maybe tested in a drill once a year. Meanwhile someone adds a microservice that reads a queue that only exists in the primary Region, turns off ECR replication to save money, or pins a role's policy to a primary-Region KMS key ARN. Nothing fails until the day you fail over. Between drills there is no evidence either way.
+
+### 2. Every resource passes its own check. The stack still fails.
+
+Resource-level checks ask whether RDS is Multi-AZ, whether backups are on, whether the bucket is versioned. A healthy cross-Region database replica still does not make the product recoverable if:
 
 - the container image was never replicated to the DR Region;
 - a secret or KMS key exists only in the primary Region;
 - the DR execution role's policy still points at a primary-Region ARN;
 - a StatefulSet needs an EBS StorageClass, but the DR cluster has no EBS CSI driver;
-- Route 53 failover depends on editing records during the outage.
+- the service quota for Fargate vCPUs in the DR Region is too low for the plan;
+- Route 53 failover depends on editing records, an IAM change or a us-east-1 control plane during the outage.
 
-Each resource passes its own check. The stack still fails. Perpetual checks the links between resources.
+And Multi-AZ is not Region DR: it protects against losing a data centre, not a Region.
+
+### 3. Nobody has an accurate map of what depends on what.
+
+Architecture diagrams show what was intended. The real dependencies live in security-group rules, IAM policies, environment variables, Kubernetes manifests, and in the calls and connections the services actually make. Perpetual builds the map from both: what is **permitted** (security groups, NetworkPolicies, IAM), what is **referenced** (Terraform, task definitions, ConfigMaps) and what is **observed** (CloudTrail, VPC Flow Logs). You review it and correct it, and your corrections survive the next scan.
+
+### 4. The RTO is a promise nobody has calculated.
+
+"30 minutes" is usually a target, not a number anyone derived. Adding up per-component restore times is wrong in both directions: independent steps run in parallel, while detection, the decision to fail over, handoffs between teams and end-to-end validation add time nobody budgets for. Perpetual builds one recovery plan for the whole stack and takes the critical path through it, with buffer shown as separate lines. It also shows what each better RTO would cost, so you don't run hot standby everywhere by default or discover too late that backups alone can't meet the target.
 
 ## How it works
 
-```text
- Terraform · AWS APIs · AWS Config · Resource Explorer · Kubernetes (optional)
-     CloudTrail · VPC Flow Logs · security groups · NetworkPolicies · IAM
-                                   │
-                                   v
-                     Normalization + evidence
-                                   │
-                                   v
-            Dependency graph (dependent -> dependency)
-                                   │
-                    + your edits (confirm, add, edit, reject)
-                                   │
-                    + DR overlay: how each resource
-                      is provided in the DR Region
-                                   │
-                 ┌─────────────────┴─────────────────┐
-                 v                                   v
-           Rules engine                    Region-failure simulator
-       (evidence-backed findings)         (impact pass, then recovery pass)
-                 └─────────────────┬─────────────────┘
-                                   v
-          One stack recovery DAG  ->  stack RTO / RPO ranges
-                                   │
-                                   v
-                 Optimizer  ->  cost vs RTO/RPO trade-offs
-                                   │
-                         ┌─────────┴─────────┐
-                         v                   v
-                 DR Terraform         Failover / failback
-                 (companion)          runbooks
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg">
+  <img alt="How Perpetual works: discover infrastructure, compute dependencies, review and edit the graph, define the stack, resolve DR paths, simulate Region failure, build one stack recovery plan, compare architectures, generate DR Terraform and runbooks." src="assets/how-it-works.svg" width="100%">
+</picture>
+
+1. **Map.** Discover resources from AWS APIs, Terraform and Kubernetes. Compute dependencies from evidence, then review and edit the graph.
+2. **Assess.** Group resources into a stack (the whole product), resolve how each part is recovered in the DR Region, and simulate losing the primary Region.
+3. **Plan.** Build one recovery plan for the stack with its RTO and RPO ranges, compare DR architectures by cost, and generate companion DR Terraform and failover/failback runbooks.
 
 Core principles:
 

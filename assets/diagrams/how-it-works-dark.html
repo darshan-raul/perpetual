@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Perpetual works</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; background: #0f1a33; color: #eef3fb;
+           min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: #b4c2dc; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif', Georgia, serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+          letter-spacing: -0.02em; line-height: 1.15; color: #eef3fb; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Perpetual</p>
+    <h1>How Perpetual works</h1>
+    <div class="diagram-container">
+<svg viewBox="0 0 960 548" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="how-it-works-dark-title how-it-works-dark-desc">
+<title id="how-it-works-dark-title">How Perpetual works</title>
+<desc id="how-it-works-dark-desc">Perpetual discovers infrastructure, computes an evidence-backed dependency graph that the user reviews, defines the stack, resolves DR paths, simulates a Region failure, builds one recovery plan for the whole stack, compares architectures and generates DR Terraform and runbooks.</desc>
+<defs>
+<marker id="how-it-works-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#b4c2dc"/></marker>
+</defs>
+<rect width="100%" height="100%" fill="#0f1a33"/>
+<rect x="40" y="40" width="880" height="116" rx="8" fill="rgba(238,243,251,0.02)" stroke="rgba(238,243,251,0.1)" stroke-width="0.8"/>
+<rect x="52" y="44" width="52" height="12" rx="2" fill="#0f1a33"/>
+<text x="56" y="53" fill="#93a4c4" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">01 · MAP</text>
+<rect x="40" y="200" width="880" height="116" rx="8" fill="rgba(238,243,251,0.02)" stroke="rgba(238,243,251,0.1)" stroke-width="0.8"/>
+<rect x="52" y="204" width="68" height="12" rx="2" fill="#0f1a33"/>
+<text x="56" y="213" fill="#93a4c4" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">02 · ASSESS</text>
+<rect x="40" y="360" width="880" height="116" rx="8" fill="rgba(238,243,251,0.02)" stroke="rgba(238,243,251,0.1)" stroke-width="0.8"/>
+<rect x="52" y="364" width="56" height="12" rx="2" fill="#0f1a33"/>
+<text x="56" y="373" fill="#93a4c4" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">03 · PLAN</text>
+<path d="M 320,104 H 352" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 608,104 H 640" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 320,264 H 352" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 608,264 H 640" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 320,424 H 352" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 608,424 H 640" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 768,136 V 170 Q 768,178 760,178 H 200 Q 192,178 192,186 V 232" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<path d="M 768,296 V 330 Q 768,338 760,338 H 200 Q 192,338 192,346 V 392" stroke="#b4c2dc" stroke-width="1.2" fill="none" marker-end="url(#how-it-works-dark-arrow)"/>
+<rect x="64" y="72" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="64" y="72" width="256" height="64" rx="6" fill="rgba(180,194,220,0.10)" stroke="#93a4c4" stroke-width="1"/>
+<rect x="72" y="78" width="36" height="12" rx="2" fill="none" stroke="#93a4c4" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="90" y="87" fill="#93a4c4" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">INPUT</text>
+<text x="192" y="110" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Discover infrastructure</text>
+<text x="192" y="126" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">AWS APIs · Terraform · Kubernetes</text>
+<rect x="352" y="72" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="352" y="72" width="256" height="64" rx="6" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<rect x="360" y="78" width="36" height="12" rx="2" fill="none" stroke="#eef3fb" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="378" y="87" fill="#eef3fb" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">GRAPH</text>
+<text x="480" y="110" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Compute dependencies</text>
+<text x="480" y="126" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">SGs · IAM · CloudTrail · flow logs</text>
+<rect x="640" y="72" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="640" y="72" width="256" height="64" rx="6" fill="rgba(79,179,255,0.12)" stroke="#4fb3ff" stroke-width="1.2"/>
+<rect x="648" y="78" width="24" height="12" rx="2" fill="none" stroke="#4fb3ff" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="660" y="87" fill="#4fb3ff" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">YOU</text>
+<text x="768" y="110" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Review and edit the graph</text>
+<text x="768" y="126" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">confirm · add · edit · reject</text>
+<rect x="64" y="232" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="64" y="232" width="256" height="64" rx="6" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<rect x="72" y="238" width="36" height="12" rx="2" fill="none" stroke="#eef3fb" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="90" y="247" fill="#eef3fb" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">STACK</text>
+<text x="192" y="270" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Define the stack</text>
+<text x="192" y="286" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">services · data · RTO/RPO targets</text>
+<rect x="352" y="232" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="352" y="232" width="256" height="64" rx="6" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<rect x="360" y="238" width="36" height="12" rx="2" fill="none" stroke="#eef3fb" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="378" y="247" fill="#eef3fb" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">RULES</text>
+<text x="480" y="270" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Resolve DR paths</text>
+<text x="480" y="286" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">rule packs · findings · overlay</text>
+<rect x="640" y="232" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="640" y="232" width="256" height="64" rx="6" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<rect x="648" y="238" width="24" height="12" rx="2" fill="none" stroke="#eef3fb" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="660" y="247" fill="#eef3fb" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">SIM</text>
+<text x="768" y="270" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Simulate Region failure</text>
+<text x="768" y="286" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">impact pass, then recovery pass</text>
+<rect x="64" y="392" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="64" y="392" width="256" height="64" rx="6" fill="rgba(79,179,255,0.12)" stroke="#4fb3ff" stroke-width="1.2"/>
+<rect x="72" y="398" width="28" height="12" rx="2" fill="none" stroke="#4fb3ff" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="86" y="407" fill="#4fb3ff" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">PLAN</text>
+<text x="192" y="430" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">One stack recovery plan</text>
+<text x="192" y="446" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">critical path + buffer = RTO, RPO</text>
+<rect x="352" y="392" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="352" y="392" width="256" height="64" rx="6" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<rect x="360" y="398" width="48" height="12" rx="2" fill="none" stroke="#eef3fb" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="384" y="407" fill="#eef3fb" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">OPTIMIZE</text>
+<text x="480" y="430" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">Compare architectures</text>
+<text x="480" y="446" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">cost vs RTO/RPO · Pareto</text>
+<rect x="640" y="392" width="256" height="64" rx="6" fill="#0f1a33"/>
+<rect x="640" y="392" width="256" height="64" rx="6" fill="rgba(238,243,251,0.05)" stroke="#b4c2dc" stroke-width="1"/>
+<rect x="648" y="398" width="40" height="12" rx="2" fill="none" stroke="#b4c2dc" stroke-opacity="0.5" stroke-width="0.8"/>
+<text x="668" y="407" fill="#b4c2dc" font-size="7" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle" letter-spacing="0.08em">OUTPUT</text>
+<text x="768" y="430" fill="#eef3fb" font-size="12" font-weight="600" font-family="'Geist', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" text-anchor="middle">DR Terraform + runbooks</text>
+<text x="768" y="446" fill="#b4c2dc" font-size="9" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" text-anchor="middle">failover · failback</text>
+<line x1="40" y1="500" x2="920" y2="500" stroke="rgba(238,243,251,0.1)" stroke-width="0.8"/>
+<text x="40" y="524" fill="#b4c2dc" font-size="8" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="128" y="515" width="16" height="12" rx="2" fill="#0f1a33"/>
+<rect x="128" y="515" width="16" height="12" rx="2" fill="rgba(180,194,220,0.10)" stroke="#93a4c4" stroke-width="1"/>
+<text x="152" y="524" fill="#b4c2dc" font-size="8" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em">DISCOVERY INPUT</text>
+<rect x="276" y="515" width="16" height="12" rx="2" fill="#0f1a33"/>
+<rect x="276" y="515" width="16" height="12" rx="2" fill="#1a2747" stroke="#eef3fb" stroke-width="1"/>
+<text x="300" y="524" fill="#b4c2dc" font-size="8" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em">ENGINE STEP</text>
+<rect x="400" y="515" width="16" height="12" rx="2" fill="#0f1a33"/>
+<rect x="400" y="515" width="16" height="12" rx="2" fill="rgba(79,179,255,0.12)" stroke="#4fb3ff" stroke-width="1"/>
+<text x="424" y="524" fill="#b4c2dc" font-size="8" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em">WHERE YOU ACT / HEADLINE</text>
+<rect x="596" y="515" width="16" height="12" rx="2" fill="#0f1a33"/>
+<rect x="596" y="515" width="16" height="12" rx="2" fill="rgba(238,243,251,0.05)" stroke="#b4c2dc" stroke-width="1"/>
+<text x="620" y="524" fill="#b4c2dc" font-size="8" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" letter-spacing="0.06em">GENERATED OUTPUT</text>
+</svg>
+    </div>
+  </div>
+</body>
+</html>
