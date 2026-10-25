@@ -1,6 +1,6 @@
 # Perpetual — Tracker
 
-Plan: [IMPL_PLAN.md](IMPL_PLAN.md) (locked 2026-10-25). Spec: [spec.md](spec.md) (revision 3). Update this file at the end of every session.
+Plan: [IMPL_PLAN.md](IMPL_PLAN.md) (locked 2026-10-25). Spec: [spec.md](spec.md) (revision 4). Update this file at the end of every session.
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry)
 
@@ -14,13 +14,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | P2 AWS discovery (ECS slice) | [ ] | scan sandbox → normalized graph |
 | P2b Observed evidence | [ ] | every edge shows basis; contradictions listed |
 | P3 Stack discovery | [ ] | "checkout" is one stack with services |
-| P4 DR rule packs | [ ] | evidence-backed findings |
+| P3b LLM foundation | [ ] | `perpetual llm test` + cited explainer answer |
+| P4 DR rule packs + advisor | [ ] | evidence-backed findings; cited advisory items |
 | P5 Simulation on discovered stacks | [ ] | survives/fails and why, on sandbox |
 | P6 Recovery DAG on live data | [ ] | architecture-derived RTO |
 | P7 EKS slice | [ ] | cluster ready, application not |
 | P8 RPO | [ ] | stack RPO from data stores |
-| P9 Optimizer, cost, remediation | [ ] | whole-stack candidates compared |
-| P10 Terraform compiler | [ ] | fmt + validate pass |
+| P9 Optimizer, planner, DR spec | [ ] | candidates compared; approved DR spec per demo |
+| P10 IaC transformation | [ ] | demo IaC changed, verification passes, targets met |
 | P11 Runbooks | [ ] | failover + failback for both demos |
 | P12 Hardening, v0.1 | [ ] | §109 answer for a real stack |
 
@@ -39,7 +40,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | Canary test: no secrets, env values or raw logs persisted | [ ] |
 | Import contracts green | [ ] |
 | `uv tool install` + `perpetual ui` on a clean machine | [ ] |
-| Generated Terraform passes fmt + validate | [ ] |
+| Transformation of both demo repos passes verification (spec §61.1) | [ ] |
+| Hostile-LLM tests: no state, number or verdict upgraded without verification | [ ] |
+| No apply/destroy/state/kubectl apply reachable from the transformer | [ ] |
+| Companion Terraform passes fmt + validate | [ ] |
+| LLM call log shows no state, secrets, env values or raw logs sent | [ ] |
 | Docs: README, user guide, IAM policy, rule reference | [ ] |
 
 ---
@@ -131,6 +136,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P3-04 Manual stack/service editing
 - [ ] P3-05 Discovery confidence
 
+## P3b LLM foundation
+
+- [ ] P3b-01 Provider abstraction, per-role config, capability probe, `perpetual llm configure|test`
+- [ ] P3b-02 LangGraph runtime, tools, checkpointer, interrupts, validated outputs
+- [ ] P3b-03 Fake chat model + hostile-output fixtures
+- [ ] P3b-04 Guardrails: opt-in, redaction, `.perpetualignore`, call log
+- [ ] P3b-05 Knowledge base: sources, sync/add, hybrid retrieval, citations
+- [ ] P3b-06 Skills: format, loader, first ECS-slice skills
+- [ ] P3b-07 Explainer agent
+
 ## P4 DR rule packs
 
 - [ ] P4-01 Finding model, rule registry, rule docs
@@ -139,6 +154,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P4-04 Cross-cutting rules
 - [ ] P4-05 Readiness dimensions + scoring
 - [ ] P4-06 `perpetual assess` + API + UI
+- [ ] P4-07 Advisory review agent
 
 ## P5 Simulation on discovered stacks
 
@@ -172,7 +188,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P8-02 Stack RPO
 - [ ] P8-03 RPO in CLI, API, UI
 
-## P9 Optimizer, cost and remediation
+## P9 Optimizer, cost, planner and DR spec
 
 - [ ] P9-01 Recovery options + strategy mapping
 - [ ] P9-02 Candidate generation
@@ -180,13 +196,19 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P9-04 Evaluation + Pareto
 - [ ] P9-05 Remediation planner (stack-level deltas)
 - [ ] P9-06 `perpetual optimize` + UI + §94 test
+- [ ] P9-07 LLM candidate planner
+- [ ] P9-08 DR spec + approval + export
 
-## P10 Terraform compiler
+## P10 IaC transformation
 
-- [ ] P10-01 Templates per mechanism
-- [ ] P10-02 Variables, comments, assumptions
-- [ ] P10-03 fmt + validate tests
-- [ ] P10-04 CLI, API, UI
+- [ ] P10-01 IaC declaration + resource-to-code mapping (Terraform, Kubernetes)
+- [ ] P10-02 Worktree/branch + enforced command allowlist
+- [ ] P10-03 Transformation agent (+ EKS skills)
+- [ ] P10-04 Verification loop (plan import, re-simulate, static fallback)
+- [ ] P10-05 Change delivery (commits, patch, optional PR)
+- [ ] P10-06 Companion fallback templates
+- [ ] P10-07 `perpetual transform` + API + UI
+- [ ] P10-08 Evals on examples/
 
 ## P11 Runbooks
 
@@ -227,6 +249,7 @@ Where each spec area is implemented. A spec section with no task is either cover
 | §26 | Requirement | P0-04, P1b-11 |
 | §27–§27.1 | Strategies, mechanisms, overlay | P1-02, P5-01, P9-01 |
 | §28–§28.1 | Rule packs, cross-cutting | P1-01, P4-02..04, P7-05 |
+| §28.2 | LLM advisory review | P4-07 |
 | §29–§31 | Findings, readiness, status, scoring | P1-07, P4-01, P4-05 |
 | §32–§40 | ECS and EKS checks | P4-02, P7-05 |
 | §41–§42 | RDS, data gravity | P4-03, P0-04 |
@@ -236,10 +259,11 @@ Where each spec area is implemented. A spec section with no task is either cover
 | §52 | Target vs predicted | P1-14, P8-03 |
 | §53 | Drills | backlog (schema only in P0-04) |
 | §54–§60 | Optimizer, cost, remediation | P9-01..06 |
-| §61–§62 | Terraform | P10-01..04 |
+| §56.1–§56.2 | LLM candidate planner, DR spec | P9-07, P9-08 |
+| §61–§62.1 | IaC transformation, verification, delivery, companion | P10-01..08 |
 | §63–§64 | Runbooks, failback | P11-01..04 |
 | §65–§68 | Security, access, secrets, state | P2-01, P2-08, P2b-05, P12-02 |
-| §69–§70 | LLM | backlog |
+| §69–§70 | LLM architecture, knowledge base, skills, guardrails, explainer | P3b-01..07, P10-08 |
 | §71–§75 | Tech, deployment, layout, persistence | P0-01, P0-07, P1b-06, P1b-13 |
 | §76 | Scan model | P2-01, P2-07 |
 | §77 | Drift | backlog (scans retained from P2) |
@@ -264,6 +288,10 @@ Resolve these with a decision-log entry before the task that needs them.
 | Q4 | Sandbox accounts: one account with two Regions, or a separate DR account from the start (spec §66). | P2-11 |
 | Q5 | EKS checkpoint on real EKS (cost) vs kind for Kubernetes-level checks plus EKS for AWS-level checks. | P7-09 |
 | Q6 | Price table source and refresh for `StaticCostProvider`. | P9-03 |
+| Q7 | Default model per role for evals and docs (OpenRouter model IDs), and the cost budget for an eval run. | P3b-01 |
+| Q8 | Which public sources go in `knowledge/sources.yaml` first, and their licence terms for local ingestion. | P3b-05 |
+| Q9 | How the user declares IaC paths (CLI flags only, or a `perpetual.yaml` per project) and support for multiple Terraform root modules per stack. | P10-01 |
+| Q10 | Where `terraform plan` runs: user's machine with their backend credentials only, or also a plan file the user supplies. | P10-04 |
 
 ---
 
@@ -273,6 +301,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-25 | Spec revision 4: Perpetual changes the user's Terraform and Kubernetes manifests (code only, branch/PR, never apply). LLM agents on LangGraph join advisory review, candidate planning and IaC transformation, with RAG and skills. Provider replaceable (OpenRouter, Anthropic, Bedrock, Ollama). Plan: D14 revised, D15–D18 added, new phase P3b, P4-07, P9-07/08, P10 replaced. | User direction: the tool must fix infrastructure, not only assess it, and use LLMs with RAG and skills to reach the best DR design. "LLM proposes, engine verifies" keeps results trustworthy. |
 | 2026-10-25 | Plan locked. Alembic from P0 instead of P1b. | Avoid writing an unmanaged SQLite schema that later needs a migration path. |
 | 2026-10-25 | EKS slice is P7, after the ECS slice reaches a live recovery DAG (P6). Spec Phase 2 and 4 EKS items move there. | Spec §105 says complete the ECS slice first. |
 | 2026-10-25 | Typer + Rich for the CLI; TanStack Router for the UI; ELK for graph layout; Jinja2 for Terraform templates. | Spec leaves these open. |
@@ -282,6 +311,12 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-25 — Revision 4
+
+- Spec revision 4: IaC transformation with LLM agents, advisory review, LLM candidate planner, DR spec, knowledge base, skills, provider abstraction, guardrails.
+- IMPL_PLAN, TRACKER, README and CLAUDE.md updated to match.
+- **Carry-over:** unchanged, start P0-01. Q7–Q10 are needed from P3b onward.
 
 ### 2026-10-25 — Planning
 

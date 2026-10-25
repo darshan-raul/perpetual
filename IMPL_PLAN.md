@@ -2,7 +2,7 @@
 
 Status: **locked** on 2026-10-25. Progress lives in [TRACKER.md](TRACKER.md). Change this file only through a decision-log entry there.
 
-The product is defined in [spec.md](spec.md) (revision 3). This plan orders the work and fixes the choices the spec leaves open. If this plan and the spec disagree, the spec wins unless a decision-log entry says otherwise.
+The product is defined in [spec.md](spec.md) (revision 4). This plan orders the work and fixes the choices the spec leaves open. If this plan and the spec disagree, the spec wins unless a decision-log entry says otherwise.
 
 ## 1. Goal
 
@@ -14,8 +14,9 @@ Ship Perpetual v0.1: a local, single-user tool that delivers the MVP workflow in
 4. Enter target Region, RTO, RPO and budget for the stack.
 5. Simulate Region failure: stack state, what survives, what fails, why.
 6. Calculate one recovery plan, one RTO (with buffer) and one RPO for the stack.
-7. Recommend and compare whole-stack DR architectures with cost.
-8. Generate companion DR Terraform and failover/failback runbooks.
+7. Compare whole-stack DR architectures (deterministic and LLM-proposed) and approve a DR spec.
+8. Change the user's Terraform and Kubernetes manifests to implement it, verify by re-simulating, and deliver a branch or PR.
+9. Generate failover and failback runbooks.
 
 ## 2. Locked decisions
 
@@ -34,7 +35,11 @@ Ship Perpetual v0.1: a local, single-user tool that delivers the MVP workflow in
 | D11 | Fixture format | Versioned YAML (`fixture_version: 1`) holding resources, edges with evidence, stacks, services, requirements, an optional pinned DR overlay, and overrides. A JSON Schema is generated from the Pydantic models and checked in CI. |
 | D12 | Configuration | All weights, thresholds, correlation groups, scoring, RTO-scope defaults, buffer defaults and the duration catalog are YAML under `apps/api/perpetual/config/defaults/`, loaded into typed models. A project may override them. Nothing numeric is hard-coded in rule or engine code. |
 | D13 | Cost in v0.1 | `StaticCostProvider` (versioned price table in config) first, then `AWSPricingProvider`. Infracost is optional and post-MVP. |
-| D14 | LLM | Not in v0.1 (spec §69 makes it optional). Backlog. |
+| D14 | LLM | In v0.1 (revised 2026-10-25, see tracker). LangGraph agents for advisory review, candidate planning, IaC transformation and explanation. "The LLM proposes, the engine verifies" (spec §2). |
+| D15 | LLM provider | Replaceable through LangChain's chat-model interface (`init_chat_model`). OpenAI-compatible endpoints (OpenRouter), Anthropic, Bedrock and Ollama as optional extras. Per-role model config. Keys from env or keyring. |
+| D16 | Changing infrastructure | Code only: Terraform and Kubernetes manifests (plain, Kustomize, Helm values) in a git worktree, delivered as a branch or PR. Never apply, never merge. |
+| D17 | Knowledge base | Local SQLite with `sqlite-vec` + FTS5 (hybrid retrieval); local embeddings by default (fastembed). Public sources fetched by the user, not shipped. |
+| D18 | LLM tests | Fake chat model with recorded responses in CI; real-provider evals on demand in `evals/`. |
 
 ## 3. Architecture
 
@@ -58,7 +63,7 @@ graph snapshot (NetworkX)         (spec §17, §18)
         +--> stacks + services + RTO scope   (spec §24, §24.1, §25)
         |
         +--> rule packs: findings + RecoveryMechanism (DR overlay)  (spec §27.1, §28)
-        |
+        |        +--> advisor agent (LLM): proposals -> review queue / user  (spec §28.2)
         v
 simulator: impact pass, recovery pass  (spec §43, §44)
         |
@@ -67,9 +72,17 @@ recovery planner: actions -> DAG -> buffer -> RTO; RPO  (spec §47–§51)
         |
         v
 optimizer + cost + remediation    (spec §54–§60)
+        |        <--> planner agent (LLM): candidate proposals, evaluated here  (spec §56.1)
+        v
+DR spec (user approves)           (spec §56.2)
         |
-        +--> Terraform compiler   (spec §61, §62)
-        +--> runbook generator    (spec §63, §64)
+        +--> transformer agent (LLM): edits Terraform + K8s in a worktree   (spec §61)
+        |        -> verification: plan -> planned graph -> re-assess, re-simulate  (spec §61.1)
+        |        -> branch / PR (code only)                                   (spec §62)
+        +--> companion Terraform (no IaC repo or no LLM)                      (spec §62.1)
+        +--> runbook generator                                                (spec §63, §64)
+
+Agents read engine results and the knowledge base + skills (spec §69). The engine never calls an agent.
 ```
 
 ### 3.2 Packages
@@ -92,10 +105,15 @@ apps/api/perpetual/
   recovery/        duration catalog, DAG builder, buffer, RTO, RPO
   optimizer/       candidates, Pareto, remediation
   costing/         CostProvider implementations
-  terraform/       companion DR Terraform compiler
+  iac/             resource-to-code mapping, worktrees, transformation runs, verification, companion templates
+  llm/             provider abstraction, LangGraph agents (advisor, planner, transformer, explainer), guardrails, call log
+  knowledge/       knowledge-base ingestion and hybrid retrieval
   runbooks/        failover / failback generator
   api/             FastAPI routes, static UI serving
   cli/             Typer commands
+skills/            shipped DR skills (SKILL.md + references)
+knowledge/         sources.yaml (public reference URLs)
+evals/             real-provider evaluation suite
 ```
 
 ### 3.3 Import contracts (import-linter)
@@ -107,6 +125,7 @@ apps/api/perpetual/
 - `simulator` must not import `collectors` or `importers` (rule 5).
 - `optimizer` gets options only through the rule-pack protocol (rule 6).
 - Nothing below `api` and `cli` imports them (rule 1).
+- Only `llm` imports LangChain or LangGraph. Engine packages (`rules`, `simulator`, `recovery`, `optimizer`, `costing`) never import `llm`; agents call the engine, not the other way round (rule 11).
 
 ### 3.4 Invariants to test from the start
 
@@ -115,7 +134,9 @@ apps/api/perpetual/
 - Every traversal terminates on cycles.
 - No secret values, env values, raw CloudTrail events or raw flow records are persisted. A test scans the database after the fixture and log suites for planted canary strings.
 - RTO, RPO and plans exist only per stack. No API or CLI output reports a per-resource RTO as a result.
-- A stack cannot be `READY` while a low-confidence required-path edge is unreviewed.
+- A stack cannot be `READY` while a low-confidence required-path edge is unreviewed, or while a blocking advisory item is unresolved.
+- No LLM output changes a state, number or verdict without verification or user confirmation. Tests run every LLM stage with a fake model that returns hostile output (false claims, missing citations, invalid schemas) and assert nothing upgrades.
+- Transformation never runs a command outside its allowlist; a test asserts `apply`, `destroy`, `state` and `kubectl apply` are unreachable.
 
 ## 4. Phase map
 
@@ -127,13 +148,14 @@ apps/api/perpetual/
 | P2 | Phase 2 | Live AWS discovery for the ECS slice, SG/IAM/reference evidence | checkpoint |
 | P2b | Phase 2b | CloudTrail and VPC Flow Logs | checkpoint |
 | P3 | Phase 3 | Stack and service discovery | no |
-| P4 | Phase 4 | DR rule packs for the ECS slice + cross-cutting rules | no |
+| P3b | Phase 3b | LLM foundation: providers, LangGraph, knowledge base, skills, guardrails, explainer | no |
+| P4 | Phase 4 | DR rule packs for the ECS slice + cross-cutting rules + advisory review | no |
 | P5 | Phase 5 | Simulation on discovered stacks, Fail Region UX | checkpoint |
 | P6 | Phase 6 | Recovery DAG from rule packs on live data | no |
 | P7 | §106 + EKS parts of 2/4 | EKS vertical slice incl. Kubernetes + NetworkPolicies | checkpoint |
 | P8 | Phase 7 | RPO | no |
-| P9 | Phase 8 | Optimizer, cost, remediation | no |
-| P10 | Phase 9 | Terraform compiler | no |
+| P9 | Phase 8 | Optimizer, cost, LLM candidate planner, DR spec | no |
+| P10 | Phase 9 | IaC transformation + verification + companion fallback | no |
 | P11 | Phase 10 | Runbooks + failback | no |
 | P12 | §100 | MVP hardening and v0.1 release | checkpoint |
 
@@ -264,6 +286,22 @@ Spec: §24, §24.1, §25.
 
 Exit: Perpetual understands "checkout" as one stack with its services, not unrelated resources.
 
+### P3b — LLM foundation
+
+Spec: §2, §69, §70.
+
+| ID | Task |
+|---|---|
+| P3b-01 | Provider abstraction: config schema (default + per-role + embeddings), `init_chat_model`, OpenAI-compatible/OpenRouter, Anthropic, Bedrock, Ollama extras; capability probe (tool calling, structured output); `perpetual llm configure|test`. |
+| P3b-02 | LangGraph runtime: graph base, tool registry over read-only engine APIs, SQLite checkpointer, interrupts, Pydantic-validated outputs with one retry then fail closed. |
+| P3b-03 | Fake chat model + recorded-response harness; hostile-output fixtures. |
+| P3b-04 | Guardrails: per-project opt-in notice, redaction pass, `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
+| P3b-05 | Knowledge base: `knowledge/sources.yaml`, `perpetual kb sync|add`, chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
+| P3b-06 | Skills: format, loader, index, `load_skill` tool, project overrides in `.perpetual/skills/`; first skills for the ECS slice (RDS replica, ECR replication, Secrets replication, KMS multi-Region, S3 CRR, Route 53 failover, ECS DR service). |
+| P3b-07 | Explainer agent (spec §70) in CLI (`perpetual ask`) and UI. |
+
+Exit: `perpetual llm test` passes for a configured provider; the explainer answers "why can't checkout meet 30m?" with cited, engine-sourced numbers.
+
 ### P4 — DR rule packs (ECS slice)
 
 Spec: §8.1, §28, §28.1, §29–§32, §41, §91.
@@ -276,8 +314,9 @@ Spec: §8.1, §28, §28.1, §29–§32, §41, §91.
 | P4-04 | Cross-cutting rules: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001, QUOTA-DR-001, REGION-SVC-001. |
 | P4-05 | Readiness dimensions (§30) with UNKNOWN for dimensions without rules; scoring (§31); Observability reports out-of-scope findings and never blocks. |
 | P4-06 | `perpetual assess STACK`; findings API; findings tab in UI. |
+| P4-07 | Advisory review agent (spec §28.2): typed proposals, citation check, effects on edges/mechanisms/stack state (`advisory_unresolved`), accept/dismiss with fingerprints; `perpetual advise`; UI panel. |
 
-Exit: stack assessment produces evidence-backed findings.
+Exit: stack assessment produces evidence-backed findings; advisory items appear with citations and can be accepted or dismissed.
 
 ### P5 — Simulation on discovered stacks
 
@@ -347,21 +386,27 @@ Spec: §54–§60, §94.
 | P9-04 | Evaluate candidates: DAG, RTO, RPO, readiness. Pareto frontier. Requirement-driven and budget-driven modes. |
 | P9-05 | Remediation planner (§60): re-plan the whole stack per change and explain stack-level deltas. |
 | P9-06 | `perpetual optimize STACK --rto --rpo --budget`; Optimize tab in UI. Spec §94 test. |
+| P9-07 | LLM candidate planner (spec §56.1): `CandidateProposal` schema, new-option rules (citation, catalog action types, prerequisites), refine loop, deterministic candidates always kept. |
+| P9-08 | DR spec (spec §56.2): build from selected candidate, LLM rationale with citations, approval flow, Markdown export; `perpetual dr-spec`. |
 
-Exit: several whole-stack candidates can be compared on cost, RTO and RPO.
+Exit: deterministic and LLM-proposed candidates can be compared on cost, RTO and RPO, and each demo stack has an approved DR spec.
 
-### P10 — Terraform compiler
+### P10 — IaC transformation
 
-Spec: §61, §62.
+Spec: §61, §61.1, §62, §62.1, §69.6.
 
 | ID | Task |
 |---|---|
-| P10-01 | Template set per mechanism (Jinja2) producing `generated/dr/` companion files. |
-| P10-02 | Variables for existing values, generated comments, assumptions file, no secrets. |
-| P10-03 | `terraform fmt` and `terraform validate` in tests; optional `apply` to Floci. |
-| P10-04 | CLI, API (`/terraform/generate`) and UI tab with download. |
+| P10-01 | IaC declaration per project (Terraform root modules, Kubernetes paths); resource-to-code mapping for Terraform (addresses → files/blocks) and Kubernetes (rendered objects → files). |
+| P10-02 | Worktree and branch management; tool allowlist with an enforced command runner (no apply/destroy/state/kubectl apply). |
+| P10-03 | Transformation agent (LangGraph): locate → plan edits → edit → static checks → plan and import → verify → retry → package. Skills for EKS added (EKS DR via GitOps, EBS snapshot copy). |
+| P10-04 | Verification: static checks, secret scan on diff, path check, `terraform plan -json` import as planned graph, rendered manifests, re-assess + re-simulate + RTO/RPO/cost acceptance; static-HCL fallback labeled "verified statically"; unverified branches labeled. |
+| P10-05 | Change delivery: commit per DR spec change, patch file, optional PR via `gh`/`glab`, PR body with before/after and verification report; manual steps passed to runbooks. |
+| P10-06 | Companion fallback templates (Jinja2) for first-slice mechanisms; `terraform fmt` + `validate` tests. |
+| P10-07 | `perpetual transform`; API; UI: diff view, verification report, progress. |
+| P10-08 | Evals: transform `examples/ecs-rds` and `examples/eks-rds` from the broken demos; verification must pass; metrics recorded. |
 
-Exit: `terraform fmt` and `terraform validate` pass on generated fixture configuration.
+Exit: for the broken ECS and EKS demos, `perpetual transform` changes the example Terraform and manifests, verification passes, and the re-simulated stack meets its targets.
 
 ### P11 — Runbooks and failback
 
@@ -382,8 +427,8 @@ Spec: §65–§68, §96–§98, §100, §109.
 
 | ID | Task |
 |---|---|
-| P12-01 | Full §100 workflow on the sandbox for the ECS and EKS stacks. |
-| P12-02 | Security pass: canary tests, Terraform-state redaction (§68), no outbound calls except AWS and Kubernetes. |
+| P12-01 | Full §100 workflow on the sandbox for the ECS and EKS stacks, including a transformation PR applied by the user's pipeline and a rescan that confirms the stack now meets its targets. |
+| P12-02 | Security pass: canary tests, Terraform-state redaction (§68), outbound calls limited to AWS, Kubernetes, the configured LLM provider and Terraform providers during `plan`; review of what `llm_calls` shows was sent. |
 | P12-03 | Structured logging (§96) for scan, collectors, graph, assessment, simulation, optimization. |
 | P12-04 | Performance: graph of 5,000 resources and 20,000 edges builds, simulates and renders acceptably. |
 | P12-05 | Docs: README, user guide, IAM policy, rule reference, fixture format. |
@@ -398,7 +443,8 @@ Not scheduled. Each needs a decision-log entry before work starts.
 - Drift between scans (§77).
 - AZ failure and logical-corruption scenarios (§43).
 - Drill results and proven RTO/RPO (§53).
-- LLM explanation layer (§69, §70).
+- Editing CI pipelines, remote modules, CloudFormation/CDK/Pulumi.
+- Learning duration-catalog values and evidence weights from drills and confirmed edges.
 - Hosted version: login, PostgreSQL, workers, cross-account role with external ID (§66, §71.1).
 - Infracost and CUR cost providers (§58).
 - DynamoDB and Aurora Global depth; Lambda, SQS, ElastiCache rule packs.

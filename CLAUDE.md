@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Perpetual is a local, single-user tool that decides whether an AWS **stack** (one product: its services, data stores, networking and supporting services) can survive losing its Region within its RTO, RPO and budget. It computes a dependency graph from evidence, simulates the failure, plans recovery for the whole stack, and later generates DR Terraform and runbooks.
+Perpetual is a local, single-user tool that decides whether an AWS **stack** (one product: its services, data stores, networking and supporting services) can survive losing its Region within its RTO, RPO and budget. It computes a dependency graph from evidence, simulates the failure, plans recovery for the whole stack, designs the target DR architecture, and then changes the user's own Terraform and Kubernetes manifests to implement it, verified by re-simulation and delivered as a branch or PR. LLM agents (LangGraph) help with advisory review, candidate planning and the code changes; the deterministic engine verifies everything they propose.
 
-- Product definition: [spec.md](spec.md) (revision 3). It is the source of truth for behaviour; tasks and code comments cite it as `spec §N`.
+- Product definition: [spec.md](spec.md) (revision 4). It is the source of truth for behaviour; tasks and code comments cite it as `spec §N`.
 - Plan (locked): [IMPL_PLAN.md](IMPL_PLAN.md). Progress: [TRACKER.md](TRACKER.md).
 - At the start of a session, read TRACKER.md and continue from the session log's carry-over. At the end, update task states, the session log and the decision log.
 - Changes to the plan, or any deviation from the spec, go through a decision-log entry in TRACKER.md first. Changes to product behaviour go into spec.md with a changelog line under its current revision.
@@ -35,10 +35,12 @@ uv run pytest -m contract    # real-AWS contract suite; needs sandbox credential
 
 ## Architecture
 
-Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity resolution → edge resolvers (evidence) → user override layer → NetworkX graph snapshot → stacks/services/RTO scope → rule packs (findings + DR overlay mechanisms) → two-pass simulator → recovery DAG → RTO/RPO → optimizer → Terraform compiler and runbooks.
+Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity resolution → edge resolvers (evidence) → user override layer → NetworkX graph snapshot → stacks/services/RTO scope → rule packs (findings + DR overlay mechanisms) → two-pass simulator → recovery DAG → RTO/RPO → optimizer → DR spec → IaC transformation with verification → branch/PR; companion Terraform and runbooks. LLM agents attach at three points: advisor after rule packs (spec §28.2), planner inside the optimizer loop (§56.1), transformer after DR spec approval (§61).
 
 - Python package `apps/api/perpetual/`, one subpackage per pipeline stage (IMPL_PLAN §3.2). Web UI in `apps/web/` (Vite + React), built into `apps/api/perpetual/web/static/` and served by FastAPI. TS API types in `packages/schemas` are generated from OpenAPI; never edit them by hand.
-- Layer boundaries are enforced by import-linter (IMPL_PLAN §3.3): collectors only collect, rule packs never call collectors or LLMs, the simulator never rediscovers AWS, domain models never import FastAPI or SQLAlchemy.
+- Layer boundaries are enforced by import-linter (IMPL_PLAN §3.3): collectors only collect, rule packs never call collectors or LLMs, the simulator never rediscovers AWS, domain models never import FastAPI or SQLAlchemy. Only `perpetual.llm` imports LangChain/LangGraph; the engine never calls an agent.
+- LLM providers are configured, not coded: everything goes through LangChain's chat-model interface (`init_chat_model`), so OpenRouter, Anthropic, Bedrock or Ollama can be swapped per role (spec §69.1). Never import a vendor SDK directly.
+- Agent know-how lives in `skills/` (SKILL.md per DR mechanism) and the local knowledge base; prompts stay small and load skills on demand (spec §69.3, §69.4).
 - All numbers that tune behaviour (evidence weights, correlation groups, thresholds, scoring, RTO-scope defaults, buffer, duration catalog, prices) live in YAML under `apps/api/perpetual/config/defaults/`. Never put them in rule or engine code.
 
 ## Rules that span the codebase
@@ -53,9 +55,13 @@ Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity reso
 - "Reproducible" (`rebuild_from_iac`) has the strict meaning in spec §27.1; otherwise the mechanism is `unknown`.
 - Read-only against AWS. Never call `GetSecretValue`, never enable trails, data events or flow logs. Persist only matched facts from env vars and ConfigMaps, and only aggregates of CloudTrail and flow-log data (spec §14.1, §65–§67).
 - Graph traversal must terminate on cycles and record them as evidence; use NetworkX operations rather than hand-written recursion (spec §18).
+- The LLM proposes, the engine verifies (spec §2, rule 11). LLM output never upgrades a state, supplies a number, or counts as proof. Proposals need citations; uncited ones are dropped. A blocking advisory item keeps the stack from READY (`advisory_unresolved`).
+- Code changes happen only in a git worktree on a `perpetual/dr/...` branch, through an enforced command allowlist. `terraform apply|destroy|import|state` and `kubectl apply` must stay unreachable. A change is offered only after verification re-assesses and re-simulates the planned graph (spec §61.1); otherwise it is labeled unverified.
+- Never send Terraform state, secret values, env/ConfigMap values or raw logs to an LLM. Redact IaC before sending, honour `.perpetualignore`, and record every call in `llm_calls` (spec §69.5).
 
 ## Testing
 
 - Spec §90.1: fixtures for the engine (no network), moto for collector unit tests, Floci for collector integration tests, and an opt-in real-AWS contract suite in `tests/contract/` that always tears down what it creates.
 - Canonical fixtures: `ecs-broken` (spec §87), `ecs-remediated` (§88), EKS fixture B (§86, §89). Their expected results are release gates in TRACKER.md.
 - Synthetic CloudTrail and flow-log files come from the generator in `fixtures/logs/`; emulators produce no real logs.
+- LLM stages run in tests against a fake chat model with recorded responses, including hostile outputs; CI never needs an API key. Real-provider evals live in `evals/` and run on demand (spec §69.6).

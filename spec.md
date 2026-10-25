@@ -2,11 +2,21 @@
 
 ## Cloud Disaster-Recovery Readiness, Simulation and Architecture Compiler
 
-**Status:** Engineering specification, revision 3  
+**Status:** Engineering specification, revision 4  
 **Initial cloud:** AWS  
 **Primary implementation target:** Local single-user tool first (section 71.1); a hosted version is possible later  
 **Primary user:** Cloud Architect / SRE / Platform Engineer / DevOps Engineer  
 **Primary objective:** Determine whether a real stack can survive a specified failure while satisfying its RTO, RPO and cost constraints.
+
+### Revision 4 changes
+
+- Perpetual no longer only assesses. It fixes: it changes the user's own Terraform and Kubernetes manifests so the stack meets its DR targets, and delivers the change as a branch or pull request. It never applies changes to AWS or Kubernetes (61, 62, 101).
+- LLM agents, built on LangGraph, take part in three stages: an advisory review after the rule engine (28.2), candidate generation in the optimizer (56.1), and IaC transformation (61). They use a local knowledge base (RAG) and versioned skills (69.3, 69.4).
+- The governing rule is "the LLM proposes, the engine verifies". Facts, numbers, states and feasibility still come only from deterministic code or the user. Every LLM proposal is checked by re-running assessment and simulation before it is shown as a result (2, 61.1).
+- New artifact: the DR spec, the approved target DR design for a stack, which the transformation implements (56.2).
+- The LLM provider is replaceable: any LangChain chat model, including OpenAI-compatible endpoints such as OpenRouter, Anthropic, Bedrock and local Ollama models. Each agent role can use a different model (69.1).
+- Deterministic companion Terraform stays as the fallback when no IaC repository or LLM is configured (62.1).
+- LLM features are opt-in per project, with a clear record of what is sent. Terraform state, secret values, env values and raw logs are never sent (65, 69.5).
 
 ### Revision 3 changes
 
@@ -46,7 +56,7 @@
 
 Perpetual is a disaster-recovery readiness and architecture system for AWS infrastructure.
 
-It discovers existing infrastructure from multiple sources, builds an evidence-backed dependency graph, groups infrastructure into stacks, evaluates those stacks against user-defined disaster-recovery objectives, simulates failures, recommends remediation, estimates resulting recovery characteristics and cost, and eventually generates deterministic infrastructure-as-code and recovery runbooks.
+It discovers existing infrastructure from multiple sources, builds an evidence-backed dependency graph, groups infrastructure into stacks, evaluates those stacks against user-defined disaster-recovery objectives, simulates failures, designs the DR architecture that meets them, and then changes the user's own infrastructure code (Terraform and Kubernetes manifests) to implement it. Every change is verified against the same simulation before it is offered, and is delivered as code for the user to review and apply. It also generates recovery runbooks.
 
 The central question Perpetual answers is:
 
@@ -147,11 +157,31 @@ AWS + Terraform + optional Kubernetes
        +------+------+
        |             |
        v             v
- Terraform        Runbook
- Compiler
+ IaC changes      Runbook
+ (verified)
 ```
 
-An LLM may be used as a reasoning and explanation interface over these deterministic systems.
+LLM agents work alongside this pipeline, never in place of it:
+
+```text
+ Rules Engine ----> Advisory review (LLM)  -> proposals: findings, edges, mechanisms
+ Optimizer   <----> Candidate planner (LLM) -> proposals: candidate architectures
+ DR spec     ----> IaC transformer (LLM)    -> proposals: code changes
+                                               |
+                       every proposal is re-checked by the deterministic
+                       rules, simulator and recovery engine, or by the user
+```
+
+The governing rule:
+
+> The LLM proposes. The deterministic engine, or the user, decides.
+
+Concretely:
+
+- an LLM proposal can only make a result worse (add a risk, add an edge to review) until the engine or the user confirms it. It can never make a stack READY or a mechanism RECOVERABLE on its own;
+- every number shown (cost, RTO, RPO, durations, confidence) comes from the engine and its configuration;
+- a code change is offered only after the engine has re-assessed and re-simulated the planned infrastructure (section 61.1);
+- every LLM claim cites its inputs: resource IDs, evidence IDs, file and line, knowledge-base documents or skills. Uncited claims are discarded.
 
 The LLM MUST NOT be the source of truth for:
 
@@ -161,8 +191,9 @@ The LLM MUST NOT be the source of truth for:
 - RTO calculations;
 - RPO calculations;
 - IAM policy evaluation;
-- Terraform syntax;
-- DR strategy feasibility.
+- Terraform syntax (checked by `terraform validate`);
+- DR strategy feasibility (checked by simulation);
+- whether a change meets the DR targets (checked by verification, section 61.1).
 
 ---
 
@@ -939,6 +970,7 @@ class Evidence(BaseModel):
         "cloudtrail",
         "vpc_flow_logs",
         "inference",
+        "llm_inference",
         "user_confirmation",
         "metric",
     ]
@@ -1640,6 +1672,50 @@ REGION-SVC-001    Service, feature or instance type used in primary is unavailab
 Quota and service-availability checks use read-only APIs only (`service-quotas:List*`, `ec2:DescribeInstanceTypeOfferings`).
 
 When reading environment variables or ConfigMaps, persist only the matched fact (e.g. "env var DB_HOST matches primary RDS endpoint"). Never persist the value (section 67).
+
+---
+
+# 28.2 LLM Advisory Review
+
+Rule packs are deterministic and cover known patterns. An advisory review, run by an LLM agent after the rule packs, looks for what they miss: unusual dependencies, application configuration that ties a service to the primary Region, services without a rule pack, and organization-specific standards from the knowledge base.
+
+Inputs: the stack subgraph (IDs, types, non-secret properties), deterministic findings and mechanisms, matched configuration facts (names only, never values), the IaC source of the stack's resources (section 61), knowledge-base retrievals and relevant skills (sections 69.3, 69.4).
+
+Outputs are typed proposals:
+
+```python
+class AdvisoryItem(BaseModel):
+    id: str
+    stack_id: str
+
+    kind: Literal[
+        "finding",      # a risk the rule packs did not raise
+        "edge",         # a dependency the graph is missing
+        "mechanism",    # how a resource without rule-pack coverage could be recovered
+        "question",     # something only the user can answer
+    ]
+
+    payload: dict[str, Any]
+    # Validated per kind against Finding, DependencyEdge or RecoveryMechanism.
+
+    citations: list[Citation]
+    # Resource IDs, evidence IDs, file:line, knowledge-base chunk IDs, skill IDs.
+    # Items without citations are discarded.
+
+    status: Literal["proposed", "accepted", "dismissed"]
+    fingerprint: str
+    model: str
+    run_id: str
+```
+
+Effect on results:
+
+- a proposed **edge** enters the review queue (section 23) with `source_type = llm_inference`, `basis = referenced` (it must cite the file and line, or the configuration fact, it read), and confidence capped by configuration (default 0.5);
+- a proposed **mechanism** leaves the resource's mechanism `unknown`; the suggestion is shown beside it. It becomes the mechanism only when the user accepts it (evidence `user_confirmation`);
+- a proposed **blocking finding** keeps the stack from READY: it shows `UNKNOWN` with reason `advisory_unresolved` until the user accepts or dismisses it;
+- accepted items become ordinary findings, edges or mechanisms with the user's confirmation as evidence. Dismissed items are stored by fingerprint and not re-proposed unless their inputs change, as with edge rejections.
+
+Advisory review never runs inside a rule pack (section 102, rule 4).
 
 # 29. Finding Model
 
@@ -2728,6 +2804,79 @@ Every candidate is a complete stack plan: a mechanism for every in-scope resourc
 
 ---
 
+# 56.1 LLM Candidate Planner
+
+Strategy templates give good starting points, but the best design often mixes them: for example Aurora Global Database for the orders database, backup and restore for a reporting database, and warm standby for the API tier. An LLM planner agent proposes such candidates.
+
+Loop:
+
+```text
+deterministic candidates (section 56) + their evaluations
+        |
+        v
+planner (LLM, with RAG + skills) -> up to N candidate proposals (default 5)
+        |
+        v
+deterministic evaluation: prerequisites, cost, recovery DAG, RTO, RPO, readiness
+        |
+        v
+results and failure reasons back to the planner -> refine (max 3 rounds, configurable)
+        |
+        v
+Pareto frontier and selection (section 57), deterministic
+```
+
+Rules:
+
+- a proposal is a typed `CandidateProposal`: for every in-scope resource, a mechanism chosen from the rule packs' `recovery_options()`, or a new `RecoveryOption` with `origin = llm`;
+- a new option must cite a skill or knowledge-base document, use action types that exist in the duration catalog, and pass the rule pack's prerequisite checks. An action without a catalog entry makes the candidate's RTO UNKNOWN, so it cannot be recommended;
+- the planner never supplies cost, duration, RTO or RPO values. It may write the rationale for a candidate;
+- deterministic candidates are always evaluated and kept, so the result is never worse than without the LLM.
+
+---
+
+# 56.2 DR Spec
+
+The DR spec is the target DR design for a stack: the selected candidate written up so a person can approve it and the IaC transformer (section 61) can implement it.
+
+```python
+class DRSpec(BaseModel):
+    id: str
+    stack_id: str
+    requirement_id: str
+    candidate_id: str
+
+    changes: list[DRSpecChange]
+    # Per resource: current mechanism -> target mechanism, the concrete change
+    # (e.g. "add cross-Region read replica in ap-south-2"), prerequisites, and
+    # the skill used.
+
+    order: list[str]
+    # Change IDs in apply order (e.g. DR network and KMS before replicas).
+
+    manual_steps: list[str]
+    # What code cannot do: quota increase requests, account setup, approvals.
+
+    predicted: StackPrediction
+    # RTO, RPO and monthly cost from the engine; before and after.
+
+    findings_resolved: list[str]
+    findings_remaining: list[str]
+
+    rationale: str
+    # LLM-written; cites knowledge-base documents and skills.
+
+    assumptions: list[str]
+
+    status: Literal["draft", "approved", "superseded"]
+    approved_by: str | None
+    approved_at: datetime | None
+```
+
+The user approves a DR spec before any code is changed. It exports to Markdown for review outside the tool.
+
+---
+
 # 57. Pareto Frontier
 
 The optimizer should expose architecture trade-offs.
@@ -2853,54 +3002,106 @@ Why:         ECS image pull from a non-replicated registry is now the critical p
 
 ---
 
-# 61. Terraform Compiler
+# 61. IaC Transformation
 
-The Terraform compiler MUST be deterministic.
+Perpetual implements an approved DR spec by changing the user's own infrastructure code. It does not write a separate DR codebase unless there is no code to change (section 62.1).
 
-The LLM may select or explain a remediation but must not be trusted to produce arbitrary infrastructure code.
-
-Initial approach:
+In scope for v0.1:
 
 ```text
-Generate companion DR Terraform
+Terraform       .tf and .tfvars files in the declared root modules and local modules
+Kubernetes      plain manifests, Kustomize overlays, Helm values files (and chart
+                templates when the chart lives in the repository)
 ```
 
-instead of modifying the user's existing Terraform.
+Never in scope: Terraform state, remote modules from registries, generated files, CI pipeline definitions.
 
-Example output:
+### Mapping resources to code
+
+Before editing, Perpetual maps each resource in the DR spec to the code that defines it:
+
+- Terraform: resource address -> file and block, from `terraform show -json` plus the configuration's source locations;
+- Kubernetes: object identity (kind, namespace, name) -> manifest file, from scanning the declared paths and rendering Kustomize or Helm.
+
+Resources with no code location are reported. Their changes go to manual steps, or to companion code (section 62.1) if the user chooses.
+
+### Transformation agent
+
+A LangGraph agent (section 69.2) does the work in a separate git worktree on a new branch `perpetual/dr/<stack>/<timestamp>`. The user's checkout is never modified.
+
+```text
+locate -> plan edits -> edit -> static checks -> plan and import -> verify
+                ^                                                     |
+                +---------------- failures (bounded retries) ---------+
+                                                                      |
+                                                                  package
+```
+
+Agent tools are an allowlist:
+
+```text
+read, search, edit and create files under the declared IaC paths
+terraform fmt | init -backend=false | validate | plan -out | show -json
+kustomize build | helm template | kubeconform
+load_skill | search_knowledge_base | get_stack_context
+```
+
+Never available: `terraform apply`, `destroy`, `import`, `state`, `kubectl apply` or any command that changes cloud or cluster state; network access other than the configured LLM provider and the Terraform providers used by `plan`; file access outside the worktree.
+
+Retries default to 3 per DR spec change.
+
+---
+
+# 61.1 Verification
+
+A change is offered only after Perpetual has checked it against the same engine that found the problem:
+
+1. Static checks: `terraform fmt -check`, `terraform validate`, `kubeconform` on rendered manifests, a secret scanner on the diff, and a check that only allowed paths changed.
+2. Planned graph: `terraform plan` + `show -json` is imported as planned resources (section 15.1) and merged with rendered Kubernetes objects into a copy of the current graph.
+3. Re-assessment and re-simulation of the stack on the planned graph: rule packs, DR overlay, Region-failure simulation, recovery DAG, RTO, RPO, cost.
+4. Acceptance: every DR spec change is present in the planned graph; no new blocking findings; RTO and RPO comparisons are PASS (or no worse than the DR spec predicted); monthly cost within budget.
+
+`terraform plan` needs read access to the state backend and the user's credentials. When that is not available, Perpetual falls back to static verification: changed HCL is parsed and turned into planned resources directly. The result is labeled "verified statically" and has lower confidence.
+
+Failures go back to the agent as structured feedback (which check failed, on which resource, with the finding or simulation path). If retries run out, the branch is still produced but marked **unverified**, with the failing checks listed. It is never presented as ready.
+
+---
+
+# 62. Change Delivery
+
+Output of a transformation:
+
+- a git branch with one commit per DR spec change, in the DR spec's order;
+- a pull request through `gh` or `glab` when the user enables it, otherwise the branch and a patch file;
+- a description containing: the DR spec summary, before and after stack RTO, RPO and monthly cost, the verification report, files changed, the apply order, and manual steps.
+
+Perpetual never merges, never pushes to a protected branch and never applies. The user's normal review and pipeline apply the change.
+
+Changes that cannot be expressed as code (quota increases, account creation, one-off data seeding) are listed as manual steps and copied into the failover runbook prerequisites (section 63).
+
+---
+
+# 62.1 Companion Fallback
+
+When no IaC repository is declared, or LLM features are disabled, Perpetual generates deterministic companion DR Terraform from templates, as in revision 3:
 
 ```text
 generated/
   dr/
-    versions.tf
-    providers.tf
-    network.tf
-    rds.tf
-    ecs.tf
-    ecr.tf
-    secrets.tf
-    route53.tf
-    outputs.tf
+    versions.tf  providers.tf  network.tf  rds.tf  ecs.tf  ecr.tf
+    secrets.tf   route53.tf    outputs.tf
 ```
 
----
+Generated configuration:
 
-# 62. Terraform Generation
+- is formatted with `terraform fmt`;
+- passes `terraform validate` when supplied with required variables;
+- contains clear generated comments;
+- never embeds secrets;
+- references existing values through variables;
+- lists its assumptions.
 
-Use templates or deterministic HCL generation.
-
-Generated configuration should:
-
-- be formatted with `terraform fmt`;
-- pass `terraform validate` when supplied with required variables;
-- contain clear generated comments;
-- avoid embedding secrets;
-- reference existing values through variables;
-- expose assumptions.
-
-Later versions may use HCL AST editing to patch existing Terraform.
-
-Do not implement arbitrary AST modification in v0.1.
+The same templates are given to the transformation agent as reference patterns through the skills (section 69.4).
 
 ---
 
@@ -2971,11 +3172,13 @@ Security principles:
 Read-only by default.
 Do not retrieve secret values.
 Do not retrieve application data.
-Do not send raw infrastructure state to LLMs unnecessarily.
+Never send Terraform state, secret values, env values or raw logs to an LLM (section 69.5).
 Redact credentials.
 Minimize persisted sensitive metadata.
 Never enable logging, trails or flow logs in customer accounts; read what exists.
 Persist only aggregates of CloudTrail and flow-log data (section 14.1).
+Change code, never infrastructure: no apply, no kubectl apply, no merges (section 62).
+LLM features are opt-in per project.
 ```
 
 ---
@@ -3048,25 +3251,117 @@ Requirements:
 
 # 69. LLM Architecture
 
-The application must work without an LLM.
+Discovery, the graph, assessment, simulation, the deterministic optimizer and companion Terraform work without an LLM. Advisory review (28.2), the candidate planner (56.1), DR spec rationale (56.2), IaC transformation (61) and the explainer (70) need one.
 
-LLM is an optional UX layer.
+## 69.1 Provider Abstraction
 
-Tools exposed to the LLM might include:
+The provider is replaceable. Perpetual depends on LangChain's chat-model interface, not on a vendor SDK.
 
-```text
-get_stack()
-get_resource()
-get_dependency_path()
-get_findings()
-simulate_region_failure()
-calculate_recovery_path()
-get_recovery_options()
-optimize_budget()
-explain_finding()
+```yaml
+# perpetual.yaml (project) or user config
+llm:
+  default:
+    provider: openai_compatible      # openai_compatible | anthropic | bedrock | ollama | ...
+    model: anthropic/claude-sonnet-4.5
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+  roles:                             # optional per-role overrides
+    planner:     { model: ... }
+    advisor:     { model: ... }
+    transformer: { model: ... }
+    explainer:   { model: ... }
+  embeddings:
+    provider: local                  # local (fastembed) | openai_compatible | bedrock | ...
+    model: BAAI/bge-small-en-v1.5
 ```
 
-The LLM receives structured tool results.
+- Models are built with LangChain's `init_chat_model`; OpenRouter and any OpenAI-compatible endpoint use the OpenAI integration with `base_url`.
+- API keys come from environment variables or the OS keyring. They are never written to the database or logs.
+- On configuration, Perpetual probes each role's model for tool calling and structured output, and refuses roles that lack them.
+- Example model names in this spec are illustrative.
+
+## 69.2 Agents
+
+Agents are LangGraph graphs:
+
+```text
+advisor       section 28.2   proposes findings, edges, mechanisms, questions
+planner       section 56.1   proposes candidate architectures, writes DR spec rationale
+transformer   section 61     edits IaC, runs checks, responds to verification failures
+explainer     section 70     answers questions over deterministic tool results
+```
+
+- Tools give agents read access to Perpetual's own data (stack context, findings, simulations, plans) and to the knowledge base and skills. Agents never call AWS.
+- State is checkpointed with LangGraph's SQLite checkpointer in the project data directory, so runs can resume and be audited.
+- Human-in-the-loop interrupts: DR spec approval before transformation; confirmation before opening a pull request.
+- All structured outputs are validated with Pydantic. Invalid output is retried once with the validation error, then the step fails closed.
+
+## 69.3 Knowledge Base (RAG)
+
+A local knowledge base grounds the agents.
+
+Sources:
+
+- **Public references.** Perpetual ships a list of source URLs (the AWS DR whitepaper, service guides on replication, backup, quotas and failover, EKS DR guidance) and the code to ingest them. `perpetual kb sync` fetches them to the user's machine. Perpetual does not ship copies.
+- **Perpetual's own material.** Rule documentation, duration-catalog basis notes, skills.
+- **The user's documents.** Runbooks, ADRs, postmortems, internal standards: `perpetual kb add ./docs`.
+
+Storage is local: a SQLite database with `sqlite-vec` for vectors and FTS5 for keywords, combined as hybrid retrieval. Every chunk keeps its source (URL or path), title and fetch date, and every retrieval is cited by chunk ID.
+
+## 69.4 Skills
+
+Skills are versioned, reviewable know-how for implementing DR mechanisms, loaded by agents only when relevant.
+
+```text
+skills/
+  rds-cross-region-replica/
+    SKILL.md            # frontmatter + procedure
+    terraform.md        # patterns and pitfalls
+    verify.md           # what verification must see
+  aurora-global-database/
+  ecr-replication/
+  secrets-manager-replication/
+  kms-multi-region-keys/
+  s3-cross-region-replication/
+  route53-failover/
+  ecs-dr-service/
+  eks-dr-cluster-gitops/
+  ebs-snapshot-copy/
+```
+
+`SKILL.md` frontmatter:
+
+```yaml
+name: rds-cross-region-replica
+description: Add a cross-Region read replica for an RDS MySQL/PostgreSQL instance.
+applies_to:
+  resource_types: [rds/db]
+  mechanisms: [live_counterpart]
+  strategies: [pilot_light, warm_standby, hot_standby]
+version: 1
+```
+
+- Agents see the index (name and description) and load a full skill with the `load_skill` tool. This keeps prompts small.
+- Shipped skills live in the repository and are reviewed like code. Users and organizations can add or override skills in `<project>/.perpetual/skills/`.
+- A skill's IaC patterns are examples, not templates to paste; the agent adapts them to the user's code.
+
+## 69.5 Data Sent and Guardrails
+
+LLM features are off until the user configures a provider and accepts, per project, a notice that lists what will be sent.
+
+Sent: stack subgraph metadata (IDs, types, non-secret properties), findings, plans, simulation results, the IaC files in scope, knowledge-base excerpts, skills.
+
+Never sent: Terraform state, secret values, environment-variable and ConfigMap values, raw CloudTrail or flow-log data, credentials.
+
+Before sending IaC files, a redaction pass removes secret-like values (known key patterns, high-entropy strings, `sensitive` variables' defaults). A `.perpetualignore` file excludes paths entirely.
+
+Every LLM call is recorded locally in `llm_calls`: time, role, provider, model, token counts, which files and documents were included, redactions applied, and a hash of the prompt. The UI and `perpetual llm log` show it. For no data egress, use a local model (`ollama`).
+
+## 69.6 Testing and Evaluation
+
+- Unit and integration tests use a fake chat model with recorded responses. CI never needs an API key.
+- An evaluation suite in `evals/` runs against real providers on demand: the canonical fixtures (sections 85–89) must yield DR specs that meet their targets, and transformations of `examples/` repositories must pass verification.
+- Tracked per model: verification pass rate, retries per change, share of claims with valid citations, accepted vs dismissed advisory items.
 
 ---
 
@@ -3097,7 +3392,7 @@ Three blockers dominate your current recovery path:
 The database path alone exceeds your target.
 ```
 
-The numbers MUST originate from Perpetual's recovery engine.
+The numbers MUST originate from Perpetual's recovery engine. The explainer calls the same read-only tools as the other agents and cites the results it uses.
 
 ---
 
@@ -3118,7 +3413,15 @@ kubernetes Python client
 httpx
 pytest
 uv
+LangGraph + langchain-core (agents, checkpointing)
+LangChain integrations as extras: openai (OpenAI-compatible, OpenRouter),
+  anthropic, aws (Bedrock), ollama
+sqlite-vec + FTS5 (knowledge base)
+fastembed (local embeddings, optional)
+python-hcl2 (static verification)
 ```
+
+Tools pinned in `mise.toml` for transformation and verification: Terraform, kubeconform, kustomize, helm, gh (optional).
 
 Do not add Celery/Redis initially unless background jobs become necessary.
 
@@ -3138,7 +3441,7 @@ perpetual ui              # serves API + UI on http://localhost:8000
 - One Python process runs FastAPI. It serves the REST API and the pre-built UI as static files. Node.js is needed only to build the UI, never to run Perpetual.
 - The API binds to `127.0.0.1` by default. Binding to other interfaces requires an explicit flag and a warning, because there is no login in local mode.
 - Data lives in one SQLite file in the user's data directory (for example `~/.local/share/perpetual/perpetual.db`). Users can override the path per project.
-- AWS access uses the user's own credential chain (section 66). Discovery data, CloudTrail and flow-log aggregates and Terraform state never leave the machine, except for what the user chooses to send to an optional LLM (section 69).
+- AWS access uses the user's own credential chain (section 66). Discovery data, CloudTrail and flow-log aggregates and Terraform state never leave the machine, except for what the user chooses to send to an LLM provider (section 69.5).
 - The CLI and the UI use the same engine and the same database file.
 
 Keeping a hosted version possible:
@@ -3197,9 +3500,10 @@ perpetual/
 |   |       +-- recovery/
 |   |       +-- optimizer/
 |   |       +-- costing/
-|   |       +-- terraform/
+|   |       +-- iac/            # code mapping, worktrees, verification, companion templates
 |   |       +-- runbooks/
-|   |       +-- llm/
+|   |       +-- llm/            # providers, agents (LangGraph), guardrails, call log
+|   |       +-- knowledge/      # knowledge base ingestion and retrieval
 |   |       +-- models/
 |   |       +-- persistence/
 |   |
@@ -3218,8 +3522,15 @@ perpetual/
 |   +-- contract/        # real-AWS contract suite (section 90.1)
 |
 +-- examples/
-|   +-- ecs-rds/
+|   +-- ecs-rds/         # also the IaC repos the transformation evals change
 |   +-- eks-rds/
+|
++-- skills/              # shipped DR skills (section 69.4)
+|
++-- knowledge/
+|   +-- sources.yaml     # public reference URLs for `perpetual kb sync`
+|
++-- evals/               # LLM evaluation suite (section 69.6)
 |
 +-- generated/
 |
@@ -3318,6 +3629,13 @@ duration_catalog_versions
 
 architecture_candidates
 cost_estimates
+
+advisory_items
+dr_specs
+transformations
+llm_calls
+kb_documents
+kb_chunks
 
 dr_drills
 ```
@@ -3443,10 +3761,30 @@ POST /edges/{id}/confirm
 POST /edges/{id}/reject
 ```
 
+LLM-assisted:
+
+```text
+POST /stacks/{id}/advise
+GET  /stacks/{id}/advisories
+POST /advisories/{id}/accept
+POST /advisories/{id}/dismiss
+
+POST /stacks/{id}/dr-spec              # from the selected candidate
+GET  /dr-specs/{id}
+POST /dr-specs/{id}/approve
+
+POST /dr-specs/{id}/transform          # body: IaC paths, open_pr
+GET  /transformations/{id}             # progress, diff, verification report
+
+GET  /llm/calls
+POST /kb/sync
+POST /kb/documents
+```
+
 Later:
 
 ```text
-POST /stacks/{id}/terraform/generate
+POST /stacks/{id}/terraform/companion
 
 POST /stacks/{id}/runbook/generate
 ```
@@ -3484,7 +3822,23 @@ perpetual simulate checkout \
 perpetual optimize checkout \
   --rto 30m \
   --rpo 5m \
-  --budget 1200
+  --budget 1200            # includes LLM candidates unless --no-llm
+
+perpetual llm configure
+perpetual llm test
+perpetual llm log
+
+perpetual kb sync
+perpetual kb add ./docs/runbooks
+
+perpetual skills list
+
+perpetual advise checkout
+perpetual dr-spec checkout [--approve]
+perpetual transform checkout \
+  --terraform ./infra/live/prod \
+  --k8s ./deploy/overlays/prod \
+  [--open-pr]
 ```
 
 CLI can initially call local Python services directly rather than requiring the API.
@@ -3885,8 +4239,9 @@ Phase 2       collectors                                  moto (unit), Floci (in
 Phase 2b      CloudTrail and flow-log readers             synthetic log files in Floci S3,
                                                           real AWS (contract)
 Phases 3-8    stack discovery, rules, RPO, optimizer      fixtures
-Phase 9       Terraform compiler                          terraform validate; apply to Floci
-                                                          optional
+Phase 3b      LLM foundation                              fake chat model (recorded responses)
+Phase 9       IaC transformation                          examples/ repos + Floci for terraform
+                                                          plan; fake model in CI, evals on demand
 ```
 
 ### Synthetic logs
@@ -4291,6 +4646,27 @@ Perpetual understands "checkout" as a stack rather than unrelated AWS resources.
 
 ---
 
+## Phase 3b — LLM Foundation
+
+Deliver:
+
+- provider abstraction and per-role configuration (section 69.1);
+- LangGraph runtime with SQLite checkpointing;
+- fake chat model and recorded-response test harness;
+- knowledge base: ingestion, hybrid retrieval, citations (section 69.3);
+- skills loader and the first shipped skills (section 69.4);
+- guardrails: opt-in notice, redaction, `.perpetualignore`, call log (section 69.5);
+- explainer agent (section 70).
+
+Exit criterion:
+
+```text
+perpetual llm test passes against a configured provider; the explainer answers
+"why can't checkout meet 30m?" with cited, engine-sourced numbers.
+```
+
+---
+
 ## Phase 4 — DR Rule Engine
 
 First rule packs:
@@ -4307,10 +4683,13 @@ network
 Route53
 ```
 
+Then the advisory review (section 28.2).
+
 Exit criterion:
 
 ```text
-Stack assessment produces evidence-backed findings.
+Stack assessment produces evidence-backed findings; advisory items appear with
+citations and can be accepted or dismissed.
 ```
 
 ---
@@ -4377,26 +4756,35 @@ and:
 "What is the best DR posture for this budget?"
 ```
 
+Includes the LLM candidate planner (section 56.1) and the DR spec (section 56.2).
+
 Exit criterion:
 
 ```text
-Several architecture candidates can be compared.
+Several architecture candidates, deterministic and LLM-proposed, can be compared,
+and an approved DR spec exists for each demo stack.
 ```
 
 ---
 
-## Phase 9 — Terraform Compiler
+## Phase 9 — IaC Transformation
 
-Generate companion DR Terraform.
+Deliver:
+
+- resource-to-code mapping for Terraform and Kubernetes (section 61);
+- transformation agent in a git worktree with the tool allowlist;
+- verification loop (section 61.1), including static fallback;
+- change delivery: branch, commits, patch, optional PR (section 62);
+- companion fallback templates (section 62.1);
+- evaluation suite runs on `examples/` (section 69.6).
 
 Exit criterion:
 
-```bash
-terraform fmt
-terraform validate
+```text
+For the broken ECS and EKS demos, `perpetual transform` changes the example
+Terraform and manifests, verification passes, and the re-simulated stack meets
+its targets.
 ```
-
-passes against generated fixture configuration.
 
 ---
 
@@ -4450,16 +4838,15 @@ The first genuinely usable release is achieved when this workflow works:
    estimated RTO with its breakdown and buffer
    estimated RPO
 
-9. Perpetual recommends:
-   a whole-stack DR plan
+9. Perpetual compares candidate architectures (deterministic and
+   LLM-proposed) and the user approves a DR spec:
+   current vs target architecture
+   RTO, RPO and additional cost
 
-10. Perpetual compares:
-    current architecture
-    recommended architecture
-    additional cost
+10. Perpetual changes the user's Terraform and Kubernetes manifests,
+    verifies the change by re-simulating, and delivers a branch or PR.
 
 11. Perpetual generates:
-    Terraform companion configuration
     failover runbook
     failback runbook
 ```
@@ -4480,7 +4867,8 @@ Do NOT initially build:
 - logical-corruption and AZ-failure simulation (the `FailureScenario` type must allow them; section 43);
 - Kubernetes scheduler replacement;
 - full Terraform language interpreter;
-- arbitrary Terraform source-code mutation;
+- applying changes: `terraform apply`, `kubectl apply`, merging or pushing to protected branches;
+- editing code outside the declared IaC paths, CI pipelines or remote modules;
 - Neo4j;
 - Z3;
 - dozens of AWS services;
@@ -4520,7 +4908,7 @@ They do not contain UI logic.
 
 Rule packs assess resources.
 
-They do not call LLMs.
+They do not call LLMs. LLM review runs as a separate stage after them (section 28.2).
 
 ### Rule 5
 
@@ -4532,11 +4920,11 @@ It does not rediscover AWS.
 
 Optimizer consumes recovery options.
 
-It does not generate arbitrary cloud architecture itself.
+LLM-proposed candidates enter as typed options and are evaluated by the same deterministic code (section 56.1).
 
 ### Rule 7
 
-Terraform generation is deterministic.
+Code changes are proposed by an agent and accepted only after verification (section 61.1). Companion Terraform is deterministic.
 
 ### Rule 8
 
@@ -4549,6 +4937,10 @@ Every important conclusion must be explainable through evidence.
 ### Rule 10
 
 Every important graph dependency must expose why it exists.
+
+### Rule 11
+
+An LLM output never changes a state, number or verdict by itself. It becomes a result only through deterministic verification or user confirmation.
 
 ---
 
@@ -4702,6 +5094,8 @@ The following statement should remain true throughout development:
 > Perpetual does not ask whether each AWS resource has DR. Perpetual asks whether the stack can operate after failure.
 
 It follows that Perpetual produces one DR plan, one RTO and one RPO per stack and failure scenario.
+
+And: Perpetual only offers a change to infrastructure code once its own engine has shown the change makes the stack meet its targets.
 
 That is the architectural boundary around the entire product.
 
