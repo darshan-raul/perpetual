@@ -200,8 +200,8 @@ Spec: §24.1, §27.1, §28, §30.1, §43–§50, §52, §92, §93.
 | P1-06 | Recovery pass over the DR overlay: memoised, cycle-safe, `worst()` ordering, DR-side dependencies, control-plane rule for global services. |
 | P1-07 | Stack state mapping and the review gate (`UNKNOWN`, reason `graph_not_reviewed`). |
 | P1-08 | Reason chains from stack root to root cause, crossing into the overlay (spec §44, §46). |
-| P1-09 | Duration catalog v1: loader, bucket matching, `catalog_version` and bucket in `basis`, `None` for missing entries. |
-| P1-10 | `recovery_actions()` for first-slice mechanisms with phases and refined prerequisites. |
+| P1-09 | Duration catalog v1: loader, bucket matching, `catalog_version` and bucket in `basis`, generic fallback action types (`generic_promote_counterpart`, `generic_restore_from_backup`, `generic_rebuild_from_iac`), per-resource project duration overrides, `None` for missing entries. |
+| P1-10 | `recovery_actions()` for first-slice mechanisms with phases and refined prerequisites, plus fallback action synthesis for user-confirmed mechanisms on unmodeled resources. |
 | P1-11 | DAG builder: phase-template default edges, refinement, `decide` action, `stack_validation` action, acyclicity error. |
 | P1-12 | Buffer: handoff on manual/semi-automatic actions, stack validation, contingency. |
 | P1-13 | RTO: longest path for low/expected/high, UNKNOWN propagation with partial path, breakdown (critical path vs parallel). |
@@ -263,8 +263,8 @@ Spec: §14.1 (CloudTrail, flow logs, persistence, contradictions), §16, §22, �
 |---|---|
 | P2b-01 | Synthetic log generator `fixtures/logs/` (CloudTrail S3 layout, flow logs v2 and v5, edge cases). |
 | P2b-02 | CloudTrail reader: S3, CloudTrail Lake, Athena; `LookupEvents` fallback; window config (default 30 days). |
-| P2b-03 | Principal → compute mapping (task role, IRSA, Pod Identity, instance profile). |
-| P2b-04 | Flow-log reader: S3 and CloudWatch Logs; time-aware ENI resolution (current ENIs, Config history, CloudTrail ENI events); v5 fields; ephemeral-port folding; dropped-flow counts. |
+| P2b-03 | Principal → compute mapping (ECS task role, Lambda execution role, IRSA, Pod Identity, EC2 instance profile rolled up to Auto Scaling group). |
+| P2b-04 | Flow-log reader: S3 and CloudWatch Logs; time-aware ENI resolution (current ENIs, Config history, CloudTrail ENI events, incl. EC2/ASG ENIs and Lambda VPC Hyperplane ENIs); v5 fields; ephemeral-port folding; dropped-flow counts. |
 | P2b-05 | Observations: aggregate-only persistence; canary test proving raw data is not stored. |
 | P2b-06 | Contradiction and "unobserved in window" flags; external-node proposals from unknown destinations. |
 | P2b-07 | Coverage report (trails, data events, flow-log destinations) in CLI and UI. |
@@ -278,8 +278,8 @@ Spec: §24, §24.1, §25.
 
 | ID | Task |
 |---|---|
-| P3-01 | Grouping signals: tags, Terraform modules, ALB → target group → ECS chains, connectivity (including observed), IAM references. |
-| P3-02 | Service suggestion inside a stack (ECS services, Lambda; Deployments in P7) with resources only they use; shared resources stay at stack level. |
+| P3-01 | Grouping signals: tags, Terraform modules, WAF → ALB → target group → ECS / EC2 / ASG / Lambda chains, SNS → SQS → Lambda event chains, connectivity (including observed), IAM references. |
+| P3-02 | Service suggestion inside a stack (ECS services, EC2 / Auto Scaling groups, Lambda; Deployments in P7) with resources only they use; shared resources stay at stack level. |
 | P3-03 | Root resources and dependency closure; shared resources across stacks. |
 | P3-04 | Manual editing of stacks and services in CLI (`perpetual stacks ...`) and UI; stored as overrides. |
 | P3-05 | Discovery confidence. |
@@ -296,7 +296,7 @@ Spec: §2, §69, §70.
 | P3b-02 | LangGraph runtime: graph base, tool registry over read-only engine APIs + `web_search` and `web_fetch` tools for unmodeled/out-of-scope resources (persisting fetched docs into the local KB), SQLite checkpointer, interrupts, Pydantic-validated outputs with one retry then fail closed. |
 | P3b-03 | Fake chat model + recorded-response harness; hostile-output fixtures. |
 | P3b-04 | Guardrails: per-project opt-in notice, redaction pass, query sanitization for `web_search`/`web_fetch` (generic AWS/DR/Terraform terms only; `--offline` / `allow_web_research` toggle), `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
-| P3b-05 | Knowledge base: shipped domain knowledge (`knowledge/domain/` covering ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, ECR, Secrets, SSM, KMS, IAM, Route 53, ALB, WAF, CloudWatch Logs, VPC), `knowledge/sources.yaml`, `perpetual kb sync|add`, automatic ingestion of agent `web_fetch` results (`origin = "agent_web_fetch"`), chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
+| P3b-05 | Knowledge base: shipped domain knowledge (`knowledge/domain/` covering ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, ECR, Secrets, SSM, KMS, IAM, Route 53, ALB, WAF, CloudWatch Logs, VPC), `knowledge/sources.yaml`, `perpetual kb sync|add|list|show|remove` (+ `GET/DELETE /kb/documents`), automatic ingestion of agent `web_fetch` results (`origin = "agent_web_fetch"`), chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
 | P3b-06 | Skills: format, loader, index, `load_skill` tool, project overrides in `.perpetual/skills/`; first skills for the ECS slice (RDS replica, ECR replication, Secrets replication, KMS multi-Region, S3 CRR, Route 53 failover, ECS DR service, EC2/ASG + AMI DR, Lambda multi-Region, SQS/SNS DR, WAF Web ACL DR). |
 | P3b-07 | Explainer agent (spec §70) in CLI (`perpetual ask`) and UI. |
 
@@ -382,7 +382,7 @@ Spec: §54–§60, §94.
 |---|---|
 | P9-01 | `recovery_options()` in packs; strategy → mechanism mapping per pack (§27). |
 | P9-02 | Candidate generation per strategy + bounded variants; current architecture as baseline; prerequisite and conflict rejection. |
-| P9-03 | `CostProvider`: `StaticCostProvider` with versioned price table; then `AWSPricingProvider`. Cost confidence and assumptions (§59). |
+| P9-03 | `CostProvider`: `StaticCostProvider` with versioned price table (covering ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, S3, EBS/EFS, SQS/SNS, ECR, Secrets, KMS, Route 53, ALB, WAF, CloudWatch Logs, NAT/VPC); then `AWSPricingProvider`. Cost confidence and assumptions (§59). |
 | P9-04 | Evaluate candidates: DAG, RTO, RPO, readiness. Pareto frontier. Requirement-driven and budget-driven modes. |
 | P9-05 | Remediation planner (§60): re-plan the whole stack per change and explain stack-level deltas. |
 | P9-06 | `perpetual optimize STACK --rto --rpo --budget`; Optimize tab in UI. Spec §94 test. |
@@ -402,7 +402,7 @@ Spec: §61, §61.1, §62, §62.1, §69.6.
 | P10-03 | Transformation agent (LangGraph): locate → plan edits → edit → static checks → plan and import → verify → retry → package. Skills for EKS added (EKS DR via GitOps, EBS snapshot copy). |
 | P10-04 | Verification: static checks, secret scan on diff, path check, `terraform plan -json` import as planned graph, rendered manifests, re-assess + re-simulate + RTO/RPO/cost acceptance; static-HCL fallback labeled "verified statically"; unverified branches labeled. |
 | P10-05 | Change delivery: commit per DR spec change, patch file, optional PR via `gh`/`glab`, PR body with before/after and verification report; manual steps passed to runbooks. |
-| P10-06 | Companion fallback templates (Jinja2) for first-slice mechanisms; `terraform fmt` + `validate` tests. |
+| P10-06 | Companion fallback templates (Jinja2) for first-slice mechanisms (incl. ECS, EC2/ASG, Lambda, SQS/SNS, RDS, S3, ECR, Secrets, KMS, WAF, CloudWatch Logs, Route 53, VPC); `terraform fmt` + `validate` tests. |
 | P10-07 | `perpetual transform`; API; UI: diff view, verification report, progress. |
 | P10-08 | Evals: transform `examples/ecs-rds` and `examples/eks-rds` from the broken demos; verification must pass; metrics recorded. |
 

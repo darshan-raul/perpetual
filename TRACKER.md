@@ -76,8 +76,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P1-06 Recovery pass
 - [ ] P1-07 Stack state + review gate
 - [ ] P1-08 Reason chains
-- [ ] P1-09 Duration catalog v1
-- [ ] P1-10 First-slice recovery actions
+- [ ] P1-09 Duration catalog v1 (incl. generic fallback action types + per-resource duration overrides)
+- [ ] P1-10 First-slice recovery actions (+ fallback actions for user-accepted unmodeled mechanisms)
 - [ ] P1-11 DAG builder (template, refinement, decide, stack validation)
 - [ ] P1-12 Buffer
 - [ ] P1-13 RTO (low/expected/high, UNKNOWN, breakdown)
@@ -121,8 +121,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [ ] P2b-01 Synthetic log generator
 - [ ] P2b-02 CloudTrail reader
-- [ ] P2b-03 Principal → compute mapping
-- [ ] P2b-04 Flow-log reader + ENI resolution
+- [ ] P2b-03 Principal → compute mapping (task role, Lambda role, IRSA, Pod Identity, EC2/ASG instance profile)
+- [ ] P2b-04 Flow-log reader + ENI resolution (incl. EC2/ASG + Lambda Hyperplane ENIs)
 - [ ] P2b-05 Aggregate-only observations + canary
 - [ ] P2b-06 Contradictions, unobserved, external proposals
 - [ ] P2b-07 Coverage report
@@ -130,8 +130,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ## P3 Stack and service discovery
 
-- [ ] P3-01 Grouping signals
-- [ ] P3-02 Service suggestion
+- [ ] P3-01 Grouping signals (incl. WAF→ALB→TG→ECS/EC2/ASG/Lambda & SNS→SQS→Lambda chains)
+- [ ] P3-02 Service suggestion (ECS, EC2/ASG, Lambda; Deployments in P7)
 - [ ] P3-03 Roots, closure, shared resources
 - [ ] P3-04 Manual stack/service editing
 - [ ] P3-05 Discovery confidence
@@ -142,7 +142,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P3b-02 LangGraph runtime, tools (incl. `web_search`, `web_fetch`), checkpointer, interrupts, validated outputs
 - [ ] P3b-03 Fake chat model + hostile-output fixtures
 - [ ] P3b-04 Guardrails: opt-in, redaction, query sanitization for web tools, `.perpetualignore`, call log
-- [ ] P3b-05 Knowledge base: shipped domain docs (`knowledge/domain/`), `sources.yaml`, sync/add, agent web-fetch ingestion, hybrid retrieval, citations
+- [ ] P3b-05 Knowledge base: shipped domain docs (`knowledge/domain/`), `sources.yaml`, `kb sync|add|list|show|remove`, agent web-fetch ingestion, hybrid retrieval, citations
 - [ ] P3b-06 Skills: format, loader, first-slice skills (incl. EC2/ASG, Lambda, SQS/SNS, WAF)
 - [ ] P3b-07 Explainer agent
 
@@ -192,7 +192,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [ ] P9-01 Recovery options + strategy mapping
 - [ ] P9-02 Candidate generation
-- [ ] P9-03 Cost providers + confidence
+- [ ] P9-03 Cost providers + confidence (incl. EC2/ASG, Lambda, SQS/SNS, WAF, CloudWatch Logs)
 - [ ] P9-04 Evaluation + Pareto
 - [ ] P9-05 Remediation planner (stack-level deltas)
 - [ ] P9-06 `perpetual optimize` + UI + §94 test
@@ -206,7 +206,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P10-03 Transformation agent (+ EKS skills)
 - [ ] P10-04 Verification loop (plan import, re-simulate, static fallback)
 - [ ] P10-05 Change delivery (commits, patch, optional PR)
-- [ ] P10-06 Companion fallback templates
+- [ ] P10-06 Companion fallback templates (incl. EC2/ASG, Lambda, SQS/SNS, WAF, CloudWatch Logs)
 - [ ] P10-07 `perpetual transform` + API + UI
 - [ ] P10-08 Evals on examples/
 
@@ -301,6 +301,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-26 | Close 5 pipeline integration gaps for expanded AWS services and KB web research: (1) add generic fallback action types (`generic_promote_counterpart`, `generic_restore_from_backup`, `generic_rebuild_from_iac`) and per-resource duration overrides in the duration catalog (`P1-09`, `P1-10`, `spec §49.1`, `§56.1`) so user-accepted mechanisms on unmodeled resources can produce a valid RTO; (2) add Lambda execution-role and ASG instance-profile mapping in `P2b-03` and EC2/ASG + Lambda Hyperplane ENI resolution in `P2b-04` (`spec §14.1`); (3) add `WAF→ALB→TG→ECS/EC2/ASG/Lambda` and `SNS→SQS→Lambda` grouping chains in `P3-01` and `EC2/ASG` service suggestions in `P3-02`; (4) cover `EC2/ASG`, `Lambda`, `SQS/SNS`, `WAF`, and `CloudWatch Logs` in `StaticCostProvider` (`P9-03`) and companion Terraform templates (`P10-06`, `spec §62.1`); (5) add `perpetual kb list|show|remove` and `GET /kb/documents`, `DELETE /kb/documents/{id}` (`P3b-05`, `spec §78–79`) to inspect and curate agent-fetched KB documents. | Ensure end-to-end consistency across observed evidence, stack grouping, RTO calculation, costing, companion templates and KB curation for the expanded v0.1 scope. |
 | 2026-10-26 | Expand v0.1 AWS services and KB web-research capabilities: (1) add `EC2` (instances, ASG, launch templates, AMIs), `Lambda`, `SQS`, `SNS`, `WAF` (WAFv2), and `CloudWatch Logs` across models (`P0-04`), collectors (`P2-02..03`), rule packs (`P4-02..03`), recovery actions (`P6-01`), RPO (`P8-01`) and skills (`P3b-06`); (2) ship curated domain knowledge for all in-scope services in `knowledge/domain/` (`P3b-05`); (3) give LLM agents sanitized `web_search` and `web_fetch` tools (`P3b-02`, `P3b-04`, `P3b-05`) so when an out-of-scope / unmodeled resource appears, the agent fetches official docs, persists/indexes them into the local knowledge base (`kb_documents`/`kb_chunks`) to improve local docs, and cites them during advisory review and DR candidate planning. | User direction: cover EC2, Lambda, SQS, SNS, WAF and CloudWatch Logs in v0.1, hold local domain knowledge for all supported services, and let agents research unmodeled resources via `web_search`/`web_fetch` while enriching the local doc store. |
 | 2026-10-26 | Tighten P0/P2 plan details: (1) root `pyproject.toml` builds the `perpetual` package from `apps/api/perpetual` so `uv tool install .` works from the repo root; (2) P0-04 discriminated union includes out-of-scope (`CloudWatchLogGroupProperties`, `CodePipelineProperties`), `ExternalResourceProperties` and fallback `GenericResourceProperties`; (3) P0-01 creates `__init__.py` stubs for all §3.2 subpackages so P0-02 `import-linter` contracts run immediately, and `iac`, `graph`, `evidence`, `stacks`, `normalization`, `importers` are also forbidden from importing `llm`; (4) P0-07 tests SQLite + PostgreSQL dialect compilation for models/migrations and P2-09 includes PostgreSQL in `docker-compose.yml`. | Ensure root installability (`P1b-13`), typed validation for out-of-scope/external resources (`spec §15.2–15.3, §24.1`), day-one `import-linter` contract enforcement (`P0-02`), and PostgreSQL schema compatibility (`spec §71.1, §73`). |
 | 2026-10-25 | Spec revision 4: Perpetual changes the user's Terraform and Kubernetes manifests (code only, branch/PR, never apply). LLM agents on LangGraph join advisory review, candidate planning and IaC transformation, with RAG and skills. Provider replaceable (OpenRouter, Anthropic, Bedrock, Ollama). Plan: D14 revised, D15–D18 added, new phase P3b, P4-07, P9-07/08, P10 replaced. | User direction: the tool must fix infrastructure, not only assess it, and use LLMs with RAG and skills to reach the best DR design. "LLM proposes, engine verifies" keeps results trustworthy. |
@@ -319,6 +320,7 @@ Newest first. Each entry: date, what was done, carry-over for the next session.
 - Tightened P0/P2 plan details (root-installable `uv` workspace, out-of-scope/fallback typed properties, `import-linter` subpackage stubs and boundaries, SQLite/PostgreSQL dialect compilation checks).
 - Expanded v0.1 AWS service scope to include EC2 & Auto Scaling, Lambda, SQS, SNS, WAF (WAFv2), and CloudWatch Logs across `spec.md`, `IMPL_PLAN.md`, `TRACKER.md`, `CLAUDE.md` and `README.md`.
 - Added shipped domain knowledge (`knowledge/domain/`) for all in-scope services and sanitized `web_search` / `web_fetch` agent tools to fetch, persist and cite docs for unmodeled/out-of-scope resources in the local KB.
+- Closed 5 pipeline integration gaps: generic fallback duration-catalog actions + per-resource duration overrides for unmodeled resources, CloudTrail/ENI resolution for EC2/ASG and Lambda, WAF/SQS/SNS/EC2/Lambda stack grouping chains, static cost + companion Terraform coverage, and KB curation CLI/API (`kb list|show|remove`).
 - **Carry-over:** start P0-01.
 
 ### 2026-10-25 — Revision 4

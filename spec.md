@@ -878,7 +878,7 @@ Requires Kubernetes access (section 14, Level 2).
 ### CloudTrail
 
 - Each relevant event gives a principal (an assumed-role session) and a resource (from `resources` or `requestParameters`).
-- The principal is mapped back to compute through its role: ECS task role, IRSA role, Pod Identity association, instance profile. The edge runs from that compute to the resource.
+- The principal is mapped back to compute through its role: ECS task role, Lambda execution role, IRSA role, Pod Identity association, EC2 instance profile (rolled up to its Auto Scaling group when applicable). The edge runs from that compute to the resource.
 - Perpetual reads an existing trail from its S3 bucket, from CloudTrail Lake, or from an Athena table over the trail. The `LookupEvents` API is a fallback only: it covers management events for 90 days at a low rate limit.
 - Management events are always recorded. S3 object-level and DynamoDB item-level calls are data events, which are off by default and billed. Perpetual MUST NOT enable trails or data events (section 65). It reports which coverage existed, so a missing S3 edge is explained by missing data events rather than read as "no dependency".
 - The lookback window is configurable, default 30 days.
@@ -887,7 +887,7 @@ Requires Kubernetes access (section 14, Level 2).
 ### VPC Flow Logs
 
 - Each accepted flow gives a source and destination address, destination port and protocol.
-- Addresses resolve to resources through their ENI (`interface-id`): ECS task ENIs, RDS ENIs, ALB ENIs, NAT gateways, VPC endpoints, EKS pod IPs.
+- Addresses resolve to resources through their ENI (`interface-id`): ECS task ENIs, EC2/Auto Scaling instance ENIs, Lambda VPC Hyperplane ENIs (mapped to the Lambda functions sharing that VPC subnet and security group), RDS ENIs, ALB ENIs, NAT gateways, VPC endpoints, EKS pod IPs.
 - Fargate tasks and pods are short-lived, so their ENIs and IPs are reused. Resolution uses the ENI as it was at the flow's timestamp: current ENIs first, then AWS Config or CloudTrail ENI history. Flows that cannot be resolved are dropped and counted, never guessed.
 - Version 5 fields (`pkt-srcaddr`, `pkt-dstaddr`, `flow-direction`) are used when present, to see through NAT gateways and load balancers.
 - Return traffic on ephemeral ports is folded into the originating flow.
@@ -2618,8 +2618,9 @@ The numbers above are illustrative.
 Rules:
 
 - every estimate records `catalog_version` and the matched bucket in `basis`;
-- values are heuristic until replaced by drill data (section 53). Drill-derived values take precedence for that stack and action;
-- an action with no catalog entry gets `expected_seconds = None`, which makes the RTO UNKNOWN. Never default it to zero.
+- values are heuristic until replaced by drill data (section 53) or per-resource duration overrides in project configuration. Drill-derived values and explicit project overrides take precedence for that stack and action;
+- for unmodeled/out-of-scope resources whose recovery mechanism is confirmed by the user (e.g. via an accepted advisory proposal in section 28.2 or candidate proposal in section 56.1), the catalog includes conservative, low-confidence generic fallback action types (`generic_promote_counterpart`, `generic_restore_from_backup`, `generic_rebuild_from_iac`) so the DAG builder can include them in the stack RTO calculation;
+- an action with no catalog entry (and no project override) gets `expected_seconds = None`, which makes the RTO UNKNOWN. Never default it to zero.
 
 Catalog estimates cover the action only. They MUST NOT include buffer. Buffer is added once, in section 49.2.
 
@@ -3154,8 +3155,8 @@ When no IaC repository is declared, or LLM features are disabled, Perpetual gene
 ```text
 generated/
   dr/
-    versions.tf  providers.tf  network.tf  rds.tf  ecs.tf  ecr.tf
-    secrets.tf   route53.tf    outputs.tf
+    versions.tf  providers.tf  network.tf  rds.tf  ecs.tf  ec2.tf  lambda.tf
+    sqs_sns.tf   ecr.tf        secrets.tf  waf.tf  logs.tf route53.tf  outputs.tf
 ```
 
 Generated configuration:
@@ -3872,9 +3873,12 @@ POST /dr-specs/{id}/approve
 POST /dr-specs/{id}/transform          # body: IaC paths, open_pr
 GET  /transformations/{id}             # progress, diff, verification report
 
-GET  /llm/calls
-POST /kb/sync
-POST /kb/documents
+GET    /llm/calls
+POST   /kb/sync
+GET    /kb/documents
+POST   /kb/documents
+GET    /kb/documents/{id}
+DELETE /kb/documents/{id}
 ```
 
 Later:
@@ -3926,6 +3930,9 @@ perpetual llm log
 
 perpetual kb sync
 perpetual kb add ./docs/runbooks
+perpetual kb list [--origin agent_web_fetch]
+perpetual kb show <doc-id>
+perpetual kb remove <doc-id>
 
 perpetual skills list
 
