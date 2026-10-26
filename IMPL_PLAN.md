@@ -241,12 +241,12 @@ Spec: §9, §11–§13, §14.1 (security groups, IAM), §21, §22, §65–§67, 
 
 | ID | Task |
 |---|---|
-| P2-01 | Collector protocol; per-account sessions (primary + DR account, profile or role); region iteration; pagination; throttling retries; per-collector failure → scan `partial`. |
-| P2-02 | Collectors: EC2 (instances, Auto Scaling groups, launch templates, AMIs) / VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks, ARC if present), ACM, WAF (WAFv2 Web ACLs, rule groups, associations). |
+| P2-01 | Collector protocol; per-account sessions (primary + DR account, profile or role); region iteration + global/`us-east-1` pass (`Route 53`, `IAM`, `CloudFront`, `WAFv2 Scope=CLOUDFRONT`, `ACM in us-east-1`); pagination; throttling retries; per-collector failure → scan `partial`. |
+| P2-02 | Collectors: EC2 (instances, Auto Scaling groups, launch templates, AMIs) / VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks, ARC if present), ACM, WAF (WAFv2 `REGIONAL` and `CLOUDFRONT` Web ACLs, rule groups, associations). |
 | P2-03 | Collectors: ECS, Lambda (functions, layers, event-source mappings), ECR (incl. replication config), SQS (queues, DLQs, policies), SNS (topics, subscriptions, policies), Secrets Manager (metadata, replication), SSM parameters (metadata), KMS (incl. multi-Region), IAM roles/policies, CloudWatch Logs (log groups, KMS, retention, subscription filters). |
 | P2-04 | Collectors: RDS/Aurora (instances, clusters, replicas, snapshots), S3 (versioning, replication), AWS Backup. |
 | P2-05 | Supplementary: Resource Explorer, AWS Config items and relationships. |
-| P2-06 | Edge resolvers: security groups (spec §14.1 rules incl. wide-open handling), IAM (identity and resource policies, wildcard handling), configuration references (task-definition secrets, Lambda/ECS env/endpoint matching that persists only the matched fact, event-source mappings, SNS→SQS/Lambda subscriptions, WAF→ALB associations, EC2 instance profiles/AMIs/volumes), Config relationships. |
+| P2-06 | Edge resolvers: security groups (spec §14.1 rules incl. wide-open handling), IAM (identity and resource policies, wildcard handling), configuration references (task-definition secrets, Lambda/ECS env/endpoint matching that persists only the matched fact, `ASG → LaunchTemplate → AMI → EBS Snapshot → KMS Key`, `Lambda → S3 code bucket / ECR image / Lambda Layer`, event-source mappings, SNS→SQS/Lambda subscriptions, WAF→ALB/CloudFront associations, EC2 instance profiles/volumes), Config relationships. |
 | P2-07 | `perpetual scan --profile P --region R --dr-region R2 [--dr-profile P2]`; `POST /projects/{id}/scans`; scan status and errors in UI. |
 | P2-08 | `docs/iam/perpetual-readonly.json` minimal read-only policy, with optional log-reading statements. |
 | P2-09 | Tests: moto unit tests per collector; `docker-compose.yml` with Floci and PostgreSQL (for live Postgres migration verification, spec §71.1, §73); `examples/ecs-rds/` Terraform applied to Floci and scanned in CI. Check Floci support per operation first and record gaps in the decision log. |
@@ -294,8 +294,8 @@ Spec: §2, §69, §70.
 |---|---|
 | P3b-01 | Provider abstraction: config schema (default + per-role + embeddings), `init_chat_model`, OpenAI-compatible/OpenRouter, Anthropic, Bedrock, Ollama extras; capability probe (tool calling, structured output); `perpetual llm configure|test`. |
 | P3b-02 | LangGraph runtime: graph base, tool registry over read-only engine APIs + `web_search` and `web_fetch` tools for unmodeled/out-of-scope resources (persisting fetched docs into the local KB), SQLite checkpointer, interrupts, Pydantic-validated outputs with one retry then fail closed. |
-| P3b-03 | Fake chat model + recorded-response harness; hostile-output fixtures. |
-| P3b-04 | Guardrails: per-project opt-in notice, redaction pass, query sanitization for `web_search`/`web_fetch` (generic AWS/DR/Terraform terms only; `--offline` / `allow_web_research` toggle), `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
+| P3b-03 | Fake chat model + recorded-response and recorded `web_search`/`web_fetch` harness; hostile-output and prompt-injection web-page fixtures (no live network in CI). |
+| P3b-04 | Guardrails: per-project opt-in notice, redaction pass, query sanitization for `web_search`/`web_fetch` (generic AWS/DR/Terraform terms only; `--offline` / `allow_web_research` toggle), untrusted web-content sanitization (strip prompt injections before KB indexing), `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
 | P3b-05 | Knowledge base: shipped domain knowledge (`knowledge/domain/` covering ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, ECR, Secrets, SSM, KMS, IAM, Route 53, ALB, WAF, CloudWatch Logs, VPC), `knowledge/sources.yaml`, `perpetual kb sync|add|list|show|remove` (+ `GET/DELETE /kb/documents`), automatic ingestion of agent `web_fetch` results (`origin = "agent_web_fetch"`), chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
 | P3b-06 | Skills: format, loader, index, `load_skill` tool, project overrides in `.perpetual/skills/`; first skills for the ECS slice (RDS replica, ECR replication, Secrets replication, KMS multi-Region, S3 CRR, Route 53 failover, ECS DR service, EC2/ASG + AMI DR, Lambda multi-Region, SQS/SNS DR, WAF Web ACL DR). |
 | P3b-07 | Explainer agent (spec §70) in CLI (`perpetual ask`) and UI. |
@@ -309,8 +309,8 @@ Spec: §8.1, §28, §28.1, §29–§32, §41, §91.
 | ID | Task |
 |---|---|
 | P4-01 | Finding model, stable rule-ID registry, rule docs generated to `docs/rules/`. |
-| P4-02 | Packs: ECS (§32), EC2/Auto Scaling (§5.3), Lambda (§5.4), ECR, SQS (§7.1), SNS (§7.1), Secrets/SSM, KMS, IAM. |
-| P4-03 | Packs: RDS (§41, Multi-AZ ≠ cross-Region), S3, network (VPC, subnets, NAT, routes, endpoints), ALB, Route 53 (data-plane vs control-plane, §8.1), WAF (§8), CloudWatch Logs (§8, §24.1). |
+| P4-02 | Packs: ECS (§32), EC2/Auto Scaling (§5.3, incl. cross-Region AMI copy + snapshot KMS decryptability), Lambda (§5.4, incl. DR S3 package / ECR image / regional layer availability + event-source mappings), ECR, SQS (§7.1, endpoint recovery vs in-flight message RPO), SNS (§7.1), Secrets/SSM, KMS, IAM. |
+| P4-03 | Packs: RDS (§41, Multi-AZ ≠ cross-Region), S3, network (VPC, subnets, NAT, routes, endpoints), ALB, Route 53 (data-plane vs control-plane, §8.1), WAF (§8, primary-vs-DR Web ACL and rule parity), CloudWatch Logs (§8, §24.1). |
 | P4-04 | Cross-cutting rules: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001, QUOTA-DR-001, REGION-SVC-001. |
 | P4-05 | Readiness dimensions (§30) with UNKNOWN for dimensions without rules; scoring (§31); Observability reports out-of-scope findings and never blocks. |
 | P4-06 | `perpetual assess STACK`; findings API; findings tab in UI. |
@@ -368,7 +368,7 @@ Spec: §51, §52.
 
 | ID | Task |
 |---|---|
-| P8-01 | RPO estimators per mechanism: recovery-point age, replica lag (CloudWatch metrics), S3 replication (RTC metrics if present), DynamoDB Global Tables posture, EBS/AMI snapshot age (EC2/EKS), SQS retention/redrive posture. |
+| P8-01 | RPO estimators per mechanism: recovery-point age, replica lag (CloudWatch metrics), S3 replication (RTC metrics if present), DynamoDB Global Tables posture, EBS/AMI snapshot age (EC2/EKS), SQS stateful in-flight message RPO vs endpoint recovery (§7.1, §51). |
 | P8-02 | Stack RPO (worst over required in-scope stores), UNKNOWN propagation, contributors. |
 | P8-03 | RPO in CLI, API and UI; target comparison. |
 

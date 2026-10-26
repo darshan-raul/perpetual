@@ -105,12 +105,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ## P2 AWS discovery (ECS slice)
 
-- [ ] P2-01 Collector protocol, sessions, partial scans
-- [ ] P2-02 EC2 (instances, ASG, launch templates, AMIs) / VPC, ELB, Route 53, ACM, WAF collectors
+- [ ] P2-01 Collector protocol, sessions (incl. global/`us-east-1` pass), partial scans
+- [ ] P2-02 EC2 (instances, ASG, launch templates, AMIs) / VPC, ELB, Route 53, ACM, WAF (REGIONAL + CLOUDFRONT) collectors
 - [ ] P2-03 ECS, Lambda, ECR, SQS, SNS, Secrets, SSM, KMS, IAM, CloudWatch Logs collectors
 - [ ] P2-04 RDS/Aurora, S3, Backup collectors
 - [ ] P2-05 Resource Explorer, AWS Config
-- [ ] P2-06 Edge resolvers: SG, IAM, references, event-source/subscription/WAF associations, Config
+- [ ] P2-06 Edge resolvers: SG, IAM, references, ASG→LT→AMI→Snapshot→KMS, Lambda→S3/ECR/Layers, event-source/subscription/WAF associations, Config
 - [ ] P2-07 `perpetual scan` + API + UI status
 - [ ] P2-08 Read-only IAM policy doc
 - [ ] P2-09 moto + Floci (+ Postgres) tests, `examples/ecs-rds`
@@ -140,8 +140,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [ ] P3b-01 Provider abstraction, per-role config, capability probe, `perpetual llm configure|test`
 - [ ] P3b-02 LangGraph runtime, tools (incl. `web_search`, `web_fetch`), checkpointer, interrupts, validated outputs
-- [ ] P3b-03 Fake chat model + hostile-output fixtures
-- [ ] P3b-04 Guardrails: opt-in, redaction, query sanitization for web tools, `.perpetualignore`, call log
+- [ ] P3b-03 Fake chat model + recorded web-search/fetch harness + hostile/prompt-injection fixtures
+- [ ] P3b-04 Guardrails: opt-in, redaction, query sanitization + untrusted web-content sanitization, `.perpetualignore`, call log
 - [ ] P3b-05 Knowledge base: shipped domain docs (`knowledge/domain/`), `sources.yaml`, `kb sync|add|list|show|remove`, agent web-fetch ingestion, hybrid retrieval, citations
 - [ ] P3b-06 Skills: format, loader, first-slice skills (incl. EC2/ASG, Lambda, SQS/SNS, WAF)
 - [ ] P3b-07 Explainer agent
@@ -301,6 +301,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-26 | Close 5 service-specific and CI-security gaps: (1) add a global/`us-east-1` collector pass in `P2-01..02` for `WAFv2 (Scope=CLOUDFRONT)`, `ACM (us-east-1)`, `Route 53`, `IAM`, `CloudFront`, and check primary-vs-DR WAF parity in `P4-03`; (2) resolve `ASG → LaunchTemplate → AMI → EBS Snapshot → KMS Key` in `P2-06` and verify cross-Region AMI + snapshot KMS decryptability in `P4-02`; (3) resolve `Lambda → S3 code bucket / ECR image / Lambda Layer` in `P2-06` and verify DR artifact/layer availability in `P4-02`; (4) distinguish SQS endpoint recovery (`RTO`) from in-flight message durability (`RPO`) in `spec §7.1`, `§51`, `P4-02`, and `P8-01`; (5) add offline recorded `web_search`/`web_fetch` fixtures (including hostile/prompt-injection web pages) in `P3b-03` and untrusted web-content sanitization in `P3b-04`. | Prevent missed `us-east-1`/CloudFront WAF & ACM resources, catch Regional AMI/Lambda layer/S3 package blockers, model SQS in-flight message RPO accurately, and keep CI offline and resilient to prompt injection from web-fetched docs. |
 | 2026-10-26 | Close 5 pipeline integration gaps for expanded AWS services and KB web research: (1) add generic fallback action types (`generic_promote_counterpart`, `generic_restore_from_backup`, `generic_rebuild_from_iac`) and per-resource duration overrides in the duration catalog (`P1-09`, `P1-10`, `spec §49.1`, `§56.1`) so user-accepted mechanisms on unmodeled resources can produce a valid RTO; (2) add Lambda execution-role and ASG instance-profile mapping in `P2b-03` and EC2/ASG + Lambda Hyperplane ENI resolution in `P2b-04` (`spec §14.1`); (3) add `WAF→ALB→TG→ECS/EC2/ASG/Lambda` and `SNS→SQS→Lambda` grouping chains in `P3-01` and `EC2/ASG` service suggestions in `P3-02`; (4) cover `EC2/ASG`, `Lambda`, `SQS/SNS`, `WAF`, and `CloudWatch Logs` in `StaticCostProvider` (`P9-03`) and companion Terraform templates (`P10-06`, `spec §62.1`); (5) add `perpetual kb list|show|remove` and `GET /kb/documents`, `DELETE /kb/documents/{id}` (`P3b-05`, `spec §78–79`) to inspect and curate agent-fetched KB documents. | Ensure end-to-end consistency across observed evidence, stack grouping, RTO calculation, costing, companion templates and KB curation for the expanded v0.1 scope. |
 | 2026-10-26 | Expand v0.1 AWS services and KB web-research capabilities: (1) add `EC2` (instances, ASG, launch templates, AMIs), `Lambda`, `SQS`, `SNS`, `WAF` (WAFv2), and `CloudWatch Logs` across models (`P0-04`), collectors (`P2-02..03`), rule packs (`P4-02..03`), recovery actions (`P6-01`), RPO (`P8-01`) and skills (`P3b-06`); (2) ship curated domain knowledge for all in-scope services in `knowledge/domain/` (`P3b-05`); (3) give LLM agents sanitized `web_search` and `web_fetch` tools (`P3b-02`, `P3b-04`, `P3b-05`) so when an out-of-scope / unmodeled resource appears, the agent fetches official docs, persists/indexes them into the local knowledge base (`kb_documents`/`kb_chunks`) to improve local docs, and cites them during advisory review and DR candidate planning. | User direction: cover EC2, Lambda, SQS, SNS, WAF and CloudWatch Logs in v0.1, hold local domain knowledge for all supported services, and let agents research unmodeled resources via `web_search`/`web_fetch` while enriching the local doc store. |
 | 2026-10-26 | Tighten P0/P2 plan details: (1) root `pyproject.toml` builds the `perpetual` package from `apps/api/perpetual` so `uv tool install .` works from the repo root; (2) P0-04 discriminated union includes out-of-scope (`CloudWatchLogGroupProperties`, `CodePipelineProperties`), `ExternalResourceProperties` and fallback `GenericResourceProperties`; (3) P0-01 creates `__init__.py` stubs for all §3.2 subpackages so P0-02 `import-linter` contracts run immediately, and `iac`, `graph`, `evidence`, `stacks`, `normalization`, `importers` are also forbidden from importing `llm`; (4) P0-07 tests SQLite + PostgreSQL dialect compilation for models/migrations and P2-09 includes PostgreSQL in `docker-compose.yml`. | Ensure root installability (`P1b-13`), typed validation for out-of-scope/external resources (`spec §15.2–15.3, §24.1`), day-one `import-linter` contract enforcement (`P0-02`), and PostgreSQL schema compatibility (`spec §71.1, §73`). |
@@ -321,6 +322,7 @@ Newest first. Each entry: date, what was done, carry-over for the next session.
 - Expanded v0.1 AWS service scope to include EC2 & Auto Scaling, Lambda, SQS, SNS, WAF (WAFv2), and CloudWatch Logs across `spec.md`, `IMPL_PLAN.md`, `TRACKER.md`, `CLAUDE.md` and `README.md`.
 - Added shipped domain knowledge (`knowledge/domain/`) for all in-scope services and sanitized `web_search` / `web_fetch` agent tools to fetch, persist and cite docs for unmodeled/out-of-scope resources in the local KB.
 - Closed 5 pipeline integration gaps: generic fallback duration-catalog actions + per-resource duration overrides for unmodeled resources, CloudTrail/ENI resolution for EC2/ASG and Lambda, WAF/SQS/SNS/EC2/Lambda stack grouping chains, static cost + companion Terraform coverage, and KB curation CLI/API (`kb list|show|remove`).
+- Closed 5 service-specific and CI-security gaps: global/`us-east-1` discovery pass for CloudFront WAFv2/ACM + DR WAF parity, `ASG→LaunchTemplate→AMI→Snapshot→KMS` and `Lambda→S3/ECR/Layer` dependency chains, SQS endpoint RTO vs in-flight message RPO distinction, and offline recorded/hostile `web_search`/`web_fetch` fixtures + prompt-injection sanitization.
 - **Carry-over:** start P0-01.
 
 ### 2026-10-25 — Revision 4

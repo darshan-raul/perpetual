@@ -409,8 +409,8 @@ Support:
 
 - standalone EC2 instances;
 - Auto Scaling groups (ASGs);
-- launch templates;
-- AMIs (including cross-Region AMI copy and KMS encryption);
+- launch templates (resolving the `ASG -> LaunchTemplate -> AMI -> EBS Snapshot -> KMS Key` dependency chain);
+- AMIs (including cross-Region AMI copy, SSM parameter/data-source lookup in the DR Region, and backing EBS snapshot KMS decryptability in DR);
 - instance profiles and IAM roles;
 - attached EBS volumes and snapshot/backup coverage;
 - VPC, subnets, security groups and load balancer target group attachments;
@@ -423,8 +423,8 @@ Support:
 Support:
 
 - Lambda functions, versions and aliases;
-- Lambda layers;
-- deployment packages (S3) and container images (ECR);
+- Lambda layers (detecting hardcoded primary-Region layer ARNs vs DR layer availability);
+- deployment packages (S3 code bucket cross-Region availability/replication) and container images (ECR replication);
 - VPC configuration (subnets, security groups);
 - execution roles and resource-based policies;
 - environment variable reference matching (persisting only matched facts per section 67);
@@ -573,7 +573,7 @@ Inspect:
 - queue policies;
 - message retention and visibility timeout;
 - event-source mappings (Lambda) and producers/consumers;
-- DR posture (recreation in DR via IaC vs active-active / replay considerations for in-flight messages).
+- DR posture: Perpetual MUST distinguish **queue endpoint recovery** (`RTO` — recreating the queue in DR via IaC or keeping a warm standby queue so new messages can be processed) from **in-flight message durability** (`RPO` — AWS SQS does not natively replicate queued messages across Regions, so unconsumed messages in a primary queue or DLQ are stranded during a Region outage unless backed by a durable cross-Region store or dual-write pattern).
 
 ### Amazon SNS
 
@@ -600,7 +600,7 @@ Initially include awareness of:
 - ALB;
 - NLB;
 - CloudFront;
-- AWS WAF (WAFv2 Web ACLs, rule groups, IP sets, regional ALB and global CloudFront associations);
+- AWS WAF (WAFv2 Web ACLs, rule groups, IP sets, regional ALB associations and `us-east-1` `Scope=CLOUDFRONT` associations, plus primary-vs-DR Web ACL and rule parity checks);
 - Amazon CloudWatch Logs (log groups, KMS encryption, retention, subscription filters; out of RTO scope by default per section 24.1 unless marked required, assessed under Observability);
 - VPC;
 - subnets;
@@ -613,7 +613,7 @@ Initially include awareness of:
 - AWS Backup;
 - Service Quotas (DR Region quotas for the services a stack uses);
 - Route 53 Application Recovery Controller (routing controls, readiness checks) where configured;
-- ACM certificates (including us-east-1 certificates used by CloudFront).
+- ACM certificates (including `us-east-1` certificates used by CloudFront, discovered via a global/`us-east-1` collector pass alongside `Route 53`, `IAM`, `CloudFront`, and `CLOUDFRONT`-scoped WAFv2 Web ACLs).
 
 Detailed service-specific rules can be added incrementally.
 
@@ -2734,6 +2734,10 @@ Use replication configuration and available metrics.
 
 Use replication posture.
 
+### Stateful SQS queues
+
+SQS has no native cross-Region message replication. When an in-scope SQS queue holds unacknowledged work without a cross-Region durable backing store (such as S3/DynamoDB persistence before enqueue or dual-Region publishing), in-flight messages in the primary Region remain unavailable for the duration of the Region outage; the RPO estimator flags this gap and bounds RPO accordingly rather than reporting zero data loss from queue recreation alone.
+
 If Perpetual cannot confidently determine RPO:
 
 ```text
@@ -3428,13 +3432,13 @@ Never sent: Terraform state, secret values, environment-variable and ConfigMap v
 
 Before sending IaC files, a redaction pass removes secret-like values (known key patterns, high-entropy strings, `sensitive` variables' defaults). A `.perpetualignore` file excludes paths entirely.
 
-For `web_search` and `web_fetch`, queries are sanitized before execution so they contain only generic AWS service, resource-type, DR and Terraform terms—never account IDs, ARNs, resource names, internal hostnames, tags or code snippets. Web research can be disabled per project (`allow_web_research: false` or `--offline`).
+For `web_search` and `web_fetch`, queries are sanitized before execution so they contain only generic AWS service, resource-type, DR and Terraform terms—never account IDs, ARNs, resource names, internal hostnames, tags or code snippets. Fetched web content is stripped of scripts, hidden text and instruction-like prompt-injection patterns and wrapped as untrusted reference text before indexing into `kb_chunks` or passing to a model. Web research can be disabled per project (`allow_web_research: false` or `--offline`).
 
 Every LLM call (and every `web_search` / `web_fetch` invocation) is recorded locally in `llm_calls`: time, role, provider, model, token counts, which files, documents and web URLs were included, redactions applied, and a hash of the prompt. The UI and `perpetual llm log` show it. For no data egress, use a local model (`ollama`) with web research disabled.
 
 ## 69.6 Testing and Evaluation
 
-- Unit and integration tests use a fake chat model with recorded responses. CI never needs an API key.
+- Unit and integration tests use a fake chat model and a recorded `web_search` / `web_fetch` harness (including hostile and prompt-injection web-page fixtures). CI never needs an API key or live internet access.
 - An evaluation suite in `evals/` runs against real providers on demand: the canonical fixtures (sections 85–89) must yield DR specs that meet their targets, and transformations of `examples/` repositories must pass verification.
 - Tracked per model: verification pass rate, retries per change, share of claims with valid citations, accepted vs dismissed advisory items.
 
