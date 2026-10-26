@@ -81,7 +81,7 @@ Multi-AZ protects against Availability Zone failures; it does not provide recove
 - Compare designs from backup-and-restore to hot standby, including combinations proposed by an LLM planner using AWS guidance and your runbooks.
 - Score each design with the engine against cost, RTO and RPO targets.
 - After you approve a design, generate changes to your Terraform and Kubernetes manifests.
-- Re-run assessment and simulation, then deliver the changes as a pull request with their verification status.
+- Re-run assessment and simulation on the proposed design, then deliver the changes with their verification status and deployment prerequisites. A fresh scan after deployment establishes observed readiness.
 
 ## LLM proposes, engine verifies
 
@@ -89,7 +89,7 @@ LLMs are good at reading your code and AWS documentation and proposing changes. 
 
 - every number you see (cost, RTO, RPO, durations) comes from the engine, never from a model;
 - an LLM suggestion can flag a risk, but it can never mark something as safe. That takes the engine or you;
-- a code change is offered only after the engine has re-run the assessment and simulation on the planned infrastructure and the stack meets its targets. Otherwise it is clearly labeled unverified;
+- a design is marked verified only when the engine evaluates the planned infrastructure against its targets, with explicit assumptions and deployment prerequisites. Static checks alone cannot establish design verification, and design verification cannot establish observed readiness;
 - every suggestion cites what it is based on: a resource, a file and line, a document or a skill.
 
 The planned agent setup supports:
@@ -108,7 +108,7 @@ Stack             checkout
 Primary Region    ap-south-1  ->  DR Region ap-south-2
 
                   Today        After proposed change
-Status            NOT READY    READY
+Status            NOT READY    Design meets targets
 RTO (target 30m)  74-110m      21-29m
 RPO (target 5m)   UNKNOWN      1-3m
 DR cost / month   $0           $640
@@ -118,12 +118,13 @@ Blocking findings fixed
 2. DR execution role cannot decrypt the KMS key   -> multi-Region key + policy
 3. Database recovery exceeds the RTO              -> cross-Region read replica
 
-Pull request      perpetual/dr/checkout/2026-11-02  (7 files, verified)
+Pull request      perpetual/dr/checkout/2026-11-02  (7 files, design verified)
+Deployment        Pending; fresh scan required for observed READY
 ```
 
 ## Design guarantees
 
-- **Code only.** Perpetual edits Terraform and Kubernetes manifests on a separate branch. It never runs `terraform apply` or `kubectl apply`, never merges, and never changes your AWS accounts. Your review and your pipeline apply the change.
+- **Code only.** Perpetual edits Terraform and Kubernetes manifests on a separate branch. Repository tools run in an isolated environment with restricted credentials and network access. It never runs `terraform apply` or `kubectl apply` or merges. Your review and your pipeline apply the change.
 - **No guessing.** Missing evidence is `UNKNOWN`, never a pass. A stack isn't shown as DR-ready until you've reviewed the dependencies and open suggestions that result relies on.
 - **Every answer has a reason.** Findings, dependencies and suggestions all show their evidence.
 - **Your data stays yours.** Perpetual runs on your machine. LLM features are opt-in per project, every call is logged, and Terraform state, secret values, environment values and raw logs are never sent to a model.
@@ -132,7 +133,7 @@ Pull request      perpetual/dr/checkout/2026-11-02  (7 files, verified)
 
 **First release covers:**
 
-- ECS, EC2 and Serverless stacks: Route 53, WAF, ALB, ECS on Fargate/EC2, EC2 instances and Auto Scaling groups, Lambda, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, RDS/Aurora, S3, CloudWatch Logs, VPC networking;
+- ECS, EC2 and Serverless stacks: Route 53, WAF, ALB/NLB, CloudFront, ACM, ECS on Fargate/EC2, EC2 instances and Auto Scaling groups, Lambda, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, RDS/Aurora, basic DynamoDB recovery, S3, EBS/EFS, CloudWatch Logs, VPC networking;
 - EKS stacks: clusters, node groups, add-ons, IRSA and Pod Identity, persistent volumes on EBS/EFS;
 - code changes to Terraform, plain Kubernetes manifests, Kustomize overlays and Helm values.
 
@@ -193,6 +194,6 @@ Perpetual is pre-alpha: the design is complete and implementation is starting. D
 
 ## Documents
 
-- [`spec.md`](spec.md): what Perpetual does, in detail.
+- [`spec.md`](spec.md) & [`docs/spec/`](docs/spec/): architecture overview, reader's guide, section index, and the 7 modular specification documents (`§1`–`§109`).
 - [`IMPL_PLAN.md`](IMPL_PLAN.md): how it gets built, phase by phase.
 - [`TRACKER.md`](TRACKER.md): progress and decisions.

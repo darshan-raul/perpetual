@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Perpetual is a local, single-user tool that decides whether an AWS **stack** (one product: its services, data stores, networking and supporting services) can survive losing its Region within its RTO, RPO and budget. It computes a dependency graph from evidence, simulates the failure, plans recovery for the whole stack, designs the target DR architecture, and then changes the user's own Terraform and Kubernetes manifests to implement it, verified by re-simulation and delivered as a branch or PR. LLM agents (LangGraph) help with advisory review, candidate planning and the code changes; the deterministic engine verifies everything they propose.
 
-- Product definition: [spec.md](spec.md) (revision 4). It is the source of truth for behaviour; tasks and code comments cite it as `spec §N`.
+- Product definition: [spec.md](spec.md) (revision 4 overview & index) and the 7 modular parts in [`docs/spec/`](docs/spec/). Together they are the source of truth for behaviour; tasks and code comments cite sections as `spec §N`.
 - Plan (locked): [IMPL_PLAN.md](IMPL_PLAN.md). Progress: [TRACKER.md](TRACKER.md).
 - At the start of a session, read TRACKER.md and continue from the session log's carry-over. At the end, update task states, the session log and the decision log.
 - Changes to the plan, or any deviation from the spec, go through a decision-log entry in TRACKER.md first. Changes to product behaviour go into spec.md with a changelog line under its current revision.
@@ -47,6 +47,12 @@ Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity reso
 
 - Edge direction is always dependent → dependency. `replicates_to` and `backed_up_by` are not "requires" edges; the impact pass skips them and only the DR overlay follows them (spec §20, §44).
 - Missing evidence is `UNKNOWN`, never PASS or READY. An action with no catalog entry makes the RTO UNKNOWN, never zero (spec §30, §49.1).
+- Use the ordered readiness table in spec §31. A usable recovery path that misses RPO is recoverable but NOT_READY; target failure alone is not application unavailability.
+- Live and planned snapshots have different precedence. Apply lifecycle changes under §15.4 and invalidate old operational proof; import saved-plan `terraform show -json`, never the `plan -json` UI stream.
+- Coverage, confirmed absence and freshness follow §76.1. Failed collectors retain historical context but cannot prove current presence, absence or readiness.
+- Preserve ALL/ANY/quorum groups and selected recovery paths (§19.1). Ambiguous shared-role/ENI observations remain candidate sets, without exact-edge confidence uplift (§14.1).
+- Bind results, approvals and verification reports to immutable input/output digests (§56.3). Check validity on resume and delivery. Design verification never establishes observed READY (§61.1).
+- Cost uses versioned workload inputs and total steady-state DR ownership (§59.1); missing usage/prices stay unknown. Budget PASS requires the high bound within budget.
 - Use the canonical status vocabulary in spec §30.1; UI colours map onto it and are not separate states.
 - DR results exist only per stack: one plan, one RTO, one RPO per stack and failure scenario. Per-resource durations, options and costs are inputs and must not be presented as results (spec §47, §50, §55).
 - Monitoring, logging and CI/CD are out of RTO scope by default: shown and assessed, but never blocking and never on the plan (spec §24.1).
@@ -56,12 +62,13 @@ Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity reso
 - Read-only against AWS. Never call `GetSecretValue`, never enable trails, data events or flow logs. Persist only matched facts from env vars and ConfigMaps, and only aggregates of CloudTrail and flow-log data (spec §14.1, §65–§67).
 - Graph traversal must terminate on cycles and record them as evidence; use NetworkX operations rather than hand-written recursion (spec §18).
 - The LLM proposes, the engine verifies (spec §2, rule 11). LLM output never upgrades a state, supplies a number, or counts as proof. Proposals need citations; uncited ones are dropped. A blocking advisory item keeps the stack from READY (`advisory_unresolved`).
-- Code changes happen only in a git worktree on a `perpetual/dr/...` branch, through an enforced command allowlist. `terraform apply|destroy|import|state` and `kubectl apply` must stay unreachable. A change is offered only after verification re-assesses and re-simulates the planned graph (spec §61.1); otherwise it is labeled unverified.
+- Code changes happen only in a git worktree on a `perpetual/dr/...` branch. The command allowlist and process/filesystem/network/credential isolation in §61 are mandatory before repository tool execution; no unsandboxed fallback. `terraform apply|destroy|import|state` and `kubectl apply` stay unreachable. Reports separate static checks, design verification, deployment prerequisites and observed readiness (§61.1).
 - Never send Terraform state, secret values, env/ConfigMap values or raw logs to an LLM. Redact IaC before sending, sanitize `web_search`/`web_fetch` queries to generic AWS/DR/Terraform terms only, honour `.perpetualignore`, and record every call in `llm_calls` (spec §69.5).
 
 ## Testing
 
 - Spec §90.1: fixtures for the engine (no network), moto for collector unit tests, Floci for collector integration tests, and an opt-in real-AWS contract suite in `tests/contract/` that always tears down what it creates.
+- Spec §90.2 and IMPL_PLAN §3.5 assign review regressions and end-to-end evidence coverage. Implement each gate in its owning phase; do not defer them all to hardening.
 - Canonical fixtures: `ecs-broken` (spec §87), `ecs-remediated` (§88), EKS fixture B (§86, §89). Their expected results are release gates in TRACKER.md.
 - Synthetic CloudTrail and flow-log files come from the generator in `fixtures/logs/`; emulators produce no real logs.
 - LLM stages run in tests against a fake chat model with recorded responses, including hostile outputs; CI never needs an API key. Real-provider evals live in `evals/` and run on demand (spec §69.6).
