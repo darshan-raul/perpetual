@@ -26,7 +26,7 @@ Ship Perpetual v0.1: a local, single-user tool that delivers the MVP workflow in
 | D2 | Source of truth | `spec.md` defines behaviour. This plan defines order and tooling. Section numbers in tasks refer to the spec. |
 | D3 | Delivery | Local single-user tool (spec §71.1). `perpetual ui` runs one FastAPI process on `127.0.0.1:8000` that serves the API and the pre-built UI. SQLite by default. No hosting in v0.1. |
 | D4 | Toolchain | `mise` pins Python 3.13, `uv`, Node (LTS, build-time only) and Terraform in the repo `mise.toml`. All commands run through `mise run <task>`. |
-| D5 | Repo layout | Spec §73, with: a root `pyproject.toml` as a `uv` workspace; the Python package in `apps/api/perpetual/`; the Vite app in `apps/web/`; the UI build copied into `apps/api/perpetual/web/static/` (gitignored) and shipped inside the wheel. |
+| D5 | Repo layout | Spec §73, with: a root `pyproject.toml` (uv workspace + root-installable `perpetual` package pointing Hatchling at `apps/api/perpetual` so `uv tool install .` works from the repo root); the Python package in `apps/api/perpetual/`; the Vite app in `apps/web/`; the UI build copied into `apps/api/perpetual/web/static/` (gitignored) and shipped inside the wheel. |
 | D6 | Python stack | Pydantic v2, SQLAlchemy 2 (typed ORM), Alembic **from P0** (the spec defers it to 1b; starting early avoids migration debt), NetworkX, boto3, `kubernetes` client, Typer + Rich for the CLI, httpx, pytest, ruff, mypy `--strict`. |
 | D7 | UI stack | Vite, React, TypeScript strict, Tailwind, shadcn/ui, React Flow with ELK layout, TanStack Query, TanStack Router. API types generated from OpenAPI with `openapi-typescript` into `packages/schemas`. |
 | D8 | Layer boundaries | Enforced with `import-linter` contracts in CI (§3.3). Not left to review. |
@@ -38,7 +38,7 @@ Ship Perpetual v0.1: a local, single-user tool that delivers the MVP workflow in
 | D14 | LLM | In v0.1 (revised 2026-10-25, see tracker). LangGraph agents for advisory review, candidate planning, IaC transformation and explanation. "The LLM proposes, the engine verifies" (spec §2). |
 | D15 | LLM provider | Replaceable through LangChain's chat-model interface (`init_chat_model`). OpenAI-compatible endpoints (OpenRouter), Anthropic, Bedrock and Ollama as optional extras. Per-role model config. Keys from env or keyring. |
 | D16 | Changing infrastructure | Code only: Terraform and Kubernetes manifests (plain, Kustomize, Helm values) in a git worktree, delivered as a branch or PR. Never apply, never merge. |
-| D17 | Knowledge base | Local SQLite with `sqlite-vec` + FTS5 (hybrid retrieval); local embeddings by default (fastembed). Public sources fetched by the user, not shipped. |
+| D17 | Knowledge base | Local SQLite with `sqlite-vec` + FTS5 (hybrid retrieval); local embeddings by default (fastembed). Ships curated DR domain reference docs in `knowledge/domain/` for all in-scope AWS services, plus `knowledge/sources.yaml` (fetched via `perpetual kb sync`), plus dynamic agent `web_search` and `web_fetch` (with sanitized queries) that persist and index fetched documentation for out-of-scope/unmodeled resources into the local KB. |
 | D18 | LLM tests | Fake chat model with recorded responses in CI; real-provider evals on demand in `evals/`. |
 
 ## 3. Architecture
@@ -107,12 +107,12 @@ apps/api/perpetual/
   costing/         CostProvider implementations
   iac/             resource-to-code mapping, worktrees, transformation runs, verification, companion templates
   llm/             provider abstraction, LangGraph agents (advisor, planner, transformer, explainer), guardrails, call log
-  knowledge/       knowledge-base ingestion and hybrid retrieval
+  knowledge/       knowledge-base ingestion (shipped domain docs, sources.yaml, user docs, agent web-fetch) and hybrid retrieval
   runbooks/        failover / failback generator
   api/             FastAPI routes, static UI serving
   cli/             Typer commands
 skills/            shipped DR skills (SKILL.md + references)
-knowledge/         sources.yaml (public reference URLs)
+knowledge/         domain/ (shipped AWS service DR domain docs) + sources.yaml (public reference URLs)
 evals/             real-provider evaluation suite
 ```
 
@@ -125,7 +125,7 @@ evals/             real-provider evaluation suite
 - `simulator` must not import `collectors` or `importers` (rule 5).
 - `optimizer` gets options only through the rule-pack protocol (rule 6).
 - Nothing below `api` and `cli` imports them (rule 1).
-- Only `llm` imports LangChain or LangGraph. Engine packages (`rules`, `simulator`, `recovery`, `optimizer`, `costing`) never import `llm`; agents call the engine, not the other way round (rule 11).
+- Only `llm` imports LangChain or LangGraph. Engine and deterministic pipeline packages (`rules`, `simulator`, `recovery`, `optimizer`, `costing`, `iac`, `graph`, `evidence`, `stacks`, `normalization`, `importers`) never import `llm`; agents call the engine, not the other way round (rule 11).
 
 ### 3.4 Invariants to test from the start
 
@@ -169,13 +169,13 @@ Spec: §15, §15.1–15.3, §16–§23, §24, §26, §27.1 (models), §30.1, §4
 
 | ID | Task |
 |---|---|
-| P0-01 | Repo skeleton: `mise.toml` (python, uv, node, terraform + tasks `lint`, `fmt`, `typecheck`, `test`, `check`), root `pyproject.toml` (uv workspace), `apps/api/pyproject.toml`, ruff, mypy strict, pytest config, `.gitignore`. |
+| P0-01 | Repo skeleton: `mise.toml` (python, uv, node, terraform + tasks `lint`, `fmt`, `typecheck`, `test`, `check`), root `pyproject.toml` (uv workspace + Hatchling package pointing at `apps/api/perpetual` for `uv tool install .`), `apps/api/pyproject.toml`, `__init__.py` stubs for all §3.2 subpackages, ruff, mypy strict, pytest config, `.gitignore`. |
 | P0-02 | `import-linter` contracts (§3.3). |
 | P0-03 | GitHub Actions: lint, typecheck, import contracts, tests on Linux. |
-| P0-04 | Domain models in `models/` for every type in spec §104, plus `StackService`, `GraphOverride`, `BufferPolicy`, status enums (spec §30.1). Typed properties (discriminated union) for first-slice types: Route 53 zone/record, ALB, listener, target group, ECS cluster/service/task definition, ECR repository, Secrets Manager secret, SSM parameter, KMS key, RDS instance, S3 bucket, VPC, subnet, security group, IAM role/policy. |
+| P0-04 | Domain models in `models/` for every type in spec §104, plus `StackService`, `GraphOverride`, `BufferPolicy`, status enums (spec §30.1). Typed properties (discriminated union) for first-slice types: Route 53 zone/record, WAF web ACL, ALB, listener, target group, ECS cluster/service/task definition, EC2 instance/Auto Scaling group/launch template/AMI, Lambda function/event-source mapping, SQS queue, SNS topic/subscription, ECR repository, Secrets Manager secret, SSM parameter, KMS key, RDS instance, S3 bucket, VPC, subnet, security group, IAM role/policy, CloudWatch log group, plus out-of-scope CI/CD types (`CodePipelineProperties`), `ExternalResourceProperties` (spec §15.2) and fallback `GenericResourceProperties`. |
 | P0-05 | `ids/`: canonical IDs, global IDs, planned `tf:` IDs, parsing and tests. |
 | P0-06 | `config/`: typed loading of defaults (evidence weights, correlation groups, thresholds, scoring, RTO-scope defaults, buffer defaults) with per-project override. |
-| P0-07 | `persistence/`: SQLAlchemy models for resources, edges, evidence, graph_overrides, stacks, stack_resources, stack_services, recovery_mechanisms (+ projects, scans). Initial Alembic migration. Repositories scoped by `project_id`. |
+| P0-07 | `persistence/`: SQLAlchemy models for resources, edges, evidence, graph_overrides, stacks, stack_resources, stack_services, recovery_mechanisms (+ projects, scans). Initial Alembic migration. Repositories scoped by `project_id`. SQL compilation / dialect test asserting all models and migrations compile cleanly against both `sqlite` and `postgresql` dialects (spec §71.1). |
 | P0-08 | `fixtures/`: fixture format v1, loader, validator, JSON Schema export, `perpetual fixtures validate`. |
 | P0-09 | `evidence/`: combination function with correlation groups (pluggable), evidence fingerprints (spec §22, §23). |
 | P0-10 | `graph/overrides`: apply confirm/reject/add/edit edge and add/edit node overrides; rescan merge rules; orphan detection; YAML export/apply. |
@@ -242,14 +242,14 @@ Spec: §9, §11–§13, §14.1 (security groups, IAM), §21, §22, §65–§67, 
 | ID | Task |
 |---|---|
 | P2-01 | Collector protocol; per-account sessions (primary + DR account, profile or role); region iteration; pagination; throttling retries; per-collector failure → scan `partial`. |
-| P2-02 | Collectors: EC2/VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks, ARC if present), ACM. |
-| P2-03 | Collectors: ECS, ECR (incl. replication config), Secrets Manager (metadata, replication), SSM parameters (metadata), KMS (incl. multi-Region), IAM roles/policies. |
+| P2-02 | Collectors: EC2 (instances, Auto Scaling groups, launch templates, AMIs) / VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks, ARC if present), ACM, WAF (WAFv2 Web ACLs, rule groups, associations). |
+| P2-03 | Collectors: ECS, Lambda (functions, layers, event-source mappings), ECR (incl. replication config), SQS (queues, DLQs, policies), SNS (topics, subscriptions, policies), Secrets Manager (metadata, replication), SSM parameters (metadata), KMS (incl. multi-Region), IAM roles/policies, CloudWatch Logs (log groups, KMS, retention, subscription filters). |
 | P2-04 | Collectors: RDS/Aurora (instances, clusters, replicas, snapshots), S3 (versioning, replication), AWS Backup. |
 | P2-05 | Supplementary: Resource Explorer, AWS Config items and relationships. |
-| P2-06 | Edge resolvers: security groups (spec §14.1 rules incl. wide-open handling), IAM (identity and resource policies, wildcard handling), configuration references (task-definition secrets, env/endpoint matching that persists only the matched fact), Config relationships. |
+| P2-06 | Edge resolvers: security groups (spec §14.1 rules incl. wide-open handling), IAM (identity and resource policies, wildcard handling), configuration references (task-definition secrets, Lambda/ECS env/endpoint matching that persists only the matched fact, event-source mappings, SNS→SQS/Lambda subscriptions, WAF→ALB associations, EC2 instance profiles/AMIs/volumes), Config relationships. |
 | P2-07 | `perpetual scan --profile P --region R --dr-region R2 [--dr-profile P2]`; `POST /projects/{id}/scans`; scan status and errors in UI. |
 | P2-08 | `docs/iam/perpetual-readonly.json` minimal read-only policy, with optional log-reading statements. |
-| P2-09 | Tests: moto unit tests per collector; `docker-compose.yml` with Floci; `examples/ecs-rds/` Terraform applied to Floci and scanned in CI. Check Floci support per operation first and record gaps in the decision log. |
+| P2-09 | Tests: moto unit tests per collector; `docker-compose.yml` with Floci and PostgreSQL (for live Postgres migration verification, spec §71.1, §73); `examples/ecs-rds/` Terraform applied to Floci and scanned in CI. Check Floci support per operation first and record gaps in the decision log. |
 | P2-10 | Contract suite skeleton `tests/contract/` (opt-in marker, create/destroy with guaranteed teardown); redaction of recorded responses into `fixtures/aws/`. |
 | P2-11 | Real-AWS checkpoint: scan the sandbox account → normalized graph. |
 
@@ -293,11 +293,11 @@ Spec: §2, §69, §70.
 | ID | Task |
 |---|---|
 | P3b-01 | Provider abstraction: config schema (default + per-role + embeddings), `init_chat_model`, OpenAI-compatible/OpenRouter, Anthropic, Bedrock, Ollama extras; capability probe (tool calling, structured output); `perpetual llm configure|test`. |
-| P3b-02 | LangGraph runtime: graph base, tool registry over read-only engine APIs, SQLite checkpointer, interrupts, Pydantic-validated outputs with one retry then fail closed. |
+| P3b-02 | LangGraph runtime: graph base, tool registry over read-only engine APIs + `web_search` and `web_fetch` tools for unmodeled/out-of-scope resources (persisting fetched docs into the local KB), SQLite checkpointer, interrupts, Pydantic-validated outputs with one retry then fail closed. |
 | P3b-03 | Fake chat model + recorded-response harness; hostile-output fixtures. |
-| P3b-04 | Guardrails: per-project opt-in notice, redaction pass, `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
-| P3b-05 | Knowledge base: `knowledge/sources.yaml`, `perpetual kb sync|add`, chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
-| P3b-06 | Skills: format, loader, index, `load_skill` tool, project overrides in `.perpetual/skills/`; first skills for the ECS slice (RDS replica, ECR replication, Secrets replication, KMS multi-Region, S3 CRR, Route 53 failover, ECS DR service). |
+| P3b-04 | Guardrails: per-project opt-in notice, redaction pass, query sanitization for `web_search`/`web_fetch` (generic AWS/DR/Terraform terms only; `--offline` / `allow_web_research` toggle), `.perpetualignore`, `llm_calls` log, `perpetual llm log`, UI view. |
+| P3b-05 | Knowledge base: shipped domain knowledge (`knowledge/domain/` covering ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, ECR, Secrets, SSM, KMS, IAM, Route 53, ALB, WAF, CloudWatch Logs, VPC), `knowledge/sources.yaml`, `perpetual kb sync|add`, automatic ingestion of agent `web_fetch` results (`origin = "agent_web_fetch"`), chunking, sqlite-vec + FTS5 hybrid retrieval, citations by chunk ID. |
+| P3b-06 | Skills: format, loader, index, `load_skill` tool, project overrides in `.perpetual/skills/`; first skills for the ECS slice (RDS replica, ECR replication, Secrets replication, KMS multi-Region, S3 CRR, Route 53 failover, ECS DR service, EC2/ASG + AMI DR, Lambda multi-Region, SQS/SNS DR, WAF Web ACL DR). |
 | P3b-07 | Explainer agent (spec §70) in CLI (`perpetual ask`) and UI. |
 
 Exit: `perpetual llm test` passes for a configured provider; the explainer answers "why can't checkout meet 30m?" with cited, engine-sourced numbers.
@@ -309,8 +309,8 @@ Spec: §8.1, §28, §28.1, §29–§32, §41, §91.
 | ID | Task |
 |---|---|
 | P4-01 | Finding model, stable rule-ID registry, rule docs generated to `docs/rules/`. |
-| P4-02 | Packs: ECS (§32), ECR, Secrets/SSM, KMS, IAM. |
-| P4-03 | Packs: RDS (§41, Multi-AZ ≠ cross-Region), S3, network (VPC, subnets, NAT, routes, endpoints), ALB, Route 53 (data-plane vs control-plane, §8.1). |
+| P4-02 | Packs: ECS (§32), EC2/Auto Scaling (§5.3), Lambda (§5.4), ECR, SQS (§7.1), SNS (§7.1), Secrets/SSM, KMS, IAM. |
+| P4-03 | Packs: RDS (§41, Multi-AZ ≠ cross-Region), S3, network (VPC, subnets, NAT, routes, endpoints), ALB, Route 53 (data-plane vs control-plane, §8.1), WAF (§8), CloudWatch Logs (§8, §24.1). |
 | P4-04 | Cross-cutting rules: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001, QUOTA-DR-001, REGION-SVC-001. |
 | P4-05 | Readiness dimensions (§30) with UNKNOWN for dimensions without rules; scoring (§31); Observability reports out-of-scope findings and never blocks. |
 | P4-06 | `perpetual assess STACK`; findings API; findings tab in UI. |
@@ -368,7 +368,7 @@ Spec: §51, §52.
 
 | ID | Task |
 |---|---|
-| P8-01 | RPO estimators per mechanism: recovery-point age, replica lag (CloudWatch metrics), S3 replication (RTC metrics if present), DynamoDB Global Tables posture, EBS snapshot age. |
+| P8-01 | RPO estimators per mechanism: recovery-point age, replica lag (CloudWatch metrics), S3 replication (RTC metrics if present), DynamoDB Global Tables posture, EBS/AMI snapshot age (EC2/EKS), SQS retention/redrive posture. |
 | P8-02 | Stack RPO (worst over required in-scope stores), UNKNOWN propagation, contributors. |
 | P8-03 | RPO in CLI, API and UI; target comparison. |
 
@@ -428,7 +428,7 @@ Spec: §65–§68, §96–§98, §100, §109.
 | ID | Task |
 |---|---|
 | P12-01 | Full §100 workflow on the sandbox for the ECS and EKS stacks, including a transformation PR applied by the user's pipeline and a rescan that confirms the stack now meets its targets. |
-| P12-02 | Security pass: canary tests, Terraform-state redaction (§68), outbound calls limited to AWS, Kubernetes, the configured LLM provider and Terraform providers during `plan`; review of what `llm_calls` shows was sent. |
+| P12-02 | Security pass: canary tests, Terraform-state redaction (§68), `web_search`/`web_fetch` query sanitization tests, outbound calls limited to AWS, Kubernetes, the configured LLM provider, Terraform providers during `plan`, and sanitized doc lookups when enabled; review of what `llm_calls` shows was sent. |
 | P12-03 | Structured logging (§96) for scan, collectors, graph, assessment, simulation, optimization. |
 | P12-04 | Performance: graph of 5,000 resources and 20,000 edges builds, simulates and renders acceptably. |
 | P12-05 | Docs: README, user guide, IAM policy, rule reference, fixture format. |
@@ -447,5 +447,5 @@ Not scheduled. Each needs a decision-log entry before work starts.
 - Learning duration-catalog values and evidence weights from drills and confirmed edges.
 - Hosted version: login, PostgreSQL, workers, cross-account role with external ID (§66, §71.1).
 - Infracost and CUR cost providers (§58).
-- DynamoDB and Aurora Global depth; Lambda, SQS, ElastiCache rule packs.
+- DynamoDB and Aurora Global depth; ElastiCache, Step Functions and API Gateway rule packs.
 - Multi-stack view that de-duplicates shared resources.

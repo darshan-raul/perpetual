@@ -40,7 +40,7 @@ Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity reso
 - Python package `apps/api/perpetual/`, one subpackage per pipeline stage (IMPL_PLAN §3.2). Web UI in `apps/web/` (Vite + React), built into `apps/api/perpetual/web/static/` and served by FastAPI. TS API types in `packages/schemas` are generated from OpenAPI; never edit them by hand.
 - Layer boundaries are enforced by import-linter (IMPL_PLAN §3.3): collectors only collect, rule packs never call collectors or LLMs, the simulator never rediscovers AWS, domain models never import FastAPI or SQLAlchemy. Only `perpetual.llm` imports LangChain/LangGraph; the engine never calls an agent.
 - LLM providers are configured, not coded: everything goes through LangChain's chat-model interface (`init_chat_model`), so OpenRouter, Anthropic, Bedrock or Ollama can be swapped per role (spec §69.1). Never import a vendor SDK directly.
-- Agent know-how lives in `skills/` (SKILL.md per DR mechanism) and the local knowledge base; prompts stay small and load skills on demand (spec §69.3, §69.4).
+- Agent know-how lives in `skills/` (SKILL.md per DR mechanism) and the local knowledge base (`knowledge/domain/` shipped service DR docs + `knowledge/sources.yaml` + dynamic `web_search`/`web_fetch` ingestion for unmodeled/out-of-scope resources); prompts stay small and load skills on demand (spec §69.3, §69.4).
 - All numbers that tune behaviour (evidence weights, correlation groups, thresholds, scoring, RTO-scope defaults, buffer, duration catalog, prices) live in YAML under `apps/api/perpetual/config/defaults/`. Never put them in rule or engine code.
 
 ## Rules that span the codebase
@@ -57,7 +57,7 @@ Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity reso
 - Graph traversal must terminate on cycles and record them as evidence; use NetworkX operations rather than hand-written recursion (spec §18).
 - The LLM proposes, the engine verifies (spec §2, rule 11). LLM output never upgrades a state, supplies a number, or counts as proof. Proposals need citations; uncited ones are dropped. A blocking advisory item keeps the stack from READY (`advisory_unresolved`).
 - Code changes happen only in a git worktree on a `perpetual/dr/...` branch, through an enforced command allowlist. `terraform apply|destroy|import|state` and `kubectl apply` must stay unreachable. A change is offered only after verification re-assesses and re-simulates the planned graph (spec §61.1); otherwise it is labeled unverified.
-- Never send Terraform state, secret values, env/ConfigMap values or raw logs to an LLM. Redact IaC before sending, honour `.perpetualignore`, and record every call in `llm_calls` (spec §69.5).
+- Never send Terraform state, secret values, env/ConfigMap values or raw logs to an LLM. Redact IaC before sending, sanitize `web_search`/`web_fetch` queries to generic AWS/DR/Terraform terms only, honour `.perpetualignore`, and record every call in `llm_calls` (spec §69.5).
 
 ## Testing
 

@@ -95,7 +95,7 @@ LLMs are good at reading your code and AWS documentation and proposing changes. 
 The planned agent setup supports:
 
 - **LangGraph workflows** for advisory review, DR design and code changes.
-- **A local knowledge base** with AWS DR guidance, your runbooks and standards.
+- **A local knowledge base** with shipped DR domain knowledge for all in-scope AWS services, AWS DR guidance, your runbooks and standards—plus controlled `web_search` and `web_fetch` tools so when an unmodeled or out-of-scope resource appears, the agent can fetch official documentation, persist and index it into the local knowledge base to improve the local docs, and cite it during DR planning.
 - **Versioned skills:** reviewed recipes for techniques such as cross-Region RDS replicas and ECR replication.
 - **Provider choice:** OpenRouter, Anthropic, Bedrock or local models through Ollama, with a different model per role if needed.
 
@@ -132,8 +132,8 @@ Pull request      perpetual/dr/checkout/2026-11-02  (7 files, verified)
 
 **First release covers:**
 
-- ECS stacks: Route 53, ALB, ECS on Fargate, ECR, Secrets Manager, KMS, RDS, S3, VPC networking;
-- EKS stacks: clusters, node groups, add-ons, IRSA and Pod Identity, persistent volumes on EBS;
+- ECS, EC2 and Serverless stacks: Route 53, WAF, ALB, ECS on Fargate/EC2, EC2 instances and Auto Scaling groups, Lambda, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, RDS/Aurora, S3, CloudWatch Logs, VPC networking;
+- EKS stacks: clusters, node groups, add-ons, IRSA and Pod Identity, persistent volumes on EBS/EFS;
 - code changes to Terraform, plain Kubernetes manifests, Kustomize overlays and Helm values.
 
 **Checked but not counted in the RTO:** monitoring, logging and CI/CD.

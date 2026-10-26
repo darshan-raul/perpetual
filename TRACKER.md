@@ -51,13 +51,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ## P0 Engine foundation
 
-- [ ] P0-01 Repo skeleton, `mise.toml` with tasks, uv workspace, ruff, mypy strict, pytest
+- [ ] P0-01 Repo skeleton, `mise.toml` with tasks, root-installable `uv` workspace, `__init__.py` subpackage stubs, ruff, mypy strict, pytest
 - [ ] P0-02 import-linter contracts
 - [ ] P0-03 GitHub Actions CI
-- [ ] P0-04 Domain models + first-slice typed properties + status enums
+- [ ] P0-04 Domain models + first-slice/out-of-scope/fallback typed properties + status enums
 - [ ] P0-05 Canonical resource IDs
 - [ ] P0-06 Typed config + defaults
-- [ ] P0-07 Persistence + initial Alembic migration
+- [ ] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
 - [ ] P0-08 Fixture format v1, loader, validator, JSON Schema
 - [ ] P0-09 Evidence combination + fingerprints
 - [ ] P0-10 Graph overrides (apply, merge, orphan, YAML)
@@ -106,14 +106,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 ## P2 AWS discovery (ECS slice)
 
 - [ ] P2-01 Collector protocol, sessions, partial scans
-- [ ] P2-02 EC2/VPC, ELB, Route 53, ACM collectors
-- [ ] P2-03 ECS, ECR, Secrets, SSM, KMS, IAM collectors
+- [ ] P2-02 EC2 (instances, ASG, launch templates, AMIs) / VPC, ELB, Route 53, ACM, WAF collectors
+- [ ] P2-03 ECS, Lambda, ECR, SQS, SNS, Secrets, SSM, KMS, IAM, CloudWatch Logs collectors
 - [ ] P2-04 RDS/Aurora, S3, Backup collectors
 - [ ] P2-05 Resource Explorer, AWS Config
-- [ ] P2-06 Edge resolvers: SG, IAM, references, Config
+- [ ] P2-06 Edge resolvers: SG, IAM, references, event-source/subscription/WAF associations, Config
 - [ ] P2-07 `perpetual scan` + API + UI status
 - [ ] P2-08 Read-only IAM policy doc
-- [ ] P2-09 moto + Floci tests, `examples/ecs-rds`
+- [ ] P2-09 moto + Floci (+ Postgres) tests, `examples/ecs-rds`
 - [ ] P2-10 Contract suite skeleton + redaction
 - [ ] P2-11 Real-AWS checkpoint
 
@@ -139,18 +139,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 ## P3b LLM foundation
 
 - [ ] P3b-01 Provider abstraction, per-role config, capability probe, `perpetual llm configure|test`
-- [ ] P3b-02 LangGraph runtime, tools, checkpointer, interrupts, validated outputs
+- [ ] P3b-02 LangGraph runtime, tools (incl. `web_search`, `web_fetch`), checkpointer, interrupts, validated outputs
 - [ ] P3b-03 Fake chat model + hostile-output fixtures
-- [ ] P3b-04 Guardrails: opt-in, redaction, `.perpetualignore`, call log
-- [ ] P3b-05 Knowledge base: sources, sync/add, hybrid retrieval, citations
-- [ ] P3b-06 Skills: format, loader, first ECS-slice skills
+- [ ] P3b-04 Guardrails: opt-in, redaction, query sanitization for web tools, `.perpetualignore`, call log
+- [ ] P3b-05 Knowledge base: shipped domain docs (`knowledge/domain/`), `sources.yaml`, sync/add, agent web-fetch ingestion, hybrid retrieval, citations
+- [ ] P3b-06 Skills: format, loader, first-slice skills (incl. EC2/ASG, Lambda, SQS/SNS, WAF)
 - [ ] P3b-07 Explainer agent
 
 ## P4 DR rule packs
 
 - [ ] P4-01 Finding model, rule registry, rule docs
-- [ ] P4-02 ECS, ECR, Secrets/SSM, KMS, IAM packs
-- [ ] P4-03 RDS, S3, network, ALB, Route 53 packs
+- [ ] P4-02 ECS, EC2/ASG, Lambda, ECR, SQS, SNS, Secrets/SSM, KMS, IAM packs
+- [ ] P4-03 RDS, S3, network, ALB, Route 53, WAF, CloudWatch Logs packs
 - [ ] P4-04 Cross-cutting rules
 - [ ] P4-05 Readiness dimensions + scoring
 - [ ] P4-06 `perpetual assess` + API + UI
@@ -301,6 +301,8 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-26 | Expand v0.1 AWS services and KB web-research capabilities: (1) add `EC2` (instances, ASG, launch templates, AMIs), `Lambda`, `SQS`, `SNS`, `WAF` (WAFv2), and `CloudWatch Logs` across models (`P0-04`), collectors (`P2-02..03`), rule packs (`P4-02..03`), recovery actions (`P6-01`), RPO (`P8-01`) and skills (`P3b-06`); (2) ship curated domain knowledge for all in-scope services in `knowledge/domain/` (`P3b-05`); (3) give LLM agents sanitized `web_search` and `web_fetch` tools (`P3b-02`, `P3b-04`, `P3b-05`) so when an out-of-scope / unmodeled resource appears, the agent fetches official docs, persists/indexes them into the local knowledge base (`kb_documents`/`kb_chunks`) to improve local docs, and cites them during advisory review and DR candidate planning. | User direction: cover EC2, Lambda, SQS, SNS, WAF and CloudWatch Logs in v0.1, hold local domain knowledge for all supported services, and let agents research unmodeled resources via `web_search`/`web_fetch` while enriching the local doc store. |
+| 2026-10-26 | Tighten P0/P2 plan details: (1) root `pyproject.toml` builds the `perpetual` package from `apps/api/perpetual` so `uv tool install .` works from the repo root; (2) P0-04 discriminated union includes out-of-scope (`CloudWatchLogGroupProperties`, `CodePipelineProperties`), `ExternalResourceProperties` and fallback `GenericResourceProperties`; (3) P0-01 creates `__init__.py` stubs for all §3.2 subpackages so P0-02 `import-linter` contracts run immediately, and `iac`, `graph`, `evidence`, `stacks`, `normalization`, `importers` are also forbidden from importing `llm`; (4) P0-07 tests SQLite + PostgreSQL dialect compilation for models/migrations and P2-09 includes PostgreSQL in `docker-compose.yml`. | Ensure root installability (`P1b-13`), typed validation for out-of-scope/external resources (`spec §15.2–15.3, §24.1`), day-one `import-linter` contract enforcement (`P0-02`), and PostgreSQL schema compatibility (`spec §71.1, §73`). |
 | 2026-10-25 | Spec revision 4: Perpetual changes the user's Terraform and Kubernetes manifests (code only, branch/PR, never apply). LLM agents on LangGraph join advisory review, candidate planning and IaC transformation, with RAG and skills. Provider replaceable (OpenRouter, Anthropic, Bedrock, Ollama). Plan: D14 revised, D15–D18 added, new phase P3b, P4-07, P9-07/08, P10 replaced. | User direction: the tool must fix infrastructure, not only assess it, and use LLMs with RAG and skills to reach the best DR design. "LLM proposes, engine verifies" keeps results trustworthy. |
 | 2026-10-25 | Plan locked. Alembic from P0 instead of P1b. | Avoid writing an unmanaged SQLite schema that later needs a migration path. |
 | 2026-10-25 | EKS slice is P7, after the ECS slice reaches a live recovery DAG (P6). Spec Phase 2 and 4 EKS items move there. | Spec §105 says complete the ECS slice first. |
@@ -311,6 +313,13 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-26 — Plan review, AWS service expansion & KB web research
+
+- Tightened P0/P2 plan details (root-installable `uv` workspace, out-of-scope/fallback typed properties, `import-linter` subpackage stubs and boundaries, SQLite/PostgreSQL dialect compilation checks).
+- Expanded v0.1 AWS service scope to include EC2 & Auto Scaling, Lambda, SQS, SNS, WAF (WAFv2), and CloudWatch Logs across `spec.md`, `IMPL_PLAN.md`, `TRACKER.md`, `CLAUDE.md` and `README.md`.
+- Added shipped domain knowledge (`knowledge/domain/`) for all in-scope services and sanitized `web_search` / `web_fetch` agent tools to fetch, persist and cite docs for unmodeled/out-of-scope resources in the local KB.
+- **Carry-over:** start P0-01.
 
 ### 2026-10-25 — Revision 4
 

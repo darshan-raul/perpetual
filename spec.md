@@ -17,6 +17,8 @@
 - The LLM provider is replaceable: any LangChain chat model, including OpenAI-compatible endpoints such as OpenRouter, Anthropic, Bedrock and local Ollama models. Each agent role can use a different model (69.1).
 - Deterministic companion Terraform stays as the fallback when no IaC repository or LLM is configured (62.1).
 - LLM features are opt-in per project, with a clear record of what is sent. Terraform state, secret values, env values and raw logs are never sent (65, 69.5).
+- Expanded v0.1 AWS service scope to include standalone EC2 and Auto Scaling, AWS Lambda, Amazon SQS, Amazon SNS, AWS WAF (WAFv2), and Amazon CloudWatch Logs (5.3, 5.4, 7.1, 8).
+- The local knowledge base ships curated DR domain reference docs for all in-scope AWS services in `knowledge/domain/` alongside `knowledge/sources.yaml`, and agents have controlled `web_search` and `web_fetch` tools (with sanitized, non-sensitive queries) to fetch documentation for out-of-scope or unmodeled resources, persist and index it into the local knowledge base to improve the local docs, and cite those chunks during advisory review and DR candidate planning (28.2, 56.1, 69.2, 69.3, 69.5).
 
 ### Revision 3 changes
 
@@ -401,6 +403,36 @@ Can every external dependency resolve?
 
 ---
 
+## 5.3 Amazon EC2 and Auto Scaling
+
+Support:
+
+- standalone EC2 instances;
+- Auto Scaling groups (ASGs);
+- launch templates;
+- AMIs (including cross-Region AMI copy and KMS encryption);
+- instance profiles and IAM roles;
+- attached EBS volumes and snapshot/backup coverage;
+- VPC, subnets, security groups and load balancer target group attachments;
+- instance families, capacity types and DR Region quota requirements.
+
+---
+
+## 5.4 AWS Lambda
+
+Support:
+
+- Lambda functions, versions and aliases;
+- Lambda layers;
+- deployment packages (S3) and container images (ECR);
+- VPC configuration (subnets, security groups);
+- execution roles and resource-based policies;
+- environment variable reference matching (persisting only matched facts per section 67);
+- event-source mappings (SQS, SNS, DynamoDB) and asynchronous destinations / DLQs;
+- reserved and provisioned concurrency and DR Region concurrency quotas.
+
+---
+
 # 6. Data Services In Scope
 
 ## 6.1 Amazon RDS
@@ -529,6 +561,32 @@ Inspect:
 
 ---
 
+## 7.1 Messaging: Amazon SQS and Amazon SNS
+
+### Amazon SQS
+
+Inspect:
+
+- standard and FIFO queues;
+- dead-letter queues (DLQs) and redrive policies;
+- KMS encryption;
+- queue policies;
+- message retention and visibility timeout;
+- event-source mappings (Lambda) and producers/consumers;
+- DR posture (recreation in DR via IaC vs active-active / replay considerations for in-flight messages).
+
+### Amazon SNS
+
+Inspect:
+
+- standard and FIFO topics;
+- subscriptions (SQS, Lambda, HTTPS, cross-Region endpoints);
+- KMS encryption;
+- topic policies and delivery status logging;
+- DR posture (DR topic + subscription readiness or cross-Region delivery).
+
+---
+
 # 8. Supporting Services
 
 Initially include awareness of:
@@ -542,6 +600,8 @@ Initially include awareness of:
 - ALB;
 - NLB;
 - CloudFront;
+- AWS WAF (WAFv2 Web ACLs, rule groups, IP sets, regional ALB and global CloudFront associations);
+- Amazon CloudWatch Logs (log groups, KMS encryption, retention, subscription filters; out of RTO scope by default per section 24.1 unless marked required, assessed under Observability);
 - VPC;
 - subnets;
 - route tables;
@@ -665,15 +725,20 @@ Examples:
 ```text
 ECSCollector
 EKSCollector
+EC2Collector
+LambdaCollector
 RDSCollector
 S3Collector
+SQSCollector
+SNSCollector
 ECRCollector
-EC2Collector
 ELBCollector
 Route53Collector
+WAFCollector
 SecretsManagerCollector
 KMSCollector
 IAMCollector
+CloudWatchLogsCollector
 BackupCollector
 ```
 
@@ -1679,7 +1744,7 @@ When reading environment variables or ConfigMaps, persist only the matched fact 
 
 Rule packs are deterministic and cover known patterns. An advisory review, run by an LLM agent after the rule packs, looks for what they miss: unusual dependencies, application configuration that ties a service to the primary Region, services without a rule pack, and organization-specific standards from the knowledge base.
 
-Inputs: the stack subgraph (IDs, types, non-secret properties), deterministic findings and mechanisms, matched configuration facts (names only, never values), the IaC source of the stack's resources (section 61), knowledge-base retrievals and relevant skills (sections 69.3, 69.4).
+Inputs: the stack subgraph (IDs, types, non-secret properties), deterministic findings and mechanisms, matched configuration facts (names only, never values), the IaC source of the stack's resources (section 61), knowledge-base retrievals and relevant skills (sections 69.3, 69.4). When a stack contains an out-of-scope or unmodeled resource type whose DR behaviour is not yet in the local knowledge base, the agent may use `web_search` and `web_fetch` (section 69.3) to fetch official documentation, persist and index it into the local knowledge base, and cite those chunks in its proposals.
 
 Outputs are typed proposals:
 
@@ -2829,7 +2894,7 @@ Pareto frontier and selection (section 57), deterministic
 Rules:
 
 - a proposal is a typed `CandidateProposal`: for every in-scope resource, a mechanism chosen from the rule packs' `recovery_options()`, or a new `RecoveryOption` with `origin = llm`;
-- a new option must cite a skill or knowledge-base document, use action types that exist in the duration catalog, and pass the rule pack's prerequisite checks. An action without a catalog entry makes the candidate's RTO UNKNOWN, so it cannot be recommended;
+- a new option must cite a skill or knowledge-base document (including chunks ingested on demand via `web_search` / `web_fetch` for unmodeled resources; section 69.3), use action types that exist in the duration catalog, and pass the rule pack's prerequisite checks. An action without a catalog entry makes the candidate's RTO UNKNOWN, so it cannot be recommended;
 - the planner never supplies cost, duration, RTO or RPO values. It may write the rationale for a candidate;
 - deterministic candidates are always evaluated and kept, so the result is never worse than without the LLM.
 
@@ -3044,9 +3109,10 @@ read, search, edit and create files under the declared IaC paths
 terraform fmt | init -backend=false | validate | plan -out | show -json
 kustomize build | helm template | kubeconform
 load_skill | search_knowledge_base | get_stack_context
+web_search | web_fetch  (sanitized queries only; persists fetched docs to KB)
 ```
 
-Never available: `terraform apply`, `destroy`, `import`, `state`, `kubectl apply` or any command that changes cloud or cluster state; network access other than the configured LLM provider and the Terraform providers used by `plan`; file access outside the worktree.
+Never available: `terraform apply`, `destroy`, `import`, `state`, `kubectl apply` or any command that changes cloud or cluster state; network access other than the configured LLM provider, the Terraform providers used by `plan`, and sanitized documentation lookups via `web_search` / `web_fetch` when enabled; file access outside the worktree.
 
 Retries default to 3 per DR spec change.
 
@@ -3291,7 +3357,7 @@ transformer   section 61     edits IaC, runs checks, responds to verification fa
 explainer     section 70     answers questions over deterministic tool results
 ```
 
-- Tools give agents read access to Perpetual's own data (stack context, findings, simulations, plans) and to the knowledge base and skills. Agents never call AWS.
+- Tools give agents read access to Perpetual's own data (stack context, findings, simulations, plans), to the local knowledge base and skills, and to controlled `web_search` and `web_fetch` tools for researching unmodeled/out-of-scope resources and enriching the local knowledge base (section 69.3). Agents never call AWS.
 - State is checkpointed with LangGraph's SQLite checkpointer in the project data directory, so runs can resume and be audited.
 - Human-in-the-loop interrupts: DR spec approval before transformation; confirmation before opening a pull request.
 - All structured outputs are validated with Pydantic. Invalid output is retried once with the validation error, then the step fails closed.
@@ -3302,11 +3368,13 @@ A local knowledge base grounds the agents.
 
 Sources:
 
-- **Public references.** Perpetual ships a list of source URLs (the AWS DR whitepaper, service guides on replication, backup, quotas and failover, EKS DR guidance) and the code to ingest them. `perpetual kb sync` fetches them to the user's machine. Perpetual does not ship copies.
+- **Shipped domain knowledge (`knowledge/domain/`).** Curated Markdown reference documents shipped in the repository and indexed automatically into the local knowledge base. They hold DR domain knowledge for every in-scope AWS service (ECS, EKS, EC2/Auto Scaling, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, Route 53, ALB/NLB, WAF, CloudWatch Logs, VPC networking): replication and backup mechanisms, RTO/RPO characteristics, control-plane vs data-plane failover behaviour, service quotas, common DR failure modes, and Terraform/Kubernetes implementation patterns.
+- **Public references (`knowledge/sources.yaml`).** Perpetual ships a list of official reference URLs (the AWS DR whitepaper, service guides on replication, backup, quotas and failover, EKS DR guidance) and the code to ingest them. `perpetual kb sync` fetches and indexes them locally.
 - **Perpetual's own material.** Rule documentation, duration-catalog basis notes, skills.
 - **The user's documents.** Runbooks, ADRs, postmortems, internal standards: `perpetual kb add ./docs`.
+- **Dynamic agent research (`web_search` and `web_fetch`).** When a stack includes an out-of-scope or unmodeled resource type, or an AWS capability not yet covered in the local knowledge base, agents (`advisor`, `planner`, `transformer`, `explainer`) can invoke `web_search` and `web_fetch` to retrieve official documentation (prioritizing AWS and Terraform provider docs). Fetched pages are sanitized, chunked, embedded and persisted into `kb_documents` and `kb_chunks` (with `origin = "agent_web_fetch"`, source URL, title and fetch timestamp). This continuously improves the local doc store so subsequent runs already have that domain knowledge locally without re-fetching, and every agent claim using web-fetched knowledge must cite the stored `kb_chunk` ID.
 
-Storage is local: a SQLite database with `sqlite-vec` for vectors and FTS5 for keywords, combined as hybrid retrieval. Every chunk keeps its source (URL or path), title and fetch date, and every retrieval is cited by chunk ID.
+Storage is local: a SQLite database with `sqlite-vec` for vectors and FTS5 for keywords, combined as hybrid retrieval. Every chunk keeps its source (URL or path), origin, title and fetch date, and every retrieval is cited by chunk ID.
 
 ## 69.4 Skills
 
@@ -3325,6 +3393,10 @@ skills/
   s3-cross-region-replication/
   route53-failover/
   ecs-dr-service/
+  ec2-asg-ami-dr/
+  lambda-multi-region/
+  sqs-sns-dr/
+  waf-web-acl-dr/
   eks-dr-cluster-gitops/
   ebs-snapshot-copy/
 ```
@@ -3355,7 +3427,9 @@ Never sent: Terraform state, secret values, environment-variable and ConfigMap v
 
 Before sending IaC files, a redaction pass removes secret-like values (known key patterns, high-entropy strings, `sensitive` variables' defaults). A `.perpetualignore` file excludes paths entirely.
 
-Every LLM call is recorded locally in `llm_calls`: time, role, provider, model, token counts, which files and documents were included, redactions applied, and a hash of the prompt. The UI and `perpetual llm log` show it. For no data egress, use a local model (`ollama`).
+For `web_search` and `web_fetch`, queries are sanitized before execution so they contain only generic AWS service, resource-type, DR and Terraform terms—never account IDs, ARNs, resource names, internal hostnames, tags or code snippets. Web research can be disabled per project (`allow_web_research: false` or `--offline`).
+
+Every LLM call (and every `web_search` / `web_fetch` invocation) is recorded locally in `llm_calls`: time, role, provider, model, token counts, which files, documents and web URLs were included, redactions applied, and a hash of the prompt. The UI and `perpetual llm log` show it. For no data egress, use a local model (`ollama`) with web research disabled.
 
 ## 69.6 Testing and Evaluation
 
@@ -3528,6 +3602,7 @@ perpetual/
 +-- skills/              # shipped DR skills (section 69.4)
 |
 +-- knowledge/
+|   +-- domain/          # shipped DR domain docs for all in-scope AWS services
 |   +-- sources.yaml     # public reference URLs for `perpetual kb sync`
 |
 +-- evals/               # LLM evaluation suite (section 69.6)
@@ -3586,6 +3661,27 @@ rules/
 
   route53/
     failover.py
+
+  ec2/
+    compute.py
+    ami.py
+    asg.py
+
+  lambda_/
+    functions.py
+    events.py
+
+  sqs/
+    queues.py
+
+  sns/
+    topics.py
+
+  waf/
+    web_acl.py
+
+  logs/
+    log_groups.py
 ```
 
 ---
@@ -4581,14 +4677,21 @@ Implement:
 ```text
 ECS
 EKS
+EC2/Auto Scaling/VPC
+Lambda
 RDS/Aurora
+S3
+SQS
+SNS
 ECR
 ELB
 Route53
-S3
+WAF
 Secrets Manager
+SSM Parameter Store
 KMS
-EC2/VPC
+IAM
+CloudWatch Logs
 ```
 
 Add Resource Explorer and Config as supplementary sources.
@@ -4674,13 +4777,21 @@ First rule packs:
 ```text
 ECS
 EKS
+EC2/ASG
+Lambda
 RDS
-ECR
 S3
-Secrets
+SQS
+SNS
+ECR
+Secrets/SSM
 KMS
+IAM
 network
+ALB
 Route53
+WAF
+CloudWatch Logs
 ```
 
 Then the advisory review (section 28.2).
@@ -5017,17 +5128,24 @@ Then create the canonical ECS fixtures: broken (section 87) and remediated (sect
 
 # 105. First Vertical Slice
 
-The first complete vertical slice should use only:
+The first complete vertical slice should use:
 
 ```text
 Route53
+WAF
 ALB
 ECS
+EC2 / Auto Scaling
+Lambda
+SQS
+SNS
 ECR
-Secrets Manager
+Secrets Manager / SSM
 KMS
+IAM
 RDS
 S3
+CloudWatch Logs
 VPC/Subnets/SG
 ```
 
