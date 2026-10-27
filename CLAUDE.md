@@ -6,12 +6,13 @@ Perpetual is a local, single-user tool that decides whether an AWS **stack** (on
 
 - Product definition: [spec.md](spec.md) (revision 4 overview & index) and the 7 modular parts in [`docs/spec/`](docs/spec/). Together they are the source of truth for behaviour; tasks and code comments cite sections as `spec §N`.
 - Plan (locked): [IMPL_PLAN.md](IMPL_PLAN.md). Progress: [TRACKER.md](TRACKER.md).
-- At the start of a session, read TRACKER.md and continue from the session log's carry-over. At the end, update task states, the session log and the decision log.
+- Code walkthrough: [`docs/code/`](docs/code/README.md) explains how the code works today (architecture, tooling, one page per package, end-to-end flows). Every task that changes code updates it in the same change: the package page, the status table in `docs/code/README.md`, and `architecture.md` when connections change. Comment the *why* in code, especially validators and engine rules, citing spec sections.
+- At the start of a session, read TRACKER.md and continue from the session log's carry-over. At the end, update task states, the session log, the decision log and `docs/code/`.
 - Changes to the plan, or any deviation from the spec, go through a decision-log entry in TRACKER.md first. Changes to product behaviour go into spec.md with a changelog line under its current revision.
 
 ## Status
 
-No code yet. Work starts at P0-01 (milestone M0 PoC; milestones are in TRACKER.md). The commands and layout below are what P0 creates; P0-14 updates this file to match reality.
+Milestone M0 PoC in progress: P0-01 to P0-04a are done (repo, CI, import rules, core models); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
 
 ## Commands (from P0-01)
 

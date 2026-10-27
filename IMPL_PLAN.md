@@ -205,7 +205,7 @@ Milestone ordering is explicit even where task IDs were appended: P0-15 precedes
 | P14 | §108 | M4 | Proven readiness, drift, calibration and v0.3 release | checkpoint |
 | P15 | — | M5 | Production readiness and v1.0 release | checkpoint |
 
-Every task meets the spec §103 definition of done: typed model, implementation, unit tests, fixture, API and UI exposure where applicable, error handling, docs.
+Every task meets the spec §103 definition of done: typed model, implementation, unit tests, fixture, API and UI exposure where applicable, error handling, docs. Docs include the code walkthrough in `docs/code/`, updated in the same change as the code (decision 2026-10-28).
 
 ## 5. Phases
 

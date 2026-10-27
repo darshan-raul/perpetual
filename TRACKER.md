@@ -2,9 +2,11 @@
 
 Plan: [IMPL_PLAN.md](IMPL_PLAN.md) (locked 2026-10-25; milestones restructured 2026-10-27). Spec: [spec.md](spec.md) & [`docs/spec/`](docs/spec/) (revision 4). Update this file at the end of every session.
 
+A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/code/README.md)) are updated together.
+
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-04a**.
+**Current focus:** M0 PoC · next task **P0-04b**.
 
 ## Milestones
 
@@ -119,7 +121,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-01 Repo skeleton, `mise.toml` with tasks, root-installable `uv` workspace, `__init__.py` subpackage stubs, ruff, mypy strict, pytest
 - [x] P0-02 import-linter contracts
 - [x] P0-03 GitHub Actions CI
-- [ ] P0-04a Core graph and stack models, status enums
+- [x] P0-04a Core graph and stack models, status enums
 - [ ] P0-04b Typed properties: compute and containers
 - [ ] P0-04c Typed properties: data and storage
 - [ ] P0-04d Typed properties: messaging, network, edge and supporting services
@@ -482,6 +484,8 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | Add a code walkthrough in `docs/code/`: an index with a package status table, `architecture.md` (pipeline as built), `tooling.md`, one page per package with real code (`packages/<name>.md`, from `_template.md`) and, later, end-to-end `flows/<name>.md`. Every task that changes code updates it in the same change; it is part of the definition of done (IMPL_PLAN §4 note, CLAUDE.md). Code comments explain the *why* of validators and engine rules, citing spec sections. | User request: a scalable, always-current document to understand the code before reading it, as the codebase grows. |
+| 2026-10-28 | P0-04a model choices. (1) Domain models are immutable, reject unknown fields and require timezone-aware timestamps. (2) Spec MUSTs are enforced in the models: confidence in [0, 1]; observed evidence needs its window and count, other evidence must not have one; every dependency-edge evidence item has a basis; user-added edges have confidence 1.0 and `user_confirmation`/`asserted` evidence; `confirmed` agrees with `review_state`; quorum groups have 1 ≤ `minimum_healthy` ≤ members; Region requirements name `target_region`; duration bounds are ordered and unknown bounds stay None; stack roots are members; mechanism dependency groups are DR-side. (3) `relationship_type` is the §20 vocabulary as an enum (spec: `str`); `contains`, `member_of`, `replicates_to`, `backed_up_by` are flagged as not operational requirements. (4) `GraphOverride.payload` stays a dict but is validated against a per-kind schema. (5) Added `SourceReference` (used but undefined in the spec), `StackResource` (membership + RTO scope, §24.1), `ResourceNode.planned` (§15.1). (6) `DurationEstimate` and `BufferPolicy` moved here from P0-04f because `RecoveryRequirement` needs them. (7) `worst_state` refuses an empty input instead of returning SURVIVES. (8) Graph-wide group checks (shared dependent and scope, one group per edge) run in P0-11. (9) Pydantic's mypy plugin is enabled. | Catch invalid fixtures and imports at the boundary instead of inside the engine; keep snapshots stable for digests (§56.3); never let an empty or missing input read as healthy. |
 | 2026-10-28 | P0-02: nine import-linter contracts in `pyproject.toml`, run by `mise run lint`, each proven by a test that plants a violation in a temporary copy of the package. Two widen the plan: `knowledge` is forbidden to the engine alongside `llm`, and the LangChain/LangGraph ban covers every package except `llm`, including `api` and `cli`. Rule 6 (optimizer gets options only through the rule-pack protocol) is added in P1-01, when the protocol module exists. | Contracts that are never seen to fail could silently check nothing, especially for external packages that are not installed. A contract needs real module names, and the rule-pack protocol does not exist yet. |
 | 2026-10-28 | P0-01 setup choices: (1) the root `pyproject.toml` is the only Python project and builds `perpetual` from `apps/api/perpetual`; no separate `apps/api/pyproject.toml`, and no uv workspace until a second Python package exists. (2) Pinned tools in `mise.toml`: Python 3.13.13, uv 0.13.1, Node 24.22.1 (LTS), Terraform 1.16.7. (3) Tests live in `apps/api/tests` with pytest's importlib mode; the `contract` marker is excluded by default. (4) ruff skips Markdown. (5) `mise.local.toml` is gitignored for machine-specific overrides. No license is declared yet. | Two projects cannot build the same package (IMPL_PLAN D5 listed both). Versions are ones that installed reliably here; any machine gets them through `mise install`. The license is the owner's decision. |
 | 2026-10-27 | Close consistency gaps from the restructure review: P12-02 limited to deterministic checks; ARC, Identity Center, Accelerated Recovery and `OperatorAccessProfile` models added to P0-04d/f; Identity Center row and ARC plan owners added to §3.5; ARC plan price added to P9-03; §61 scope relabelled v0.2; v0.1 verification contract states that the supplied plan includes the companion module and applied suggested edits, plus rendered manifests for EKS; suggested edits cover Kubernetes objects; §78/§79 regrouped with new `verify` and recovery-artifact endpoints/commands; README and `runbooks/` descriptions updated. | Leftovers from moving LLM work to v0.2 and from the reorientation; an unambiguous v0.1 verification contract is needed before P10. |
@@ -505,6 +509,17 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — Code walkthrough docs
+
+- Added `docs/code/` (index, architecture, tooling, `packages/models.md`, template) and *why* comments in the model validators. Made updating it part of every task (CLAUDE.md, IMPL_PLAN, tracker).
+- **Carry-over:** P0-04b, updating `docs/code/packages/models.md` with it.
+
+### 2026-10-28 — P0-04a core models
+
+- `perpetual.models`: status vocabulary with `worst_state`/`stack_state` (§30.1), `Evidence`, `ResourceNode`/`SourceReference`, `DependencyEdge`/`DependencyGroup`/`RelationshipType`, `GraphOverride` with per-kind payloads, `Stack`/`StackService`/`StackResource`, `RecoveryRequirement`/`DurationEstimate`/`BufferPolicy`/`DRStrategy`, `RecoveryMechanism`. Pydantic 2.14 is the first runtime dependency.
+- 60 model tests covering every enforced rule; `mise run check` passes (9 contracts, mypy strict on 39 files, 94 tests).
+- **Carry-over:** P0-04b (typed properties for compute and containers).
 
 ### 2026-10-28 — P0-03 CI
 

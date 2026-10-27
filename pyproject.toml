@@ -5,7 +5,9 @@ description = "AWS disaster-recovery readiness: evidence-based dependency graph,
 readme = "README.md"
 requires-python = ">=3.13"
 authors = [{ name = "Darshan Raul" }]
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.1",
+]
 
 [dependency-groups]
 dev = [
@@ -50,6 +52,12 @@ files = ["apps/api/perpetual", "apps/api/tests"]
 mypy_path = "apps/api"
 explicit_package_bases = true
 warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests"]
