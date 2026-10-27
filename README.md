@@ -51,7 +51,7 @@ Multi-AZ protects against Availability Zone failures; it does not provide recove
 
 ## How it works
 
-<img alt="Perpetual planned architecture: AWS and infrastructure inputs feed a local discovery, dependency graph, assessment and recovery planning pipeline. Human-approved designs become code changes checked by engine verification, with optional LLM assistance." src="assets/architecture.png" width="100%">
+<img alt="Perpetual planned architecture: AWS, Terraform/Kubernetes and observed evidence inputs feed a local discovery, dependency graph, rule-pack/simulator assessment and recovery planning pipeline. Digest-bound approved DR Specs compile into isolated IaC changes and recovery artifacts checked by 4-stage verification, with opt-in v0.2 LLM assistance." src="assets/architecture.svg" width="100%">
 
 ### 1. Map the stack
 
