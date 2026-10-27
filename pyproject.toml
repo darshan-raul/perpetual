@@ -9,6 +9,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.15",
     "mypy",
     "pytest",
     "ruff",
@@ -58,3 +59,90 @@ markers = [
     "contract: real-AWS contract suite; needs sandbox credentials, never runs by default",
 ]
 xfail_strict = true
+
+# Layer boundaries (IMPL_PLAN §3.3, spec §102). Run with `lint-imports` (part of `mise run lint`).
+[tool.importlinter]
+root_package = "perpetual"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "models, ids and config import nothing else from perpetual"
+type = "forbidden"
+source_modules = ["perpetual.models", "perpetual.ids", "perpetual.config"]
+forbidden_modules = [
+    "perpetual.fixtures", "perpetual.persistence", "perpetual.collectors", "perpetual.importers",
+    "perpetual.normalization", "perpetual.evidence", "perpetual.graph", "perpetual.stacks",
+    "perpetual.rules", "perpetual.simulator", "perpetual.recovery", "perpetual.optimizer",
+    "perpetual.costing", "perpetual.iac", "perpetual.llm", "perpetual.knowledge",
+    "perpetual.runbooks", "perpetual.api", "perpetual.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "domain models never import FastAPI or SQLAlchemy"
+type = "forbidden"
+source_modules = ["perpetual.models"]
+forbidden_modules = ["fastapi", "sqlalchemy"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "collectors only collect (rule 2)"
+type = "forbidden"
+source_modules = ["perpetual.collectors"]
+forbidden_modules = ["perpetual.rules", "perpetual.simulator", "perpetual.recovery", "perpetual.optimizer"]
+
+[[tool.importlinter.contracts]]
+name = "normalization never imports api or cli (rule 3)"
+type = "forbidden"
+source_modules = ["perpetual.normalization"]
+forbidden_modules = ["perpetual.api", "perpetual.cli"]
+
+[[tool.importlinter.contracts]]
+name = "rules never import collectors (rule 4)"
+type = "forbidden"
+source_modules = ["perpetual.rules"]
+forbidden_modules = ["perpetual.collectors"]
+
+[[tool.importlinter.contracts]]
+name = "simulator never rediscovers AWS (rule 5)"
+type = "forbidden"
+source_modules = ["perpetual.simulator"]
+forbidden_modules = ["perpetual.collectors", "perpetual.importers"]
+
+[[tool.importlinter.contracts]]
+name = "nothing below api and cli imports them (rule 1)"
+type = "forbidden"
+source_modules = [
+    "perpetual.models", "perpetual.ids", "perpetual.config", "perpetual.fixtures",
+    "perpetual.persistence", "perpetual.collectors", "perpetual.importers",
+    "perpetual.normalization", "perpetual.evidence", "perpetual.graph", "perpetual.stacks",
+    "perpetual.rules", "perpetual.simulator", "perpetual.recovery", "perpetual.optimizer",
+    "perpetual.costing", "perpetual.iac", "perpetual.llm", "perpetual.knowledge",
+    "perpetual.runbooks",
+]
+forbidden_modules = ["perpetual.api", "perpetual.cli"]
+
+[[tool.importlinter.contracts]]
+name = "the engine never calls an agent (rule 11)"
+type = "forbidden"
+source_modules = [
+    "perpetual.models", "perpetual.ids", "perpetual.config", "perpetual.fixtures",
+    "perpetual.persistence", "perpetual.collectors", "perpetual.importers",
+    "perpetual.normalization", "perpetual.evidence", "perpetual.graph", "perpetual.stacks",
+    "perpetual.rules", "perpetual.simulator", "perpetual.recovery", "perpetual.optimizer",
+    "perpetual.costing", "perpetual.iac", "perpetual.runbooks",
+]
+forbidden_modules = ["perpetual.llm", "perpetual.knowledge"]
+
+[[tool.importlinter.contracts]]
+name = "only llm imports LangChain or LangGraph"
+type = "forbidden"
+source_modules = [
+    "perpetual.models", "perpetual.ids", "perpetual.config", "perpetual.fixtures",
+    "perpetual.persistence", "perpetual.collectors", "perpetual.importers",
+    "perpetual.normalization", "perpetual.evidence", "perpetual.graph", "perpetual.stacks",
+    "perpetual.rules", "perpetual.simulator", "perpetual.recovery", "perpetual.optimizer",
+    "perpetual.costing", "perpetual.iac", "perpetual.knowledge", "perpetual.runbooks",
+    "perpetual.api", "perpetual.cli",
+]
+forbidden_modules = ["langchain", "langchain_core", "langgraph"]
+allow_indirect_imports = true

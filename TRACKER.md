@@ -4,7 +4,7 @@ Plan: [IMPL_PLAN.md](IMPL_PLAN.md) (locked 2026-10-25; milestones restructured 2
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-02**.
+**Current focus:** M0 PoC · next task **P0-03**.
 
 ## Milestones
 
@@ -52,7 +52,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | §88 remediated ECS demo: RECOVERABLE (fixture) | [ ] |
 | §93 RTO tests (40 / 48 / 49.5) | [ ] |
 | PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a moto dry run; re-simulation matches §88 | [ ] |
-| Import contracts green | [ ] |
+| Import contracts green | [~] |
 
 ### v0.1 (M2)
 
@@ -117,7 +117,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 ### P0 Engine foundation
 
 - [x] P0-01 Repo skeleton, `mise.toml` with tasks, root-installable `uv` workspace, `__init__.py` subpackage stubs, ruff, mypy strict, pytest
-- [ ] P0-02 import-linter contracts
+- [x] P0-02 import-linter contracts
 - [ ] P0-03 GitHub Actions CI
 - [ ] P0-04a Core graph and stack models, status enums
 - [ ] P0-04b Typed properties: compute and containers
@@ -482,6 +482,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | P0-02: nine import-linter contracts in `pyproject.toml`, run by `mise run lint`, each proven by a test that plants a violation in a temporary copy of the package. Two widen the plan: `knowledge` is forbidden to the engine alongside `llm`, and the LangChain/LangGraph ban covers every package except `llm`, including `api` and `cli`. Rule 6 (optimizer gets options only through the rule-pack protocol) is added in P1-01, when the protocol module exists. | Contracts that are never seen to fail could silently check nothing, especially for external packages that are not installed. A contract needs real module names, and the rule-pack protocol does not exist yet. |
 | 2026-10-28 | P0-01 setup choices: (1) the root `pyproject.toml` is the only Python project and builds `perpetual` from `apps/api/perpetual`; no separate `apps/api/pyproject.toml`, and no uv workspace until a second Python package exists. (2) Pinned tools in `mise.toml`: Python 3.13.13, uv 0.13.1, Node 24.22.1 (LTS), Terraform 1.16.7. (3) Tests live in `apps/api/tests` with pytest's importlib mode; the `contract` marker is excluded by default. (4) ruff skips Markdown. (5) `mise.local.toml` is gitignored for machine-specific overrides. No license is declared yet. | Two projects cannot build the same package (IMPL_PLAN D5 listed both). Versions are ones that installed reliably here; any machine gets them through `mise install`. The license is the owner's decision. |
 | 2026-10-27 | Close consistency gaps from the restructure review: P12-02 limited to deterministic checks; ARC, Identity Center, Accelerated Recovery and `OperatorAccessProfile` models added to P0-04d/f; Identity Center row and ARC plan owners added to §3.5; ARC plan price added to P9-03; §61 scope relabelled v0.2; v0.1 verification contract states that the supplied plan includes the companion module and applied suggested edits, plus rendered manifests for EKS; suggested edits cover Kubernetes objects; §78/§79 regrouped with new `verify` and recovery-artifact endpoints/commands; README and `runbooks/` descriptions updated. | Leftovers from moving LLM work to v0.2 and from the reorientation; an unambiguous v0.1 verification contract is needed before P10. |
 | 2026-10-27 | Restructure the plan into milestones and move all LLM work to v0.2. M0 PoC (P0, P1, new P1c compile loop on fixtures) → M1 Alpha (discovery, rules, simulation, RTO/RPO on real AWS) → M2 v0.1 MVP (EKS, optimizer, IaC delivery, recovery artifacts, hardening; fully deterministic) → M3 v0.2 Agents (P3b, P4-07, P9-07, P10-01/03/08/09/12, new P13) → M4 v0.3 Proven (new P14: drill import, PROVEN tier, drift, catalog calibration, Resilience Hub importer) → M5 v1.0 Production (new P15). v0.1 delivers companion Terraform for new resources plus suggested edits by Terraform address for managed resources, and verifies designs from a saved plan the user supplies; Perpetual runs no repository tools until the v0.2 isolated runner. Large tasks split into lettered subtasks (P0-04a–f, P2-02a–e, P2-03a–g, P2-04a–d, P4-02a–g, P4-03a–g, P4-04a–c, P10-06a–d, P12-05a–d). New tasks P10-10..12. Plan: D14 and D16 revised, D20 added; spec §28.2, §56.1, §56.2, §61, §61.1, §62.1, §69, §99, §100 updated. | The main selling point (the design-and-change loop) should be proven first on fixtures (M0), not after collectors and agents. The transformation agent and its isolation sandbox are the riskiest parts, so they follow a deterministic v0.1. Without the agent, editing existing IaC in place is unsafe, so v0.1 keeps a single owner per resource: new resources in companion code, changes to managed resources as suggested edits. Smaller tasks make progress visible; milestones beyond v0.1 turn the backlog into a route to production. |
@@ -504,6 +505,13 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-02 import contracts
+
+- Nine import-linter contracts (IMPL_PLAN §3.3, CLAUDE.md) in `pyproject.toml`; `lint-imports` added to `mise run lint`.
+- `test_import_contracts.py` plants one forbidden import per contract in a temporary copy of the package and checks the right contract breaks; `llm` may import LangGraph.
+- `mise run check`: 9 contracts kept, mypy clean, 34 tests pass.
+- **Carry-over:** P0-03 (CI); add the rule-6 optimizer contract in P1-01.
 
 ### 2026-10-28 — P0-01 repo skeleton
 

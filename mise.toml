@@ -16,8 +16,8 @@ description = "Format Python code"
 run = ["uv run ruff format .", "uv run ruff check --fix ."]
 
 [tasks.lint]
-description = "Lint (ruff); import-linter joins in P0-02, eslint in P1b-07"
-run = ["uv run ruff check .", "uv run ruff format --check ."]
+description = "Lint (ruff, import-linter contracts); eslint joins in P1b-07"
+run = ["uv run ruff check .", "uv run ruff format --check .", "uv run lint-imports"]
 
 [tasks.typecheck]
 description = "Type-check (mypy --strict); tsc joins in P1b-07"
