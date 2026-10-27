@@ -1,7 +1,7 @@
 # `models` package
 
 **Owns:** the shared vocabulary every other package passes around: resources, evidence, edges, stacks, requirements, mechanisms, user edits and status values.
-**Spec:** §5.1, §5.3, §5.4, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a, P0-04b (P0-04c to P0-04f add more).
+**Spec:** §5.1, §5.3, §5.4, §6, §7, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a to P0-04c (P0-04d to P0-04f add more).
 **Depends on:** nothing else in Perpetual (an import rule enforces this); only Pydantic. **Used by:** every other package, as they are built.
 
 ## In one paragraph
@@ -21,7 +21,7 @@ These are plain data classes built with Pydantic. They hold no logic beyond vali
 | `stack.py` | `Stack`, `StackService`, `StackResource`, `RtoScope` (§24, §24.1) |
 | `requirement.py` | `RecoveryRequirement`, `DurationEstimate`, `BufferPolicy`, `DRStrategy`, `FailureScope` (§26, §27, §49) |
 | `mechanism.py` | `RecoveryMechanism`, `MechanismKind`: the DR overlay (§27.1) |
-| `properties/` | Typed per-resource-type properties (§15.3): `base.py` (`TypedProperties`), `ecs.py`, `ec2.py`, `awslambda.py`, and `__init__.py`, which builds the `ResourceProperties` union |
+| `properties/` | Typed per-resource-type properties (§15.3): `base.py` (`TypedProperties`), one file per service (`ecs.py`, `ec2.py`, `awslambda.py`, `rds.py`, `dynamodb.py`, `s3.py`, `ebs.py`, `efs.py`, `backup.py`), and `__init__.py`, which builds the `ResourceProperties` union |
 | `__init__.py` | Re-exports every public name: `from perpetual.models import DependencyEdge` |
 
 ## How it works
@@ -77,8 +77,21 @@ The node checks that `type_key` matches its own `service/resource_type`.
 | `ec2/image` | `AMIProperties` | owner, state, backing snapshots and KMS keys |
 | `lambda/function` | `LambdaFunctionProperties` | package type, S3 code or ECR image, layers, role, VPC, env var names, destinations, concurrency |
 | `lambda/event-source-mapping` | `LambdaEventSourceMappingProperties` | source queue/stream, target function, state, failure destination |
+| `rds/db` | `RDSInstanceProperties` | engine, size, Multi-AZ (AZ only), backups and latest restorable time, cross-Region backup Regions, replicas, subnet group, KMS |
+| `rds/cluster` | `AuroraClusterProperties` | members, writer, Global Database role (primary/secondary), replication source, backups, KMS |
+| `rds/snapshot`, `rds/cluster-snapshot` | `RDSSnapshotProperties` | one model for both: source, type, age, source Region of a copy, KMS |
+| `dynamodb/table` | `DynamoDBTableProperties` | PITR, Global Tables version and replica Regions, streams, encryption, size |
+| `dynamodb/backup` | `DynamoDBBackupProperties` | table, type, age, size |
+| `s3/bucket` | `S3BucketProperties` | versioning, replication rules (destination, KMS replication, RTC), encryption, size |
+| `ec2/volume` | `EBSVolumeProperties` | size, type, encryption and KMS, source snapshot, attachments |
+| `ec2/snapshot` | `EBSSnapshotProperties` | source volume, age, encryption and KMS |
+| `elasticfilesystem/file-system` | `EFSFileSystemProperties` | mount targets, KMS, replication destinations and last sync time, replica flag, backups |
+| `backup/backup-vault` | `BackupVaultProperties` | KMS, Vault Lock |
+| `backup/recovery-point` | `BackupRecoveryPointProperties` | protected resource, vault, status, age, cross-Region copy source, KMS |
 
-**Three kinds of missing.** A field set to None means absent or null in the source. A field named in `unknown_fields` is *unknown*, for example a Terraform plan value only known after apply; rules must treat it as UNKNOWN, never as absent or as the old live value (§15.4). An empty list means known to be empty.
+`type_key` follows the service name in the resource's ARN, so EBS uses `ec2/…` and EFS uses `elasticfilesystem/…`. Volumetric fields (storage size, IOPS, item counts, bucket size) are here because they drive recovery time (data gravity, §42); fast-changing metrics such as replication lag are separate measurements (P0-04e).
+
+**Three kinds of missing.** A field set to None means absent or null in the source. A field named in `unknown_fields` is *unknown*, for example a Terraform plan value only known after apply; rules must treat it as UNKNOWN, never as absent or as the old live value (§15.4). An empty list means known to be empty. Validators use `is_missing(field)` (empty *and* not marked unknown), so a value known only after apply never fails a rule such as "an Image function needs `image_uri`".
 
 **What is never stored.** Secrets appear only as references (`SecretReference.value_from` is an ARN). Environment variables keep only their names. Launch templates record only whether user data exists. The models have no field for these values, so a collector that tried to store one would fail validation (§67).
 
@@ -148,6 +161,12 @@ stack_state([ResourceState.SURVIVES, ResourceState.UNKNOWN])  # StackState.UNKNO
 | A launch template has one image source: AMI ID or SSM parameter | `LaunchTemplateProperties` | §5.3 |
 | An Image function has an image and no S3 package or layers; a Zip function has no image | `LambdaFunctionProperties` | §5.4 |
 | A task definition has at least one container | `ECSTaskDefinitionProperties` | §5.1 |
+| An Aurora instance belongs to a cluster | `RDSInstanceProperties` | Data and recovery settings live on the cluster (§6.2) |
+| A Global Database member has both its global cluster ID and its role | `AuroraClusterProperties` | The secondary is the promotion path (§6.2) |
+| Aurora keeps at least one day of backups | `AuroraClusterProperties` | AWS minimum |
+| A DynamoDB table with replicas names its global-table version | `DynamoDBTableProperties` | §6.3 |
+| S3 replication needs versioning Enabled and a replication role; rule IDs are distinct | `S3BucketProperties` | AWS prerequisites (§7) |
+| A recovery point can't complete before it was created | `BackupRecoveryPointProperties` | Its age bounds RPO (§51) |
 | Combining no states is an error, not SURVIVES | `worst_state` | Missing evidence must never read as healthy (§30) |
 
 Rules that need the whole graph, such as "group members share one dependent" and "an edge is in at most one group", are checked when the graph is built (P0-11).
@@ -161,9 +180,10 @@ Rules that need the whole graph, such as "group members share one dependent" and
 - `test_model_edge.py`: bases, user edges, review-state consistency, relationship vocabulary, group rules.
 - `test_model_stack_and_requirement.py`: stack roots, requirements, durations, mechanisms, override payloads.
 - `test_model_properties_compute.py`: union selection by `type_key`, type mismatch, `unknown_fields`, no secret/env/user-data values, ECS/EC2/Lambda rules.
+- `test_model_properties_data.py`: both RDS snapshot keys, Multi-AZ default, Aurora and Global Database rules, DynamoDB replicas, S3 replication prerequisites, recovery-point times.
 
 ## Not here yet
 
-- Typed properties for data and storage (P0-04c), messaging, network and supporting services (P0-04d), external/generic resources and quota/metric facts (P0-04e).
+- Typed properties for messaging, network and supporting services (P0-04d), external/generic resources and quota/metric facts (P0-04e).
 - Evaluation, coverage, cost, verification and drill models: P0-04f.
 - Canonical ID helpers: P0-05.

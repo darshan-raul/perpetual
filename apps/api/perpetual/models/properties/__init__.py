@@ -16,7 +16,13 @@ from perpetual.models.properties.awslambda import (
     LambdaEventSourceMappingProperties,
     LambdaFunctionProperties,
 )
+from perpetual.models.properties.backup import (
+    BackupRecoveryPointProperties,
+    BackupVaultProperties,
+)
 from perpetual.models.properties.base import TypedProperties
+from perpetual.models.properties.dynamodb import DynamoDBBackupProperties, DynamoDBTableProperties
+from perpetual.models.properties.ebs import EBSSnapshotProperties, EBSVolumeProperties
 from perpetual.models.properties.ec2 import (
     AMIProperties,
     AutoScalingGroupProperties,
@@ -35,6 +41,13 @@ from perpetual.models.properties.ecs import (
     ServiceAutoScaling,
     ServiceLoadBalancer,
 )
+from perpetual.models.properties.efs import EFSFileSystemProperties, EFSReplicationDestination
+from perpetual.models.properties.rds import (
+    AuroraClusterProperties,
+    RDSInstanceProperties,
+    RDSSnapshotProperties,
+)
+from perpetual.models.properties.s3 import S3BucketProperties, S3ReplicationRule
 
 ResourceProperties = Annotated[
     ECSClusterProperties
@@ -45,26 +58,50 @@ ResourceProperties = Annotated[
     | LaunchTemplateProperties
     | AMIProperties
     | LambdaFunctionProperties
-    | LambdaEventSourceMappingProperties,
+    | LambdaEventSourceMappingProperties
+    | RDSInstanceProperties
+    | AuroraClusterProperties
+    | RDSSnapshotProperties
+    | DynamoDBTableProperties
+    | DynamoDBBackupProperties
+    | S3BucketProperties
+    | EBSVolumeProperties
+    | EBSSnapshotProperties
+    | EFSFileSystemProperties
+    | BackupVaultProperties
+    | BackupRecoveryPointProperties,
     Field(discriminator="type_key"),
 ]
 """Any typed properties model, chosen by `type_key`."""
 
 __all__ = [
     "AMIProperties",
+    "AuroraClusterProperties",
     "AutoScalingGroupProperties",
+    "BackupRecoveryPointProperties",
+    "BackupVaultProperties",
     "BlockDeviceMapping",
     "CapacityProviderStrategyItem",
     "ContainerDefinition",
+    "DynamoDBBackupProperties",
+    "DynamoDBTableProperties",
+    "EBSSnapshotProperties",
+    "EBSVolumeProperties",
     "EC2InstanceProperties",
     "ECSClusterProperties",
     "ECSServiceProperties",
     "ECSTaskDefinitionProperties",
+    "EFSFileSystemProperties",
+    "EFSReplicationDestination",
     "LambdaEventSourceMappingProperties",
     "LambdaFunctionProperties",
     "LaunchTemplateProperties",
     "LaunchTemplateRef",
+    "RDSInstanceProperties",
+    "RDSSnapshotProperties",
     "ResourceProperties",
+    "S3BucketProperties",
+    "S3ReplicationRule",
     "SecretReference",
     "ServiceAutoScaling",
     "ServiceLoadBalancer",

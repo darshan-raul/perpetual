@@ -36,3 +36,11 @@ class TypedProperties(DomainModel):
         if invalid:
             raise ValueError(f"unknown_fields names fields this type does not have: {invalid}")
         return self
+
+    def is_missing(self, field_name: str) -> bool:
+        """True if the field is empty and *not* marked unknown.
+
+        Validators use this so a value that is only known after apply (spec §15.4)
+        does not fail a rule like "an Image function needs image_uri".
+        """
+        return not getattr(self, field_name) and field_name not in self.unknown_fields

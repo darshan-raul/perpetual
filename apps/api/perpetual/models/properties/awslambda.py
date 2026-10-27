@@ -46,7 +46,7 @@ class LambdaFunctionProperties(TypedProperties):
         # An image function runs from ECR and has no S3 package or layers; a zip
         # function has no image. Mixing them means the import is wrong.
         if self.package_type == "Image":
-            if not self.image_uri and "image_uri" not in self.unknown_fields:
+            if self.is_missing("image_uri"):
                 raise ValueError("an Image function needs image_uri")
             if self.code_s3_bucket or self.layer_arns:
                 raise ValueError("an Image function has no S3 package or layers")
