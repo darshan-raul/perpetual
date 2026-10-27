@@ -15,13 +15,14 @@ Every stage passes **models** to the next. That is why `models` is built first a
 
 | Stage | Package | State |
 |---|---|---|
-| Shared vocabulary | `models` | **Built** (P0-04a): resources, evidence, edges, groups, overrides, stacks, requirements, mechanisms, status vocabulary |
+| Shared vocabulary | `models` | **Built** (P0-04a, P0-04b): resources with typed properties (ECS, EC2/Auto Scaling, Lambda so far), evidence, edges, groups, overrides, stacks, requirements, mechanisms, status vocabulary |
 | Everything else | — | Empty subpackages with a docstring; layer rules already enforced |
 
 ## How the built pieces connect
 
 ```text
                     ResourceNode  <---- SourceReference (where it was seen)
+                        |  typed_properties: ResourceProperties (picked by type_key, e.g. ecs/service)
                         ^   ^
        from_resource_id |   | to_resource_id
                         |   |
@@ -50,4 +51,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-04b to P0-04f add typed resource properties and evaluation models to `models`. P0-05 to P0-12 add IDs, config, persistence, fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).
+P0-04c to P0-04f add the remaining typed properties and the evaluation models to `models`. P0-05 to P0-12 add IDs, config, persistence, fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).

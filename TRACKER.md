@@ -6,7 +6,7 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-04b**.
+**Current focus:** M0 PoC · next task **P0-04c**.
 
 ## Milestones
 
@@ -122,7 +122,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-02 import-linter contracts
 - [x] P0-03 GitHub Actions CI
 - [x] P0-04a Core graph and stack models, status enums
-- [ ] P0-04b Typed properties: compute and containers
+- [x] P0-04b Typed properties: compute and containers
 - [ ] P0-04c Typed properties: data and storage
 - [ ] P0-04d Typed properties: messaging, network, edge and supporting services
 - [ ] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
@@ -484,6 +484,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | P0-04b typed-property conventions: (1) each model's `type_key` is `SERVICE/TYPE` from the canonical ID (`ecs/service`, `autoscaling/group`, `ec2/launch-template`, `ec2/image`, `lambda/function`, …) and is the discriminator of the `ResourceProperties` union; `ResourceNode.typed_properties` holds it and must match the node's type. (2) None means absent/null; `unknown_fields` lists fields unknown until apply (§15.4); an empty list means known-empty. (3) Secrets are stored as references, env vars as names only, launch-template user data as a presence flag; there is no field for the values (§67). (4) Lambda module is `awslambda.py` (`lambda` is a keyword). | `resource_type` alone repeats across services (`cluster`); a key aligned with the ID is unambiguous. Unknown plan values must never read as absent or as the old live value. Making secret values unstorable is stronger than a rule saying not to store them. |
 | 2026-10-28 | Add a code walkthrough in `docs/code/`: an index with a package status table, `architecture.md` (pipeline as built), `tooling.md`, one page per package with real code (`packages/<name>.md`, from `_template.md`) and, later, end-to-end `flows/<name>.md`. Every task that changes code updates it in the same change; it is part of the definition of done (IMPL_PLAN §4 note, CLAUDE.md). Code comments explain the *why* of validators and engine rules, citing spec sections. | User request: a scalable, always-current document to understand the code before reading it, as the codebase grows. |
 | 2026-10-28 | P0-04a model choices. (1) Domain models are immutable, reject unknown fields and require timezone-aware timestamps. (2) Spec MUSTs are enforced in the models: confidence in [0, 1]; observed evidence needs its window and count, other evidence must not have one; every dependency-edge evidence item has a basis; user-added edges have confidence 1.0 and `user_confirmation`/`asserted` evidence; `confirmed` agrees with `review_state`; quorum groups have 1 ≤ `minimum_healthy` ≤ members; Region requirements name `target_region`; duration bounds are ordered and unknown bounds stay None; stack roots are members; mechanism dependency groups are DR-side. (3) `relationship_type` is the §20 vocabulary as an enum (spec: `str`); `contains`, `member_of`, `replicates_to`, `backed_up_by` are flagged as not operational requirements. (4) `GraphOverride.payload` stays a dict but is validated against a per-kind schema. (5) Added `SourceReference` (used but undefined in the spec), `StackResource` (membership + RTO scope, §24.1), `ResourceNode.planned` (§15.1). (6) `DurationEstimate` and `BufferPolicy` moved here from P0-04f because `RecoveryRequirement` needs them. (7) `worst_state` refuses an empty input instead of returning SURVIVES. (8) Graph-wide group checks (shared dependent and scope, one group per edge) run in P0-11. (9) Pydantic's mypy plugin is enabled. | Catch invalid fixtures and imports at the boundary instead of inside the engine; keep snapshots stable for digests (§56.3); never let an empty or missing input read as healthy. |
 | 2026-10-28 | P0-02: nine import-linter contracts in `pyproject.toml`, run by `mise run lint`, each proven by a test that plants a violation in a temporary copy of the package. Two widen the plan: `knowledge` is forbidden to the engine alongside `llm`, and the LangChain/LangGraph ban covers every package except `llm`, including `api` and `cli`. Rule 6 (optimizer gets options only through the rule-pack protocol) is added in P1-01, when the protocol module exists. | Contracts that are never seen to fail could silently check nothing, especially for external packages that are not installed. A contract needs real module names, and the rule-pack protocol does not exist yet. |
@@ -509,6 +510,12 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-04b typed properties: compute and containers
+
+- `perpetual.models.properties`: `TypedProperties` base with `unknown_fields`; ECS cluster/service/task definition, EC2 instance, Auto Scaling group, launch template, AMI, Lambda function and event-source mapping; `ResourceProperties` discriminated union; `ResourceNode.typed_properties` with type check.
+- 17 new tests; `mise run check`: 9 contracts, mypy strict on 45 files, 111 tests. `docs/code/packages/models.md`, README and architecture updated.
+- **Carry-over:** P0-04c (typed properties: data and storage).
 
 ### 2026-10-28 — Code walkthrough docs
 

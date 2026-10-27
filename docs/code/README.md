@@ -17,7 +17,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 
 | Package | What it owns | Status | Page |
 |---|---|---|---|
-| `models` | Domain models, enums, status vocabulary. No I/O. | Core graph and stack models (P0-04a) | [packages/models.md](packages/models.md) |
+| `models` | Domain models, enums, status vocabulary. No I/O. | Core graph and stack models (P0-04a); typed properties for ECS, EC2/Auto Scaling, Lambda (P0-04b) | [packages/models.md](packages/models.md) |
 | `config` | Typed configuration and versioned defaults | stub | — |
 | `ids` | Canonical resource IDs | stub | — |
 | `fixtures` | Fixture format, loader, validator | stub | — |
