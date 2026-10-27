@@ -3,7 +3,7 @@
 Part of the [`models` package](models.md).
 
 **Owns:** one typed configuration model per AWS resource type, which rule packs read instead of the raw property dict.
-**Spec:** §5–§8.1, §15.3, §15.4, §28.1, §42, §67. **Tracker:** P0-04b (compute), P0-04c (data and storage), P0-04d (messaging, network, edge, supporting, ARC, Identity Center, and the planned-resource fixes from review).
+**Spec:** §5–§8.1, §15.3, §15.4, §28.1, §42, §67. **Tracker:** P0-04b (compute), P0-04c (data and storage), P0-04d (messaging, network, edge, supporting, ARC, Identity Center, and the planned-resource fixes from review), P0-04e (external, generic, CodePipeline).
 **Code:** `apps/api/perpetual/models/properties/`.
 
 ## In one paragraph
@@ -25,7 +25,7 @@ node = ResourceNode.model_validate({
 type(node.typed_properties)  # ECSServiceProperties
 ```
 
-`ResourceNode` checks that `type_key` matches its own `service/resource_type`. `type_key` follows the service name in the resource's ARN, so EBS uses `ec2/…`, EFS `elasticfilesystem/…`, routing controls `route53-recovery-control/…`.
+`ResourceNode` checks that `type_key` matches its own `service/resource_type`, with two exceptions (see [External, generic and out of scope](#external-generic-and-out-of-scope)). `type_key` follows the service name in the resource's ARN, so EBS uses `ec2/…`, EFS `elasticfilesystem/…`, routing controls `route53-recovery-control/…`.
 
 ## Three kinds of missing
 
@@ -168,6 +168,21 @@ Volumetric fields (storage size, IOPS, item counts, bucket size) are here becaus
 | `route53-recovery-readiness/readiness-check` | `ReadinessCheckProperties` | legacy: collected, never recommended |
 | `sso/instance` | `IdentityCenterInstanceProperties` | home Region and replica Regions (OPS-ACCESS-001) |
 
+**External, generic and out of scope** (`other.py`)
+
+| `type_key` | Model | What rules use it for |
+|---|---|---|
+| `external/dependency` | `ExternalResourceProperties` | declared DR posture (`unknown` until the user says otherwise), description, matching hostnames |
+| `generic/resource` | `GenericResourceProperties` | nothing: it keeps unmodelled AWS types (e.g. ElastiCache in v0.1) visible in the graph; Terraform or CloudFormation type for reference |
+| `codepipeline/pipeline` | `CodePipelineProperties` | what it deploys and to which Regions: a pipeline the recovery plan uses comes back into RTO scope (§24.1) |
+
+### External, generic and out of scope
+
+These two are the exceptions to "`type_key` matches the node's `service/type`":
+
+- `external/dependency` is allowed on any node with `provider="external"`, whatever its user-chosen service name (§15.2), and only on such nodes.
+- `generic/resource` is allowed on any AWS node whose `service/type` has **no** typed model. `SPECIFIC_TYPE_KEYS` lists the ones that do, so the fallback can never be used to skip a type's validation.
+
 ## Rules they enforce, and why
 
 | Rule | Where | Why (spec) |
@@ -197,6 +212,7 @@ Volumetric fields (storage size, IOPS, item counts, bucket size) are here becaus
 | A policy statement has actions | `PolicyStatement` | IAM requirement |
 | A Region switch plan has two distinct Regions; primary and workflow targets are among them; parallel steps nest one level | `RegionSwitchPlanProperties`, `RegionSwitchStep` | ARC constraints (§63.3) |
 | Identity Center replicas are other Regions than home | `IdentityCenterInstanceProperties` | OPS-ACCESS-001 (§28.1) |
+| External properties only on `provider="external"` nodes; generic only for types without a model | `ResourceNode` | §15.2; no validation bypass |
 
 ## Tests
 
@@ -205,6 +221,7 @@ In `apps/api/tests/models/`:
 - `test_model_properties_compute.py`: union selection, type mismatch, `unknown_fields`, no secret/env/user-data values, ECS/EC2/Lambda rules.
 - `test_model_properties_data.py`: both RDS snapshot keys, Multi-AZ default, Aurora and Global Database rules, DynamoDB replicas, S3 replication prerequisites, recovery-point times.
 - `test_model_properties_planned.py`: required-or-unknown fields, nested parts, sorted `unknown_fields`, `0`/`False` vs empty, planned Aurora and S3 cases.
+- `test_model_facts_and_fallbacks.py`: external, generic and CodePipeline properties and their node checks (facts are covered in [models.md](models.md#tests)).
 - `test_model_properties_supporting.py`: every properties model is registered in the union and `type_key`s are unique; messaging, network, edge, supporting, ARC and Identity Center rules.
 
 ## Adding a resource type

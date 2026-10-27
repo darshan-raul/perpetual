@@ -6,7 +6,7 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-04e**.
+**Current focus:** M0 PoC · next task **P0-04f**.
 
 ## Milestones
 
@@ -125,7 +125,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-04b Typed properties: compute and containers
 - [x] P0-04c Typed properties: data and storage
 - [x] P0-04d Typed properties: messaging, network, edge and supporting services
-- [ ] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
+- [x] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
 - [ ] P0-04f Evaluation, coverage, workload/cost, prerequisite, verification and drill models; operator access profile; resolved-observation model (exact | ambiguous, §14.1)
 - [ ] P0-05 Canonical resource IDs
 - [ ] P0-06 Typed config + defaults
@@ -484,6 +484,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | P0-04e: `external/dependency` properties are matched on `provider="external"` (user-chosen service names, §15.2); `generic/resource` is allowed only for types without a model (`SPECIFIC_TYPE_KEYS`); CodePipeline records action Regions and providers for the §24.1 in-scope exception. Facts live in `models/facts.py`, separate from resources: `QuotaFact` (headroom None unless limit and usage known), `InstanceTypeOfferingFact` (sorted set), `CapabilityFact` (catalog answers name a version), `MetricFact` (ok/no_data/access_denied/error; only ok has samples, ordered and inside the window). Every fact has account, Region, collection time, coverage ID and `carried_forward`. | Missing data must stay unknown (§28.1, §76.1); facts change faster than configuration and need their own freshness handling; a fallback must not bypass a type's validation. |
 | 2026-10-28 | Fixes from an external review of P0-04a–d. (1) `is_missing()` treats None and empty strings/collections as missing, never 0 or False (the review's `is None` fix would let an HTTPS listener with `[]` certificates pass). (2) AWS-assigned values (IDs, ARNs, URIs, computed numbers) are declared in `required_fields`, typed nullable, and must be present or listed in `unknown_fields`; nested parts inherit `PropertyPart`, and an unknown nested value marks the parent field unknown (one level deep). (3) Every "set together" pairing check skips when a side is unknown (Aurora global membership, SQS redrive, KMS multi-Region role, Route 53 failover role), and S3's versioning check respects unknown versioning. (4) DynamoDB replicas are structured (`DynamoDBReplica`: Region, status, KMS key, table-class override). (5) `unknown_fields` is sorted and rejects repeats. (6) The resolved-observation model (§14.1) moves to P0-04f so persistence (P0-07) can store it; P2b-09 keeps the review flow. | §15.4 forbids inventing ARNs for planned resources, and the Terraform importer needs this before P1b; stable hashes need normalized lists (§56.3); per-replica KMS decides whether a replica can be read in DR. |
 | 2026-10-28 | P0-04d scope and rules: also models route tables, NAT and internet gateways, VPC endpoints, Transit Gateway attachments, Route 53 health checks, CloudFront, ACM, ECR registry (replication is per registry) and ECR images, which P2 collectors gather but the P0-04d list omitted. SNS subscription endpoints are stored only for AWS-resource protocols (email/SMS/HTTP endpoints are personal data). IAM policies are stored as structured statements for XREG-IAM-002. `accelerated_recovery_enabled` is a nullable bool rather than an API enum. A test fails if a properties model is not registered in the union. The typed-properties docs moved to `docs/code/packages/models-properties.md`. | Collectors need somewhere typed to put every fact they gather; personal data has no DR value; a forgotten union registration would otherwise surface only when a fixture fails to parse. |
 | 2026-10-28 | P0-04c: `type_key` follows the service name in each resource's ARN (`ec2/volume`, `ec2/snapshot`, `elasticfilesystem/file-system`, `backup/recovery-point`); one `RDSSnapshotProperties` model takes both `rds/snapshot` and `rds/cluster-snapshot`; AWS Backup vaults and recovery points are modelled here because restores depend on them; volumetric fields (§42) live on the models while fast-changing metrics wait for P0-04e facts; validators use `TypedProperties.is_missing()` so values known only after apply never fail a prerequisite check. | One naming rule for keys and IDs; restore mechanisms need recovery points as typed resources; metrics need freshness handling that configuration does not. |
@@ -513,6 +514,12 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-04e fallbacks and facts
+
+- `properties/other.py`: external, generic and CodePipeline properties; `SPECIFIC_TYPE_KEYS`; node check handles the two fallbacks. `models/facts.py`: quota, instance-type offering, capability and metric facts with `FactRecord`.
+- 17 new tests; `mise run check`: 9 contracts, mypy strict on 63 files, 188 tests. `docs/code` updated (facts in `models.md`, fallbacks in `models-properties.md`).
+- **Carry-over:** P0-04f (evaluation, coverage, cost, verification, drill, operator-access and resolved-observation models).
 
 ### 2026-10-28 — P0-04d typed properties: messaging, network, edge, supporting
 

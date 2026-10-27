@@ -9,6 +9,7 @@ To add a resource type: write its model with a unique `type_key` literal in the
 file for its service, import it here and add it to the union below.
 """
 
+import typing
 from typing import Annotated
 
 from pydantic import Field
@@ -79,6 +80,11 @@ from perpetual.models.properties.network import (
     TransitGatewayAttachmentProperties,
     VPCEndpointProperties,
     VPCProperties,
+)
+from perpetual.models.properties.other import (
+    CodePipelineProperties,
+    ExternalResourceProperties,
+    GenericResourceProperties,
 )
 from perpetual.models.properties.rds import (
     AuroraClusterProperties,
@@ -171,12 +177,28 @@ ResourceProperties = Annotated[
     | RoutingControlProperties
     | RegionSwitchPlanProperties
     | ReadinessCheckProperties
-    | IdentityCenterInstanceProperties,
+    | IdentityCenterInstanceProperties
+    # Out of scope, external and fallback (P0-04e)
+    | CodePipelineProperties
+    | ExternalResourceProperties
+    | GenericResourceProperties,
     Field(discriminator="type_key"),
 ]
 """Any typed properties model, chosen by `type_key`."""
 
+_FALLBACK_MODELS = (ExternalResourceProperties, GenericResourceProperties)
+
+SPECIFIC_TYPE_KEYS: frozenset[str] = frozenset(
+    key
+    for model in typing.get_args(typing.get_args(ResourceProperties)[0])
+    if model not in _FALLBACK_MODELS
+    for key in typing.get_args(model.model_fields["type_key"].annotation)
+)
+"""Every `service/type` that has its own typed model. The generic fallback is not
+allowed for these, so it can never be used to skip a type's validation."""
+
 __all__ = [
+    "SPECIFIC_TYPE_KEYS",
     "ACMCertificateProperties",
     "AMIProperties",
     "AliasTarget",
@@ -189,6 +211,7 @@ __all__ = [
     "CloudFrontDistributionProperties",
     "CloudFrontOrigin",
     "CloudFrontOriginGroup",
+    "CodePipelineProperties",
     "ContainerDefinition",
     "DynamoDBBackupProperties",
     "DynamoDBReplica",
@@ -206,6 +229,8 @@ __all__ = [
     "ECSTaskDefinitionProperties",
     "EFSFileSystemProperties",
     "EFSReplicationDestination",
+    "ExternalResourceProperties",
+    "GenericResourceProperties",
     "HealthCheckProperties",
     "HostedZoneProperties",
     "IAMPolicyProperties",

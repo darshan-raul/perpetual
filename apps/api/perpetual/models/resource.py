@@ -10,7 +10,12 @@ from pydantic import AwareDatetime, Field, model_validator
 
 from perpetual.models.common import DomainModel, NonEmptyStr
 from perpetual.models.evidence import SourceType
-from perpetual.models.properties import ResourceProperties
+from perpetual.models.properties import (
+    SPECIFIC_TYPE_KEYS,
+    ExternalResourceProperties,
+    GenericResourceProperties,
+    ResourceProperties,
+)
 
 
 class SourceReference(DomainModel):
@@ -53,14 +58,26 @@ class ResourceNode(DomainModel):
 
     @model_validator(mode="after")
     def _typed_properties_match_type(self) -> Self:
-        # The typed model is chosen by its type_key (e.g. "ecs/service"). It must
-        # describe this node's own type: ECS service properties on an RDS node would
-        # make every rule read the wrong fields.
-        if self.typed_properties is not None:
-            expected = f"{self.service}/{self.resource_type}"
-            if self.typed_properties.type_key != expected:
-                raise ValueError(
-                    f"typed_properties are for {self.typed_properties.type_key!r}, "
-                    f"but this node is {expected!r}"
-                )
+        # The typed model must describe this node's own type: ECS service properties
+        # on an RDS node would make every rule read the wrong fields.
+        typed = self.typed_properties
+        if typed is None:
+            return self
+        own_key = f"{self.service}/{self.resource_type}"
+        if isinstance(typed, ExternalResourceProperties):
+            # External nodes have a user-chosen service name (spec §15.2), so they are
+            # matched on provider instead of on service/type.
+            if self.provider != "external":
+                raise ValueError('external properties need provider "external"')
+        elif isinstance(typed, GenericResourceProperties):
+            # The fallback is only for types without a model; otherwise it would let a
+            # resource skip its type's validation.
+            if self.provider == "external":
+                raise ValueError("external nodes use external/dependency properties")
+            if own_key in SPECIFIC_TYPE_KEYS:
+                raise ValueError(f"{own_key!r} has its own typed model; generic is not allowed")
+        elif typed.type_key != own_key:
+            raise ValueError(
+                f"typed_properties are for {typed.type_key!r}, but this node is {own_key!r}"
+            )
         return self

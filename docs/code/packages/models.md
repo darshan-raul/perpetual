@@ -1,7 +1,7 @@
 # `models` package
 
 **Owns:** the shared vocabulary every other package passes around: resources, evidence, edges, stacks, requirements, mechanisms, user edits and status values.
-**Spec:** §5–§8.1, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a to P0-04d (P0-04e and P0-04f add more).
+**Spec:** §5–§8.1, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a to P0-04e (P0-04f adds more).
 **Depends on:** nothing else in Perpetual (an import rule enforces this); only Pydantic. **Used by:** every other package, as they are built.
 
 ## In one paragraph
@@ -21,6 +21,7 @@ These are plain data classes built with Pydantic. They hold no logic beyond vali
 | `stack.py` | `Stack`, `StackService`, `StackResource`, `RtoScope` (§24, §24.1) |
 | `requirement.py` | `RecoveryRequirement`, `DurationEstimate`, `BufferPolicy`, `DRStrategy`, `FailureScope` (§26, §27, §49) |
 | `mechanism.py` | `RecoveryMechanism`, `MechanismKind`: the DR overlay (§27.1) |
+| `facts.py` | Measured facts that are not configuration: `QuotaFact`, `InstanceTypeOfferingFact`, `CapabilityFact`, `MetricFact`, and the `FactRecord` union (§28.1, §76.1) |
 | `properties/` | Typed per-resource-type properties, one file per service area. See [models-properties.md](models-properties.md) |
 | `__init__.py` | Re-exports every public name: `from perpetual.models import DependencyEdge` |
 
@@ -54,6 +55,18 @@ asserted     a person said so             (user confirmation)
 Rules read a resource's configuration from `typed_properties`, a model specific to its type (54 type keys so far), never from the raw `properties` dict. Pydantic picks the model from its `type_key`, which matches the `SERVICE/TYPE` part of the resource ID. The node checks they agree. Missing values come in three kinds (absent, unknown until apply, known empty), and secret values have no field to live in.
 
 Everything about them, including the full list of types, is on its own page: **[models-properties.md](models-properties.md)**.
+
+### Facts
+
+Some things the rules need are not resource configuration: a Service Quotas limit and current usage, which instance types a Region offers, whether a feature exists in a Region, a CloudWatch series such as replica lag. They change much faster than configuration and have tighter freshness limits (§76.1: 15 minutes for the latest replication, usage or quota measurement), so they live in `facts.py`, apart from resources.
+
+Every fact records where and when it was collected, which coverage record produced it (§76.1, model in P0-04f), and whether it is `carried_forward` history that cannot satisfy a check by itself. `FactRecord` picks the fact type from `kind`.
+
+The guiding rule is that **missing data stays unknown**:
+
+- `QuotaFact.headroom` is None unless both the limit and current usage are known. A limit alone proves nothing: the account may already use most of it.
+- `MetricFact` separates `ok`, `no_data`, `access_denied` and `error`. Only an `ok` read has samples, and it always has at least one, so "no data" can never read as zero. `latest_sample_at` is what freshness is judged on, and `missing_samples` shows gaps.
+- `CapabilityFact` is `available`, `unavailable` or `unknown`. An answer from a catalog names the catalog version.
 
 ### Edges and groups
 
@@ -127,9 +140,9 @@ Rules that need the whole graph, such as "group members share one dependent" and
 - `test_model_edge.py`: bases, user edges, review-state consistency, relationship vocabulary, group rules.
 - `test_model_stack_and_requirement.py`: stack roots, requirements, durations, mechanisms, override payloads.
 - `test_model_properties_*.py`: typed properties; see [models-properties.md](models-properties.md#tests).
+- `test_model_facts_and_fallbacks.py`: external/generic/CodePipeline properties and the node checks for them; quota headroom, offerings, capability versions, metric statuses, sample order and window, `FactRecord` selection.
 
 ## Not here yet
 
-- External and generic resource properties, and quota, availability and metric facts: P0-04e.
-- Evaluation, coverage, cost, verification and drill models: P0-04f.
+- Evaluation, coverage, cost, verification, drill, operator-access and resolved-observation models: P0-04f.
 - Canonical ID helpers: P0-05.

@@ -12,6 +12,15 @@ from perpetual.models.edge import (
     ReviewState,
 )
 from perpetual.models.evidence import Basis, Evidence, SourceType
+from perpetual.models.facts import (
+    CapabilityFact,
+    CapabilityStatus,
+    FactRecord,
+    InstanceTypeOfferingFact,
+    MetricFact,
+    MetricSample,
+    QuotaFact,
+)
 from perpetual.models.mechanism import MechanismKind, RecoveryMechanism
 from perpetual.models.override import (
     DrPosture,
@@ -49,6 +58,8 @@ from perpetual.models.status import (
 __all__ = [
     "Basis",
     "BufferPolicy",
+    "CapabilityFact",
+    "CapabilityStatus",
     "Confidence",
     "Criticality",
     "DRStrategy",
@@ -60,15 +71,20 @@ __all__ = [
     "EdgeOrigin",
     "EstimateConfidence",
     "Evidence",
+    "FactRecord",
     "FailureScope",
     "GraphOverride",
     "GroupMode",
     "GroupScope",
+    "InstanceTypeOfferingFact",
     "MechanismKind",
+    "MetricFact",
+    "MetricSample",
     "NodeKind",
     "NonEmptyStr",
     "OverrideKind",
     "OverrideStatus",
+    "QuotaFact",
     "Readiness",
     "RecoveryMechanism",
     "RecoveryRequirement",
