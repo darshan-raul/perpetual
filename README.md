@@ -181,7 +181,7 @@ Perpetual is pre-alpha: the design is complete and implementation is starting. D
 | P7 | EKS support |
 | P8–P9 | RPO, cost, DR design with LLM-proposed candidates, DR spec |
 | P10 | Changing your Terraform and manifests, with verification and pull requests |
-| P11–P12 | Runbooks, first release |
+| P11–P12 | Recovery artifacts (runbook, scripts, ARC plan), first release |
 
 ## Tech stack
 

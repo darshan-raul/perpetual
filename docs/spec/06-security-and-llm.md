@@ -74,6 +74,8 @@ Collectors may read them in memory to match endpoints, ARNs and Region strings. 
 
 They MUST NOT persist the value. Unmatched values are discarded.
 
+Generated scripts (63.1, 63.2) may read secret values when an operator runs them, on the operator's machine with the operator's credentials. Perpetual never runs these scripts, never receives their output and never embeds values in them.
+
 ---
 
 # 68. Terraform State

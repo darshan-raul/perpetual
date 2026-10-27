@@ -71,6 +71,30 @@ The resulting graph MUST be acyclic. A cycle is a rule-pack bug and fails plan g
 
 ---
 
+# 47.2 Execution Method
+
+The DR spec (56.2) selects one execution method per stack:
+
+```text
+scripts              default. Generated recovery scripts kept in the user's git
+                     repository, run by an operator from a laptop with human
+                     checks between stages. Never run from CI.
+arc_region_switch    a compiled ARC Region switch plan (63.3). Steps that no
+                     execution block covers run as script steps behind a manual
+                     approval block.
+```
+
+The runbook (63) explains the flow. It is not an execution method.
+
+RTO is computed for the selected method, so a stack still has one RTO per scenario:
+
+- scripts: every human check is a gate that takes handoff time from the plan buffer (49.2);
+- arc_region_switch: the DAG is grouped into sequential steps of parallel blocks (63.3). When grouping lengthens the critical path, the plan-as-compiled RTO is the result, and the ideal DAG RTO is shown only as context.
+
+When ARC is selected, its per-plan monthly price counts toward total steady-state DR cost (59.1), taken from the versioned price table. Generated plans have no alarm triggers in v0.1; an operator starts them (101).
+
+---
+
 # 48. Recovery Action Model
 
 ```python
@@ -363,6 +387,8 @@ class DRDrill(BaseModel):
 
 Do not build automated drills in initial MVP.
 
+Drill results come from, in order of preference: an ARC Region switch execution report, the timestamped log of a recovery-script run (63.2), and a fault-injection or Resilience Hub test result. Importing them is post-MVP. Until a matching drill exists, a stack's readiness tier is at most CONFIGURED (3).
+
 ---
 
 # 54. Optimization Engine
@@ -499,8 +525,12 @@ class DRSpec(BaseModel):
     order: list[str]
     # Change IDs in apply order (e.g. DR network and KMS before replicas).
 
+    execution_method: Literal["scripts", "arc_region_switch"] = "scripts"
+    # How recovery runs (47.2). Part of the approved design and its digest.
+
     manual_steps: list[str]
-    # What code cannot do: quota increase requests, account setup, approvals.
+    # Work outside Terraform, delivered as prerequisite scripts and SOPs (63.1):
+    # backfill, quota increase requests, account setup, approvals.
 
     predicted: StackPrediction
     # RTO, RPO and monthly cost from the engine; before and after.

@@ -40,6 +40,7 @@ Ship Perpetual v0.1: a local, single-user tool that delivers the MVP workflow in
 | D16 | Changing infrastructure | Code only: Terraform and Kubernetes manifests (plain, Kustomize, Helm values) in a git worktree, delivered as a branch or PR. Never apply, never merge. Repository-controlled tools run only inside the enforced isolation boundary in spec §61. |
 | D17 | Knowledge base | Local SQLite with `sqlite-vec` + FTS5 (hybrid retrieval); local embeddings by default (fastembed). Ships curated DR domain reference docs in `knowledge/domain/` for all in-scope AWS services, plus `knowledge/sources.yaml` (fetched via `perpetual kb sync`), plus dynamic agent `web_search` and `web_fetch` (with sanitized queries) that persist and index fetched documentation for out-of-scope/unmodeled resources into the local KB. |
 | D18 | LLM tests | Fake chat model with recorded responses in CI; real-provider evals on demand in `evals/`. |
+| D19 | Recovery execution | Two methods, chosen per stack in the DR spec (spec §47.2): recovery scripts run by an operator from a laptop (default) or a compiled ARC Region switch plan. Perpetual generates and statically checks both and never runs them; the runbook explains the flow. Cross-cloud recovery is out of scope (decision 2026-10-27). |
 
 ## 3. Architecture
 
@@ -182,7 +183,7 @@ Milestone ordering is explicit even where task IDs were appended: P0-15 precedes
 | P8 | Phase 7 | RPO | no |
 | P9 | Phase 8 | Optimizer, cost, LLM candidate planner, DR spec | no |
 | P10 | Phase 9 | IaC transformation + verification + companion fallback | no |
-| P11 | Phase 10 | Runbooks + failback | no |
+| P11 | Phase 10 | Recovery artifacts: runbook, prerequisite and recovery scripts, ARC Region switch plan, failback | no |
 | P12 | §100 | MVP hardening and v0.1 release | checkpoint |
 
 Every task meets the spec §103 definition of done: typed model, implementation, unit tests, fixture, API and UI exposure where applicable, error handling, docs.
@@ -271,8 +272,8 @@ Spec: §9, §11–§13, §14.1 (security groups, IAM), §21, §22, §65–§67, 
 | ID | Task |
 |---|---|
 | P2-01 | Collector protocol; per-account sessions (primary + DR account, profile or role); region iteration + global/`us-east-1` pass (`Route 53`, `IAM`, `CloudFront`, `WAFv2 Scope=CLOUDFRONT`, `ACM in us-east-1`); pagination; throttling retries; per-collector failure → scan `partial`. |
-| P2-02 | Collectors: EC2 (instances, Auto Scaling groups, launch templates, AMIs) / VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks, ARC if present), CloudFront distributions/origins, ACM, WAF (WAFv2 `REGIONAL` and `CLOUDFRONT` Web ACLs, rule groups, associations). |
-| P2-03 | Collectors: ECS, Lambda (functions, layers, event-source mappings), ECR (incl. replication config and image digest/manifest metadata), SQS (queues, DLQs, policies), SNS (topics, subscriptions, policies), Secrets Manager (metadata, replication), SSM parameters (metadata), KMS (incl. multi-Region), IAM roles/policies, CloudWatch Logs (log groups, KMS, retention, subscription filters). |
+| P2-02 | Collectors: EC2 (instances, Auto Scaling groups, launch templates, AMIs) / VPC (VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups), ELB, Route 53 (incl. health checks and Accelerated Recovery status), ARC (routing controls; Region switch plans, evaluation status and report locations; readiness checks as legacy), CloudFront distributions/origins, ACM, WAF (WAFv2 `REGIONAL` and `CLOUDFRONT` Web ACLs, rule groups, associations). |
+| P2-03 | Collectors: ECS, Lambda (functions, layers, event-source mappings), ECR (incl. replication config and image digest/manifest metadata), SQS (queues, DLQs, policies), SNS (topics, subscriptions, policies), Secrets Manager (metadata, replication), SSM parameters (names, versions, last-modified, in primary and DR), KMS (incl. multi-Region), IAM roles/policies, IAM Identity Center instance home/replica Regions, CloudWatch Logs (log groups, KMS, retention, subscription filters). |
 | P2-04 | Collectors: RDS/Aurora (instances, clusters, replicas, snapshots), S3 (versioning, replication), AWS Backup, EBS volumes/snapshots, EFS filesystems/mount targets/replication/backup metadata, DynamoDB tables/PITR/backups/replicas/indexes/KMS. Typed normalization and absence/coverage records per §3.5. |
 | P2-05 | Supplementary: Resource Explorer, AWS Config items and relationships. |
 | P2-06 | Edge resolvers: security groups (spec §14.1 rules incl. wide-open handling), IAM (identity and resource policies, wildcard handling), configuration references (task-definition secrets, Lambda/ECS env/endpoint matching that persists only the matched fact, `ASG → LaunchTemplate → AMI → EBS Snapshot → KMS Key`, `Lambda → S3 code bucket / ECR image / Lambda Layer`, event-source mappings, SNS→SQS/Lambda subscriptions, WAF→ALB/CloudFront associations, EC2 instance profiles/volumes), Config relationships. |
@@ -343,7 +344,7 @@ Spec: §8.1, §28, §28.1, §29–§32, §41, §91.
 | P4-01 | Finding model, stable rule-ID registry, rule docs generated to `docs/rules/`. |
 | P4-02 | Packs: ECS (§32), EC2/Auto Scaling (§5.3, incl. cross-Region AMI copy + snapshot KMS decryptability), Lambda (§5.4, incl. DR S3 package / ECR image / regional layer availability + event-source mappings), ECR, SQS (§7.1, endpoint recovery vs in-flight message RPO), SNS (§7.1), Secrets/SSM, KMS, IAM. |
 | P4-03 | Packs: RDS/Aurora (§41, Multi-AZ ≠ cross-Region), S3, network (VPC, subnets, NAT, routes, endpoints), ALB/NLB, CloudFront origin failover and ACM certificate availability, Route 53 (data-plane vs control-plane, §8.1), WAF (§8, primary-vs-DR Web ACL and rule parity), CloudWatch Logs (§8, §24.1). |
-| P4-04 | Cross-cutting rules: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001, QUOTA-DR-001, REGION-SVC-001. |
+| P4-04 | Cross-cutting rules: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001 (incl. Route 53 Accelerated Recovery for us-east-1 scenarios), QUOTA-DR-001, REGION-SVC-001, ARC-RS-001, SSM-PARITY-001, OPS-ACCESS-001/002 with a declared operator access profile (spec §28.1). |
 | P4-05 | Readiness dimensions (§30) with UNKNOWN for dimensions without rules; scoring and centralized readiness composition (§31); declare required coverage/freshness for each rule; Observability reports out-of-scope findings and never blocks. |
 | P4-06 | `perpetual assess STACK`; findings API; findings tab in UI. |
 | P4-07 | Advisory review agent (spec §28.2): typed proposals, citation check, effects on edges/mechanisms/stack state (`advisory_unresolved`), accept/dismiss with fingerprints; `perpetual advise`; UI panel. |
@@ -420,7 +421,7 @@ Spec: §54–§60, §94.
 | P9-05 | Remediation planner (§60): re-plan the whole stack per change and explain stack-level deltas. |
 | P9-06 | `perpetual optimize STACK --rto --rpo --budget`; Optimize tab in UI. Spec §94 test. |
 | P9-07 | LLM candidate planner (spec §56.1): `CandidateProposal` schema, new-option rules (citation, catalog action types, prerequisites), refine loop, deterministic candidates always kept. |
-| P9-08 | DR spec (§56.2–56.3): selected candidate, cited rationale, immutable input manifest and canonical approval digest, supersession/freshness checks, Markdown export and approval UI/CLI. Pin declared IaC baseline metadata before approval; P10-01 performs detailed block mapping. Test requirement/scan/override/catalog/base-tree changes and resumed checkpoints. |
+| P9-08 | DR spec (§56.2–56.3): selected candidate, execution method (§47.2), cited rationale, immutable input manifest and canonical approval digest, supersession/freshness checks, Markdown export and approval UI/CLI. Pin declared IaC baseline metadata before approval; P10-01 performs detailed block mapping. Test requirement/scan/override/catalog/base-tree changes and resumed checkpoints. |
 | P9-09 | Versioned workload profiles (§59.1): measured quantities from P2-12 or explicit user bounds, units/windows/provenance/expiry, CLI/API/UI editing and cost-input validation. Implement before P9-03; test missing usage, regional prices, shared foundations and total versus incremental/incident cost. |
 
 Exit: deterministic and LLM-proposed candidates can be compared on cost, RTO and RPO, and each demo stack has an approved DR spec.
@@ -443,18 +444,22 @@ Spec: §61, §61.1, §62, §62.1, §69.6.
 
 Exit: for the broken ECS and EKS demos, `perpetual transform` changes the example Terraform and manifests, design verification passes and modeled targets are met with explicit deployment prerequisites. Observed readiness remains pending until deployment/rescan in P12.
 
-### P11 — Runbooks and failback
+### P11 — Recovery artifacts and failback
 
-Spec: §63, §64.
+Spec: §47.2, §63–§64.
 
 | ID | Task |
 |---|---|
 | P11-01 | Failback metadata on mechanisms (`failover_supported`, `failback_supported`, `failback_complexity`, `data_resynchronization_required`). |
-| P11-02 | Failover runbook from the recovery DAG (order, owners, manual steps, validation). |
+| P11-02 | Explanatory failover runbook from the recovery DAG (order, owners, prerequisites, validation); each step names its script step or ARC block. |
 | P11-03 | Failback runbook. |
 | P11-04 | Markdown export; CLI, API and UI. |
+| P11-05 | Prerequisite scripts and SOPs (§63.1): SSM parameter copy with an operator edit step, S3 Batch Replication backfill, quota requests, Identity Center replica instructions; each a typed deployment prerequisite. |
+| P11-06 | Recovery scripts for failover and failback (§63.2): verify before acting, no duplicate actions, resumable, dry-run, explicit Regions, timestamped per-step log, no secret values. Lint and fixture dry-run tests; never executed against AWS. |
+| P11-07 | ARC Region switch plan compiler (§63.3): DAG to steps and blocks, the three coverage classes, ungraceful settings, failback and post-recovery workflows, `aws_arcregionswitch_plan` Terraform in the PR, static checks, ignore rules on scaled attributes. |
+| P11-08 | Method-specific RTO and cost (§47.2): human-check gates for scripts, plan-as-compiled RTO for ARC with the ideal DAG as context, ARC plan price in total DR cost. |
 
-Exit: failover and failback runbooks generated from the plan for both demo stacks.
+Exit: for both demo stacks, the runbook, prerequisite scripts, recovery scripts and an ARC Region switch plan are generated from one DAG with matching step numbers and pass static checks.
 
 ### P12 — MVP hardening and v0.1 release
 
@@ -477,7 +482,9 @@ Not scheduled. Each needs a decision-log entry before work starts.
 
 - Drift between scans (§77).
 - AZ failure and logical-corruption scenarios (§43).
-- Drill results and proven RTO/RPO (§53).
+- Drill results and proven RTO/RPO (§53), including import of ARC Region switch execution reports and recovery-script logs.
+- Resilience Hub importer: discovered dependencies as candidate edges, test results as drill evidence.
+- Alarm triggers on generated Region switch plans (automatic failover).
 - Editing CI pipelines, remote modules, CloudFormation/CDK/Pulumi.
 - Learning duration-catalog values and evidence weights from drills and confirmed edges.
 - Hosted version: login, PostgreSQL, workers, cross-account role with external ID (§66, §71.1).

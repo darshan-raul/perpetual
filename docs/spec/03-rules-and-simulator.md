@@ -173,12 +173,51 @@ XREG-IAM-002      DR role policy grants access only to primary-Region resource A
 XREG-KMS-003      Data replicated to the DR Region but encrypted with a key that is
                   not usable in the DR Region.
 CTRL-PLANE-001    Recovery path requires a control-plane mutation (Route 53 record
-                  edit, IAM change) during the event.
+                  edit, IAM change) during the event. When the scenario includes
+                  us-east-1, a Route 53 public-zone edit is BLOCKED without
+                  Accelerated Recovery and waits for the catalog's Accelerated
+                  Recovery duration with it (8.1).
 QUOTA-DR-001      DR Region service quota below the capacity the recovery plan needs
                   (Fargate vCPU, EC2 On-Demand vCPU, ENIs, EIPs, LB count).
 REGION-SVC-001    Service, feature or instance type used in primary is unavailable
                   in the DR Region.
+ARC-RS-001        An existing ARC Region switch plan for the stack misses a required
+                  recovery action, orders blocks against a prerequisite edge, skips a
+                  required step in ungraceful mode, or reports evaluation status
+                  actionRequired. A passed evaluation is evidence, never READY.
+SSM-PARITY-001    SSM parameter names the stack uses exist in the primary Region but
+                  not in the DR Region (compares names and versions, never values).
+OPS-ACCESS-001    Operator sign-in depends on the failed Region: the IAM Identity
+                  Center home Region has no replica elsewhere and no break-glass path
+                  is declared. Recommend a replica in an enabled-by-default Region
+                  (it need not be the DR Region; it needs a multi-Region customer
+                  managed KMS key) plus a break-glass role.
+OPS-ACCESS-002    The declared operator path to DR resources (VPN, bastion, private
+                  EKS or database endpoints) depends on the failed Region. UNKNOWN
+                  when no operator access profile is declared.
 ```
+
+Operator access is part of every stack's recovery path, because both execution methods (47.2) need a person: scripts run from an operator's laptop, and ARC plans are started and approved by an operator. The user declares an operator access profile in the `operator_access` section of `perpetual.yaml`, kept in git and reviewed like code. The UI shows it read-only. Example:
+
+```yaml
+operator_access:
+  identity:
+    source: iam_identity_center     # or iam_users, external_idp
+    home_region: ap-south-1
+    replica_regions: []             # discovered when readable; declared otherwise
+  break_glass:
+    method: iam_role                # how operators sign in if the identity source fails
+    description: "role in DR account, credentials in offline vault"
+  network:                          # how laptops reach private endpoints
+    - target: eks_api_private
+      path: vpn
+      terminates_in: ap-south-1
+  tools:
+    uv: "0.8"
+    kubectl: "1.33"
+```
+
+Discovered facts take precedence over declared ones when both exist. Facts that are neither discovered nor declared remain UNKNOWN, and a missing section leaves OPS-ACCESS-001/002 UNKNOWN.
 
 Quota and service-availability checks use read-only APIs only (`service-quotas:List*`, `ec2:DescribeInstanceTypeOfferings`).
 

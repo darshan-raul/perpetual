@@ -98,7 +98,7 @@ Output of a transformation:
 
 Perpetual never merges, never pushes to a protected branch and never applies. The user's normal review and pipeline apply the change.
 
-Changes that cannot be expressed as code (quota increases, account creation, one-off data seeding) are listed as manual steps and copied into the failover runbook prerequisites (section 63).
+Terraform owns steady-state DR configuration: replication rules (ECR, S3, Secrets Manager replicas), standby resources, multi-Region keys and DR-Region KMS keys. Work that Terraform cannot or should not own is delivered as prerequisite scripts and SOPs (63.1): one-off backfill of data that existed before replication started, values Perpetual must not read, and account-level requests. Each becomes a typed deployment prerequisite (61.1).
 
 ---
 
@@ -126,7 +126,19 @@ The same templates are given to the transformation agent as reference patterns t
 
 ---
 
-# 63. Runbook Generator
+# 63. Recovery Artifacts
+
+One recovery DAG (47) per stack and scenario compiles into:
+
+```text
+runbook                 explains the flow; not an execution method
+recovery scripts        default execution method (63.2)
+ARC Region switch plan  optional execution method (63.3)
+```
+
+plus prerequisite scripts and SOPs for deployment (63.1). All are generated from the same DAG, carry the same evaluation digest (56.3) and use the same step numbers. Regenerating one regenerates all of them. Perpetual generates and statically checks these artifacts; it never runs them.
+
+## Runbook
 
 Generate both failover and failback runbooks.
 
@@ -164,7 +176,105 @@ FAILBACK
 10. Complete postmortem evidence.
 ```
 
-The exact runbook must be generated from the recovery graph.
+The exact runbook must be generated from the recovery graph. Each runbook step names the script step or ARC execution block that performs it.
+
+---
+
+# 63.1 Prerequisite Scripts and SOPs
+
+Delivered with the PR for work outside Terraform (62):
+
+```text
+SSM parameter copy       reads current parameters in the primary Region, lets the
+                         operator review and edit them, then writes them to the DR
+                         Region. Re-runnable. SecureString targets need the DR-Region
+                         KMS key from the Terraform change first.
+S3 backfill              S3 Batch Replication job for objects that existed before the
+                         replication rule.
+Quota requests           Service Quotas increase requests for DR capacity
+                         (QUOTA-DR-001).
+Identity Center replica  instructions to add a replica Region (OPS-ACCESS-001).
+```
+
+SOPs are instructions for ongoing operations, for example "when you create an SSM parameter for this stack, create it in the DR Region too". SSM-PARITY-001 detects a missed SOP on each scan.
+
+Scripts that touch secret values run only on the operator's machine with the operator's credentials, and Perpetual never sees their output. Decrypted values go only to a private temporary file (owner-only permissions) for the edit step, are deleted on exit and are never logged (67).
+
+---
+
+# 63.2 Recovery Scripts
+
+Failover and failback scripts are generated per stack and committed to the user's repository with the PR. Contract:
+
+- one entry point runs the DAG's steps in order and pauses for confirmation at each human check;
+- every step verifies the current state before acting and does nothing if the target state already holds, so a re-run never duplicates work (no second promotion, replica or scale-up);
+- resumable from step N after an interrupted run;
+- a dry-run mode prints the checks and actions without changing anything;
+- explicit Regions, accounts and resource identifiers, never the profile's default Region;
+- stops on the first error and prints the failing step and the command to resume;
+- a timestamped log per step with no secret values; a game-day log is drill evidence (53);
+- runs from an operator's laptop with pinned tool versions, never from CI, and never through endpoints in the failed Region;
+- written in Python with boto3, each script self-contained and run with `uv run` (inline dependency metadata pins boto3); kubectl only for Kubernetes steps.
+
+Script actions confirmed against AWS docs (2026-10-27):
+
+```text
+EFS failover        delete the replication configuration from the DR Region
+                    (--deletion-mode LOCAL_CONFIGURATION_ONLY when the source
+                    Region is unreachable). Takes several minutes; the replica
+                    becomes writable and may contain a lost+found directory.
+                    RPO is typically 15 minutes (TimeSinceLastSync).
+EFS failback        replicate the replica back to the primary (initial sync time
+                    grows with size), then re-create the original configuration.
+ElastiCache Global  FailoverGlobalReplicationGroup promotes the DR secondary;
+Datastore           allowed when the primary Region is unavailable. Replication
+                    is asynchronous, so RPO equals replica lag. (ElastiCache
+                    rules are post-MVP.)
+```
+
+Perpetual checks the scripts with a linter and a dry run against fixtures. It never executes them against AWS.
+
+---
+
+# 63.3 ARC Region Switch Plan
+
+When the DR spec selects `arc_region_switch`, the DAG compiles into an `aws_arcregionswitch_plan` Terraform resource in the PR: two Regions, active/passive, the stack's target RTO, an application health alarm, a failover workflow (activate DR), a failback workflow, and a post-recovery workflow where needed.
+
+Each recovery action maps to one of:
+
+```text
+no runtime action   replication already keeps the DR copy current (ECR, Secrets
+                    Manager replicas, multi-Region KMS keys, DynamoDB global
+                    tables, S3 replication). Perpetual verifies the prerequisite
+                    instead.
+execution block     ECS, EKS and ASG scaling; Aurora, RDS, DocumentDB and Neptune
+                    recovery; Lambda event source mapping; Route 53 health check;
+                    routing control; manual approval for the decide action.
+script step         no block exists (EFS replication failover, ElastiCache
+                    promotion): a manual approval block naming the recovery-script
+                    step to run.
+```
+
+The Terraform provider expresses parallel work as a `Parallel` step whose `parallel_config` holds steps, one level deep; each layer of the DAG becomes one step. The compiler emits only execution block types that the pinned AWS provider version supports; anything else becomes a script step.
+
+Route 53 record edits are never compiled; traffic moves through health checks or routing controls (8.1). Steps required in a Region failure are configured to run in ungraceful mode, and ARC-RS-001 flags any that would be skipped.
+
+Static checks before delivery:
+
+- every DAG action is covered;
+- block order respects every prerequisite edge;
+- every block target exists in the planned snapshot;
+- the execution role grants each block's permissions;
+- the Region pair matches the failure scenario;
+- Terraform for scaled resources (ECS desired count, ASG min and desired) ignores those attributes, so a later apply does not undo a failover.
+
+Plan evaluation status and execution reports are evidence (28.1, 53), never READY on their own.
+
+---
+
+# 63.4 Terraform After Failover
+
+After a failover, scaled counts and database roles differ from the Terraform configuration. The runbook explains which attributes are ignored, which resources need a configuration change after failback, and that the user's normal pipeline makes those changes. Perpetual never touches state.
 
 ---
 
@@ -180,6 +290,8 @@ data_resynchronization_required
 ```
 
 A DR design is incomplete if Perpetual can explain failover but cannot explain how data created in DR returns to the restored primary.
+
+Failback runs by the same execution method as failover: the failback script or the ARC plan's failback workflow (63.2, 63.3).
 
 ---
 

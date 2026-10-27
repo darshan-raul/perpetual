@@ -185,13 +185,38 @@ PROVEN RPO
 
 The MVP does not need automated DR drills, but its architecture MUST allow actual drill results to be incorporated later.
 
+### Readiness tiers
+
+```text
+DESIGN VERIFIED   the proposed change meets targets on the planned graph (61.1)
+CONFIGURED        deployed and observed: a fresh scan shows DR resources present,
+                  replication healthy and blockers resolved (observed READY, 31)
+PROVEN            a game day, an ARC Region switch execution report or a
+                  fault-injection test measured the recovery (53)
+```
+
+These are labels on the evidence behind a result, not extra states in 30.1. Observed READY means CONFIGURED, not PROVEN. Reports and the UI MUST show which tier a stack has reached.
+
+### Relationship to AWS-native tools (reviewed 2026-10)
+
+| Tool | What it does | Relationship to Perpetual |
+|---|---|---|
+| AWS Resilience Hub (next generation) | Services and user journeys, dependency discovery from DNS query logs, AI failure-mode analysis, resilience policies, FIS-based tests | Overlaps with assessment. Optional future evidence source: discovered dependencies as candidate edges, test results as drill evidence. Never required. |
+| ARC Region switch | Runs multi-Region recovery plans made of execution blocks; evaluates plans every 30 minutes; writes execution reports with measured RTO | Optional runtime. Perpetual compiles plans for it (63.3) and reads existing plans as evidence (28.1). |
+| ARC readiness checks | Closed to new customers | Legacy: collected when present, never recommended. |
+| AWS Fault Injection Service | Fault injection experiments | A source of proof; Perpetual never injects faults. |
+
+Perpetual's distinct job: compute a whole-stack RTO and RPO before DR exists, find dormant failover blockers with deterministic and cited rules, design the cheapest DR that meets the targets and budget, change the user's own IaC, and verify the change by re-simulation. The AWS tools assume DR resources already exist, or produce findings that people implement by hand.
+
+> Perpetual is the compiler. ARC Region switch is one runtime.
+
 ---
 
 # 4. Initial Scope
 
 AWS only.
 
-Do NOT implement multi-cloud in the MVP.
+Do NOT implement multi-cloud in the MVP. Cross-cloud recovery targets (for example AWS to Azure) are out of scope (decision 2026-10-27).
 
 The initial architecture must nevertheless avoid hard-coding business logic directly into generic graph models so that additional cloud providers could be added later.
 
@@ -561,7 +586,9 @@ Initially include awareness of:
 - security groups;
 - AWS Backup;
 - Service Quotas (DR Region quotas for the services a stack uses);
-- Route 53 Application Recovery Controller (routing controls, readiness checks) where configured;
+- Amazon Application Recovery Controller (ARC): routing controls; Region switch plans, their evaluation status and execution-report locations; readiness checks as legacy configuration only (closed to new customers), never recommended;
+- Route 53 Accelerated Recovery status on public hosted zones (8.1);
+- IAM Identity Center instance home Region and replica Regions (operator access, 28.1);
 - ACM certificates (including `us-east-1` certificates used by CloudFront, discovered via a global/`us-east-1` collector pass alongside `Route 53`, `IAM`, `CloudFront`, and `CLOUDFRONT`-scoped WAFv2 Web ACLs).
 
 Detailed service-specific rules can be added incrementally.
@@ -581,6 +608,17 @@ Control-plane failover editing records, creating roles or changing policies
 ```
 
 A recovery path that relies on a control-plane mutation MUST be flagged (see 28.1). It may still be valid, but it is less statically stable, and confidence is reduced.
+
+### Route 53 Accelerated Recovery
+
+Route 53 record changes depend on us-east-1. This matters only for failure scenarios that include us-east-1:
+
+- a public hosted zone with Accelerated Recovery enabled accepts record changes again from us-west-2 about 60 minutes after AWS detects the impairment (an AWS target, not a guarantee);
+- a zone without it cannot be changed until us-east-1 recovers;
+- private hosted zones and IAM changes are not covered and stay blocked;
+- changes in flight at failover can be lost and must be resubmitted.
+
+The wait is a duration-catalog entry, never a number in rule code. Data-plane failover (health checks, routing controls, Region switch) remains the recommended path.
 
 ---
 

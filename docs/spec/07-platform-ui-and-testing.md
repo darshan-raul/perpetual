@@ -1552,8 +1552,11 @@ The first genuinely usable release is achieved when this workflow works:
 
 Do NOT initially build:
 
-- multi-cloud DR;
-- automatic failover;
+- multi-cloud DR, including cross-cloud recovery targets;
+- automatic failover: Perpetual generates recovery scripts and ARC Region switch plans (63) but never runs or triggers them, and generated plans have no alarm triggers;
+- a runtime recovery orchestrator (ARC Region switch is the runtime when one is wanted);
+- fault injection;
+- an assessment-only tool that duplicates AWS Resilience Hub (3);
 - production infrastructure mutation;
 - write access to customer AWS accounts;
 - automatic database promotion;
@@ -1844,6 +1847,8 @@ Could this stack still meet its DR promise today?
 ```
 
 That is the long-term product.
+
+Integrations after the MVP: Resilience Hub discovered dependencies as candidate edges, and ARC execution reports, recovery-script logs and fault-injection results as drill evidence (53).
 
 ---
 

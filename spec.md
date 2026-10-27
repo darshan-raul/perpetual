@@ -45,9 +45,10 @@ AWS APIs + Terraform + CloudTrail / Flow Logs + optional Kubernetes
                        +----------+----------+
                        |                     |
                        v                     v
-      Isolated IaC Transformation (§61)   Failover & Failback Runbooks (§63–§64)
-      + Staged Verification (§61.1)
-      -> Branch / PR (never applies)
+      Isolated IaC Transformation (§61)   Recovery Artifacts (§63–§64): runbook,
+      + Staged Verification (§61.1)       prerequisite + recovery scripts,
+      -> Branch / PR (never applies)      optional ARC Region switch plan
+                                          (generated, never run)
 ```
 
 ---
@@ -62,7 +63,7 @@ The full specification is organized into seven modular documents under [`docs/sp
 | **Part II** | [`02-discovery-and-graph.md`](docs/spec/02-discovery-and-graph.md) | `§9–§26` | Input sources (Terraform saved-plan/state JSON, AWS APIs, Resource Explorer, Config, Kubernetes Levels 1 & 2), dependency evidence (`permitted`, `referenced`, `observed`, `asserted`), ambiguous attribution, `ResourceNode` & planned snapshot semantics (`§15.4`), `DependencyEdge` & `ALL`/`ANY`/`quorum` groups (`§19.1`), correlation-group confidence, `GraphOverride` review gate, stacks, services, RTO scope (`§24.1`), and `RecoveryRequirement`. |
 | **Part III** | [`03-rules-and-simulator.md`](docs/spec/03-rules-and-simulator.md) | `§27–§46` | DR strategies, `RecoveryMechanism` overlay & strict `rebuild_from_iac` definition (`§27.1`), `DRRulePack` protocol, cross-cutting rules (`§28.1`), LLM advisory review (`§28.2`), `Finding` model, readiness dimensions, canonical status vocabulary (`§30.1`), ordered readiness table (`§31`), ECS/EKS/RDS checks, data gravity, and the two-pass failure simulator (`§43–§46`). |
 | **Part IV** | [`04-recovery-and-optimizer.md`](docs/spec/04-recovery-and-optimizer.md) | `§47–§60` | Stack-level recovery DAG (phase template + refinement, `§47.1`), `RecoveryAction`, versioned duration catalog (`§49.1`), explicit plan buffer (`§49.2`), critical-path RTO (`§50`), data-store & stateful-SQS RPO (`§51`), target comparison (`§52`), optimizer & LLM candidate planner (`§54–§56.1`), `DRSpec` (`§56.2`), immutable `EvaluationInput` & approval digests (`§56.3`), Pareto frontier (`§57`), `CostProvider` & workload/budget contracts (`§58–§59.1`), and remediation deltas (`§60`). |
-| **Part V** | [`05-iac-and-runbooks.md`](docs/spec/05-iac-and-runbooks.md) | `§61–§64` | Resource-to-code mapping, git worktree transformation agent with mandatory OS/container isolation (`§61`), four-stage verification separating design verification from observed readiness (`§61.1`), branch/PR delivery (`§62`), deterministic companion Terraform (`§62.1`), and failover/failback runbooks (`§63–§64`). |
+| **Part V** | [`05-iac-and-runbooks.md`](docs/spec/05-iac-and-runbooks.md) | `§61–§64` | Resource-to-code mapping, git worktree transformation agent with mandatory OS/container isolation (`§61`), four-stage verification separating design verification from observed readiness (`§61.1`), branch/PR delivery (`§62`), deterministic companion Terraform (`§62.1`), and recovery artifacts: explanatory runbook, prerequisite scripts and SOPs, laptop-run recovery scripts and optional ARC Region switch plans (`§63–§64`). |
 | **Part VI** | [`06-security-and-llm.md`](docs/spec/06-security-and-llm.md) | `§65–§70` | Read-only security model, cross-account DR access (`§66`), secret/env/state redaction (`§67–§68`), replaceable LLM provider abstraction (`§69.1`), LangGraph agents (`§69.2`), local hybrid RAG knowledge base (`knowledge/domain/`, `sources.yaml`, and sanitized `web_search`/`web_fetch` enrichment, `§69.3`), versioned DR skills (`§69.4`), guardrails (`§69.5`), offline/eval testing (`§69.6`), and explainer (`§70`). |
 | **Part VII** | [`07-platform-ui-and-testing.md`](docs/spec/07-platform-ui-and-testing.md) | `§71–§109` | Backend & local single-process deployment (`§71–§71.1`), React/React Flow UI (`§72`, `§80–§84`), monorepo & persistence (`§73–§75`), scan model & coverage/freshness/absence contract (`§76–§76.1`), drift (`§77`), REST API & CLI (`§78–§79`), reference fixtures & demos (`§85–§89`), four-tier test environments & review regression gates (`§90–§94`), quality/observability/error/unknown handling (`§95–§98`), phases, MVP definition, non-goals, engineering constraints, and product invariant (`§99–§109`). |
 
@@ -83,7 +84,7 @@ The full specification is organized into seven modular documents under [`docs/sp
 ## 4. Complete Section Index (`§1`–`§109`)
 
 ### Part I — Product & AWS Scope ([`docs/spec/01-product-and-aws-scope.md`](docs/spec/01-product-and-aws-scope.md))
-- **§1** Product Definition · **§2** Product Principle · **§3** Product Positioning · **§4** Initial Scope
+- **§1** Product Definition · **§2** Product Principle · **§3** Product Positioning (readiness tiers, AWS-native tools) · **§4** Initial Scope
 - **§5** AWS Services In Scope: **§5.1** Containers (ECS) · **§5.2** Kubernetes / Amazon EKS · **§5.3** Amazon EC2 and Auto Scaling · **§5.4** AWS Lambda
 - **§6** Data Services: **§6.1** Amazon RDS · **§6.2** Aurora · **§6.3** DynamoDB
 - **§7** Storage & Messaging: S3, EBS, EFS · **§7.1** Messaging: Amazon SQS and Amazon SNS
@@ -98,13 +99,13 @@ The full specification is organized into seven modular documents under [`docs/sp
 
 ### Part III — DR Overlay, Rule Packs & Failure Simulator ([`docs/spec/03-rules-and-simulator.md`](docs/spec/03-rules-and-simulator.md))
 - **§27** DR Strategies · **§27.1** Recovery Mechanisms and the DR Overlay (strict `rebuild_from_iac`)
-- **§28** Service Rule Packs · **§28.1** Cross-Cutting Rules (`XREG-*`, `CTRL-PLANE-001`, `QUOTA-DR-001`, `REGION-SVC-001` & Evidence Producers) · **§28.2** LLM Advisory Review
+- **§28** Service Rule Packs · **§28.1** Cross-Cutting Rules (`XREG-*`, `CTRL-PLANE-001`, `QUOTA-DR-001`, `REGION-SVC-001`, `ARC-RS-001`, `SSM-PARITY-001`, `OPS-ACCESS-*` & Evidence Producers) · **§28.2** LLM Advisory Review
 - **§29** Finding Model · **§30** Readiness Dimensions · **§30.1** Status Vocabulary · **§31** Scoring & Ordered Readiness Composition
 - **§32** ECS Rule Pack · **§33–§40** EKS Rule Pack (Control Plane, Compute, Scheduling, Add-Ons, Identity, Images, Storage) · **§41** RDS Rule Pack · **§42** Data Gravity
 - **§43** Failure Simulator · **§44** Simulation Algorithm (Impact Pass & Recovery Pass) · **§45** Simulation Output · **§46** Failure Reason Chain
 
 ### Part IV — Recovery DAG, RTO/RPO, Cost & Optimizer ([`docs/spec/04-recovery-and-optimizer.md`](docs/spec/04-recovery-and-optimizer.md))
-- **§47** Recovery Planning Model · **§47.1** Building the Recovery DAG: Phase Template + Refinement · **§48** Recovery Action Model
+- **§47** Recovery Planning Model · **§47.1** Building the Recovery DAG: Phase Template + Refinement · **§47.2** Execution Method · **§48** Recovery Action Model
 - **§49** Recovery Duration · **§49.1** Duration Catalog (incl. generic fallback actions) · **§49.2** Plan Buffer
 - **§50** RTO Calculation · **§51** RPO Calculation (incl. stateful SQS) · **§52** Target vs Predicted · **§53** Proven RTO / RPO (`DRDrill`)
 - **§54** Optimization Engine · **§55** Recovery Options · **§56** MVP Optimizer · **§56.1** LLM Candidate Planner · **§56.2** DR Spec · **§56.3** Immutable Evaluation Inputs and Approval Validity
@@ -112,7 +113,7 @@ The full specification is organized into seven modular documents under [`docs/sp
 
 ### Part V — IaC Transformation, Verification & Runbooks ([`docs/spec/05-iac-and-runbooks.md`](docs/spec/05-iac-and-runbooks.md))
 - **§61** IaC Transformation (Mapping, Worktree Agent, Mandatory Execution Isolation) · **§61.1** Staged Verification (Static, Planned Graph, Modeled Design Verification, Deployment Prerequisites vs Observed Readiness)
-- **§62** Change Delivery · **§62.1** Companion Fallback · **§63** Runbook Generator · **§64** Failback Is First-Class
+- **§62** Change Delivery · **§62.1** Companion Fallback · **§63** Recovery Artifacts · **§63.1** Prerequisite Scripts and SOPs · **§63.2** Recovery Scripts · **§63.3** ARC Region Switch Plan · **§63.4** Terraform After Failover · **§64** Failback Is First-Class
 
 ### Part VI — Security Model & LLM Architecture ([`docs/spec/06-security-and-llm.md`](docs/spec/06-security-and-llm.md))
 - **§65** Security Model · **§66** AWS Access (Cross-Account DR) · **§67** Secret Handling · **§68** Terraform State
@@ -134,6 +135,7 @@ The full specification is organized into seven modular documents under [`docs/sp
 
 ### Revision 4 changes
 
+- 2026-10-27 reorientation: Perpetual is positioned as a DR design compiler for AWS stacks, with ARC Region switch as an optional runtime; cross-cloud recovery targets are out of scope (3, 4, 101). Readiness tiers: design verified, configured, proven (3, 53). Recovery runs by recovery scripts (default, run from an operator's laptop) or a compiled ARC Region switch plan, chosen in the DR spec; RTO is computed for that method, and the runbook explains rather than executes (47.2, 56.2, 63). Terraform owns steady-state DR configuration; prerequisite scripts and SOPs cover backfill and account-level work (62, 63.1). New discovery and rules for Region switch plans, Route 53 Accelerated Recovery, SSM parameter parity and operator access (8, 8.1, 28.1).
 - Modularized the specification into a concise executive overview (`spec.md`) and 7 topic files under `docs/spec/` preserving all `§1`–`§109` section numbers.
 - 2026-10-27 review fixes: authoritative planned snapshots (15.4), ambiguous observation attribution (14.1), ALL/ANY/quorum dependencies (19.1), deterministic readiness composition (31), immutable evaluation/approval inputs (56.3), workload and budget contracts (59.1), isolated transformation and staged verification (61–61.1), scan coverage/freshness (76), and corresponding regression gates (90.2). Complete evidence collection for quotas, availability, metrics, EFS and initial DynamoDB support; verification consumes saved-plan JSON.
 - Perpetual no longer only assesses. It fixes: it changes the user's own Terraform and Kubernetes manifests so the stack meets its DR targets, and delivers the change as a branch or pull request. It never applies changes to AWS or Kubernetes (61, 62, 101).

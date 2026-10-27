@@ -22,7 +22,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | P8 RPO | [ ] | stack RPO from data stores |
 | P9 Optimizer, planner, DR spec | [ ] | candidates compared; approved DR spec per demo |
 | P10 IaC transformation | [ ] | demo design verified against targets; deployment/observed readiness pending |
-| P11 Runbooks | [ ] | failover + failback for both demos |
+| P11 Recovery artifacts | [ ] | runbook, scripts and ARC plan from one DAG for both demos |
 | P12 Hardening, v0.1 | [ ] | §109 answer for a real stack |
 
 ## Release gate (v0.1)
@@ -57,6 +57,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | Isolated runner denies executable data sources/plugins, escapes, credential theft, egress and cloud mutation (§61) | [ ] |
 | Saved-plan JSON accepted; UI event stream rejected (§15.4) | [ ] |
 | All §90.2 review regressions pass; no static-only or conditional design labeled observed READY | [ ] |
+| Runbook, recovery scripts and ARC plan come from one DAG with matching step numbers; scripts pass lint + fixture dry run; ARC plan covers every action or names a script step (§63) | [ ] |
+| No generated script or plan is executed by Perpetual; generated plans have no alarm triggers (§63, §101) | [ ] |
 
 ---
 
@@ -230,12 +232,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P10-07 `perpetual transform` + API + UI
 - [ ] P10-08 Demo design-verification evals plus static-only/stale/unknown regression cases
 
-## P11 Runbooks
+## P11 Recovery artifacts
 
 - [ ] P11-01 Failback metadata
-- [ ] P11-02 Failover runbook
-- [ ] P11-03 Failback runbook
+- [ ] P11-02 Failover runbook (explanatory)
+- [ ] P11-03 Failback runbook (explanatory)
 - [ ] P11-04 Export + surfaces
+- [ ] P11-05 Prerequisite scripts and SOPs
+- [ ] P11-06 Recovery scripts (failover + failback)
+- [ ] P11-07 ARC Region switch plan compiler
+- [ ] P11-08 Method-specific RTO and cost
 
 ## P12 Hardening and v0.1
 
@@ -275,13 +281,14 @@ Where each spec area is implemented. A spec section with no task is either cover
 | §41–§42 | RDS, data gravity | P4-03, P0-04 |
 | §43–§46 | Simulator, output, reason chains | P1-04..08, P5-01..03 |
 | §47–§50 | Plan, DAG, durations, buffer, RTO | P1-09..13, P6-01..04 |
+| §47.2 | Execution method | P9-08, P11-08 |
 | §51 | RPO | P8-01..03 |
 | §52 | Target vs predicted | P1-14, P8-03 |
 | §53 | Drills | backlog (schema only in P0-04) |
 | §54–§60 | Optimizer, workload/cost/budget, remediation | P9-01..09 |
 | §56.1–§56.3 | Candidate planner, immutable evaluations and DR spec approval | P0-15, P9-07/08, P10-01/04/05 |
 | §61–§62.1 | Isolated IaC transformation, staged verification, delivery, companion | P1b-15, P10-01..09 |
-| §63–§64 | Runbooks, failback | P11-01..04 |
+| §63–§64 | Recovery artifacts (runbook, prerequisite and recovery scripts, ARC plan), failback | P11-01..08 |
 | §65–§68 | Security, access, secrets, state | P2-01, P2-08, P2b-05, P12-02 |
 | §69–§70 | LLM architecture, knowledge base, skills, guardrails, explainer | P3b-01..07, P10-08 |
 | §71–§75 | Tech, deployment, layout, persistence | P0-01, P0-07, P1b-06, P1b-13 |
@@ -312,6 +319,9 @@ Resolve these with a decision-log entry before the task that needs them.
 | Q8 | Which public sources go in `knowledge/sources.yaml` first, and their licence terms for local ingestion. | P3b-05 |
 | Q9 | UX for declaring IaC roots (CLI flags and/or `perpetual.yaml`); multiple roots require distinct root/workspace identities. Must be declared before approval under §56.3. | P9-08 |
 | Q10 | Resolved 2026-10-27: isolated local runner or supplied saved plan with matching provenance; no unsandboxed execution. Static-only otherwise (§61–61.1). | P10-09/04 |
+| Q11 | Resolved 2026-10-27: Python with boto3, run as a self-contained `uv run` script (§63.2). | P11-06 |
+| Q12 | Resolved 2026-10-27: EFS and ElastiCache failover steps and the `aws_arcregionswitch_plan` schema confirmed against AWS and provider docs (§63.2, §63.3). | P11-07 |
+| Q13 | Resolved 2026-10-27: an `operator_access` section in `perpetual.yaml`, reviewed in git; the UI displays it read-only (§28.1). | P4-04 |
 
 ---
 
@@ -321,6 +331,9 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-27 | Resolve Q13: the operator access profile is an `operator_access` section in `perpetual.yaml` (identity source and home Region, break-glass path, network path to private endpoints, tool versions). The UI shows it read-only; edits go through git. A missing section leaves OPS-ACCESS-001/002 UNKNOWN. | Operator access is part of the recovery design, so it is versioned and reviewed like code. A single source avoids drift between file and database. |
+| 2026-10-27 | Resolve Q11 and Q12. Q11: recovery and prerequisite scripts are Python with boto3, each a self-contained script run with `uv run` (inline dependency metadata pins boto3); kubectl only for Kubernetes steps. Q12, confirmed against AWS docs: EFS failover deletes the replication configuration from the DR Region (`--deletion-mode LOCAL_CONFIGURATION_ONLY` when the source Region is unreachable), takes several minutes, typical RPO 15 minutes; failback replicates the replica back to the primary and then re-creates the original configuration. ElastiCache Global Datastore failover is `FailoverGlobalReplicationGroup` and is allowed when the primary Region is unavailable; replication is asynchronous, so RPO equals replica lag. Neither has a Region switch block, so both are script steps. `aws_arcregionswitch_plan` exists in the AWS provider; parallel work is a `Parallel` step with `parallel_config` (one level). The provider's block-type list lags the API, so the compiler emits only types the pinned provider supports. | Python matches the codebase, is testable with the same fixtures and moto, and `uv run` needs no install beyond uv. Q12 facts set the EFS script step, failback order and catalog inputs, and the compiler's output schema. |
+| 2026-10-27 | Reorient Perpetual (no pivot) after reviewing AWS's 2026 resilience tooling. (1) Position it as a DR design compiler for AWS stacks: whole-stack RTO/RPO before DR exists, dormant failover blockers, the cheapest design within budget, and a verified IaC PR. ARC Region switch is an optional runtime (spec §3). (2) Cross-cloud and multi-cloud DR rejected (§4, §101). (3) Recovery runs by exactly two methods, chosen per stack in the DR spec: recovery scripts kept in git and run by an operator from a laptop with human checks (default, no CI runner), or a compiled ARC Region switch plan. The runbook explains the flow and is not an execution method. RTO is computed for the chosen method (§47.2, §56.2, §63). (4) Terraform owns steady-state DR configuration (replication, standby resources, keys). Generated prerequisite scripts and SOPs cover one-off backfill and account-level work: SSM parameter copy with an operator edit step, S3 Batch Replication of existing objects, quota requests (§62, §63.1). (5) Readiness tiers: design verified → configured (observed READY after deployment and rescan) → proven (game day, ARC execution report or fault-injection test) (§3, §53). (6) ARC readiness checks become legacy, collected only. Collect Region switch plans, Route 53 Accelerated Recovery and IAM Identity Center Regions. New rules ARC-RS-001, SSM-PARITY-001, OPS-ACCESS-001/002; CTRL-PLANE-001 refined for us-east-1 scenarios (§8, §8.1, §28.1). (7) Resilience Hub stays an optional future evidence source, never required. Plan: D19 added; P2-02/03, P4-04 and P9-08 extended; P11 becomes recovery artifacts (P11-05..08); Resilience Hub and execution-report importers go to the backlog. | AWS Resilience Hub (next generation, 2026) now discovers dependencies and runs AI failure-mode analysis and FIS tests, and ARC Region switch runs multi-Region failovers, so assessment alone no longer sets Perpetual apart. Neither designs DR within a budget or changes the user's IaC, and Region switch needs DR resources to exist plus a correct step list, which Perpetual produces. Cross-cloud targets cannot be verified without Azure/GCP expertise. Laptop-run scripts keep humans in the loop; ARC costs $70 per plan per month, so it stays optional. |
 | 2026-10-27 | Split `spec.md` (5,500+ lines) into 7 modular topic files under `docs/spec/` (`01-product-and-aws-scope.md` through `07-platform-ui-and-testing.md`) preserving all `§1`–`§109` section numbers and verbatim contracts, while turning root `spec.md` into a concise ~250-line architecture overview, reader's guide and complete section index. | Make the specification readable for human reviewers without losing any detail or breaking `spec §N` citations in `IMPL_PLAN.md`, `TRACKER.md` and `CLAUDE.md`. |
 | 2026-10-27 | Close all ten review findings and the Terraform command error in revision 4: define authoritative planned snapshots, separate design verification from observed readiness, enforce isolated IaC execution, track scan coverage/freshness, specify readiness composition, complete collector-to-rule coverage, bind approvals to immutable inputs, model ALL/ANY/quorum dependencies, preserve ambiguous observation attribution, and define workload-driven budget acceptance. Add implementation tasks and regression/release gates; use saved-plan JSON for verification. | User requested all review findings fixed. These contracts prevent stale or speculative evidence from producing READY, close missing implementation dependencies, and make verification restrictions enforceable. Implementation remains unstarted; documentation completion does not mark engineering tasks done. |
 | 2026-10-26 | Close 5 service-specific and CI-security gaps: (1) add a global/`us-east-1` collector pass in `P2-01..02` for `WAFv2 (Scope=CLOUDFRONT)`, `ACM (us-east-1)`, `Route 53`, `IAM`, `CloudFront`, and check primary-vs-DR WAF parity in `P4-03`; (2) resolve `ASG → LaunchTemplate → AMI → EBS Snapshot → KMS Key` in `P2-06` and verify cross-Region AMI + snapshot KMS decryptability in `P4-02`; (3) resolve `Lambda → S3 code bucket / ECR image / Lambda Layer` in `P2-06` and verify DR artifact/layer availability in `P4-02`; (4) distinguish SQS endpoint recovery (`RTO`) from in-flight message durability (`RPO`) in `spec §7.1`, `§51`, `P4-02`, and `P8-01`; (5) add offline recorded `web_search`/`web_fetch` fixtures (including hostile/prompt-injection web pages) in `P3b-03` and untrusted web-content sanitization in `P3b-04`. | Prevent missed `us-east-1`/CloudFront WAF & ACM resources, catch Regional AMI/Lambda layer/S3 package blockers, model SQS in-flight message RPO accurately, and keep CI offline and resilient to prompt injection from web-fetched docs. |
@@ -337,6 +350,14 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-27 — Reorientation against AWS Resilience Hub and ARC Region switch
+
+- Reviewed current AWS docs: Resilience Hub next generation (dependency discovery from DNS query logs, AI failure-mode analysis, FIS tests), ARC Region switch (execution blocks, plan evaluation, execution reports, $70/plan/month), ARC readiness checks closed to new customers, Route 53 Accelerated Recovery, IAM Identity Center multi-Region.
+- Considered and rejected a multi-cloud pivot. Recorded the reorientation in the decision log.
+- Spec: positioning and readiness tiers (§3), scope (§4, §8, §8.1), new cross-cutting rules (§28.1), execution method (§47.2, §56.2), drill sources (§53), Terraform vs scripts split (§62), recovery artifacts (§63–§63.4), failback (§64), secret handling for generated scripts (§67), non-goals (§101), long-term direction (§108).
+- Plan: D19; P2-02/03, P4-04, P9-08 extended; P11 renamed and P11-05..08 added; backlog items; new release gates; Q11–Q13.
+- **Carry-over:** start P0-01. Q13 is needed by P4-04, Q11–Q12 by P11.
 
 ### 2026-10-27 — Modularize `spec.md` and close specification/plan review findings
 
