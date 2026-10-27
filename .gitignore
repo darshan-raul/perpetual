@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (web UI, from P1b-07)
+node_modules/
+apps/web/dist/
+
+# Built UI copied into the package at build time (IMPL_PLAN D5)
+apps/api/perpetual/web/static/
+
+# Local state and outputs
+*.db
+*.sqlite3
+generated/
+.env
+.env.*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+
+# mise machine-local overrides
+mise.local.toml

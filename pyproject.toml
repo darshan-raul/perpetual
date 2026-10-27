@@ -1,0 +1,60 @@
+[project]
+name = "perpetual"
+version = "0.0.0"
+description = "AWS disaster-recovery readiness: evidence-based dependency graph, Region-failure simulation, whole-stack RTO/RPO and DR plans"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{ name = "Darshan Raul" }]
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "pytest",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The package source lives in apps/api/perpetual (IMPL_PLAN D5); the root
+# project builds it so `uv tool install .` works from the repo root.
+[tool.hatch.build.targets.wheel]
+packages = ["apps/api/perpetual"]
+
+[tool.hatch.build.targets.sdist]
+include = ["apps/api/perpetual", "README.md"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["apps/api"]
+extend-exclude = ["apps/web", "packages", "examples", "generated", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "PT", "C4", "PL", "TID"]
+ignore = ["PLR0913", "PLR2004"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["perpetual"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["apps/api/perpetual", "apps/api/tests"]
+mypy_path = "apps/api"
+explicit_package_bases = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["apps/api/tests"]
+pythonpath = ["apps/api"]
+addopts = ["--strict-markers", "--strict-config", "-ra", "--import-mode=importlib", "-m", "not contract"]
+markers = [
+    "contract: real-AWS contract suite; needs sandbox credentials, never runs by default",
+]
+xfail_strict = true

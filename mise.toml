@@ -1,0 +1,32 @@
+[tools]
+python = "3.13.13"
+uv = "0.13.1"
+node = "24.22.1"        # build-time only (web UI, from P1b-07)
+terraform = "1.16.7"    # companion Terraform fmt/validate (from P1c-02)
+
+[env]
+_.python.venv = { path = ".venv", create = false }
+
+[tasks.sync]
+description = "Install Python dependencies into .venv"
+run = "uv sync --all-groups"
+
+[tasks.fmt]
+description = "Format Python code"
+run = ["uv run ruff format .", "uv run ruff check --fix ."]
+
+[tasks.lint]
+description = "Lint (ruff); import-linter joins in P0-02, eslint in P1b-07"
+run = ["uv run ruff check .", "uv run ruff format --check ."]
+
+[tasks.typecheck]
+description = "Type-check (mypy --strict); tsc joins in P1b-07"
+run = "uv run mypy"
+
+[tasks.test]
+description = "Run tests (fixtures + moto; no AWS, no Docker)"
+run = "uv run pytest"
+
+[tasks.check]
+description = "lint + typecheck + test"
+depends = ["lint", "typecheck", "test"]
