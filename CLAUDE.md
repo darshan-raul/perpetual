@@ -11,7 +11,7 @@ Perpetual is a local, single-user tool that decides whether an AWS **stack** (on
 
 ## Status
 
-No code yet. Work starts at P0-01. The commands and layout below are what P0 creates; P0-14 updates this file to match reality.
+No code yet. Work starts at P0-01 (milestone M0 PoC; milestones are in TRACKER.md). The commands and layout below are what P0 creates; P0-14 updates this file to match reality.
 
 ## Commands (from P0-01)
 
@@ -35,7 +35,7 @@ uv run pytest -m contract    # real-AWS contract suite; needs sandbox credential
 
 ## Architecture
 
-Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity resolution → edge resolvers (evidence) → user override layer → NetworkX graph snapshot → stacks/services/RTO scope → rule packs (findings + DR overlay mechanisms) → two-pass simulator → recovery DAG → RTO/RPO → optimizer → DR spec → IaC transformation with verification → branch/PR; companion Terraform; recovery artifacts (runbook, prerequisite and recovery scripts, optional ARC Region switch plan). LLM agents attach at three points: advisor after rule packs (spec §28.2), planner inside the optimizer loop (§56.1), transformer after DR spec approval (§61).
+Pipeline (IMPL_PLAN §3.1): collectors/importers → normalizers + identity resolution → edge resolvers (evidence) → user override layer → NetworkX graph snapshot → stacks/services/RTO scope → rule packs (findings + DR overlay mechanisms) → two-pass simulator → recovery DAG → RTO/RPO → optimizer → DR spec → IaC transformation with verification → branch/PR; companion Terraform; recovery artifacts (runbook, prerequisite and recovery scripts, optional ARC Region switch plan). From v0.2, LLM agents attach at three points: advisor after rule packs (spec §28.2), planner inside the optimizer loop (§56.1), transformer after DR spec approval (§61).
 
 - Python package `apps/api/perpetual/`, one subpackage per pipeline stage (IMPL_PLAN §3.2). Web UI in `apps/web/` (Vite + React), built into `apps/api/perpetual/web/static/` and served by FastAPI. TS API types in `packages/schemas` are generated from OpenAPI; never edit them by hand.
 - Layer boundaries are enforced by import-linter (IMPL_PLAN §3.3): collectors only collect, rule packs never call collectors or LLMs, the simulator never rediscovers AWS, domain models never import FastAPI or SQLAlchemy. Only `perpetual.llm` imports LangChain/LangGraph; the engine never calls an agent.

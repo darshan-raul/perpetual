@@ -7,6 +7,8 @@
 
 Perpetual implements an approved DR spec by changing the user's own infrastructure code. It does not write a separate DR codebase unless there is no code to change (section 62.1).
 
+This section ships in v0.2 (decision 2026-10-27). v0.1 delivers companion Terraform and suggested edits (62.1) and never runs repository tools.
+
 In scope for v0.1:
 
 ```text
@@ -84,6 +86,10 @@ After the user's pipeline deploys, a fresh matching scan must establish operatio
 
 When backend credentials or an enforceable runner are unavailable, or a supplied plan has no valid provenance, static checking may parse supported literal HCL and render only with isolated approved tools. Unknown expressions remain unknown; do not build a Terraform interpreter. Label this "static checks only" with design verification UNKNOWN, never "verified statically" or ready. A supplied plan with matching provenance can undergo full design verification without executing Terraform locally.
 
+### v0.1 verification
+
+In v0.1 Perpetual runs only `terraform fmt`, `init -backend=false` and `validate` on the companion code it generated, with pinned, checksum-verified providers. It never runs `plan` or any tool against the user's existing code. Full design verification uses a saved plan that the user produces in their own environment (`terraform show -json <saved_plan>` for the root that includes the companion module) and supplies with matching provenance (56.3). Without one, the result is "static checks only" and design verification is UNKNOWN.
+
 Failures go back to the agent as sanitized structured feedback (which check failed, on which resource, with the finding or simulation path). If retries run out, a reviewable branch may still be produced but is marked **unverified**, with failed/unknown checks and prerequisites listed. Security or approval invalidation stops execution; it must not be retried with weaker controls. Only design-pass artifacts carry a design-verified label; delivery retains the exact tree/report digest from 56.3.
 
 ---
@@ -104,7 +110,7 @@ Terraform owns steady-state DR configuration: replication rules (ECR, S3, Secret
 
 # 62.1 Companion Fallback
 
-When no IaC repository is declared, or LLM features are disabled, Perpetual generates deterministic companion DR Terraform from templates, as in revision 3:
+In v0.1 companion Terraform is the delivery path. From v0.2 it is the fallback when no IaC repository is declared or LLM features are disabled. Perpetual generates deterministic companion DR Terraform from templates:
 
 ```text
 generated/
@@ -121,6 +127,8 @@ Generated configuration:
 - never embeds secrets;
 - references existing values through variables;
 - lists its assumptions.
+
+Companion code creates new resources only. A change to a resource the user's IaC already manages, such as enabling versioning on an existing bucket or a registry-wide ECR replication configuration, is delivered as a suggested edit: the Terraform address from the imported state or plan, the attribute change and a snippet, for the user to apply in their own code. Perpetual never generates a second owner for a managed resource.
 
 The same templates are given to the transformation agent as reference patterns through the skills (section 69.4).
 

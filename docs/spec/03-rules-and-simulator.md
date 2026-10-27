@@ -229,6 +229,8 @@ When reading environment variables or ConfigMaps, persist only the matched fact 
 
 # 28.2 LLM Advisory Review
 
+Ships in v0.2 (decision 2026-10-27).
+
 Rule packs are deterministic and cover known patterns. An advisory review, run by an LLM agent after the rule packs, looks for what they miss: unusual dependencies, application configuration that ties a service to the primary Region, services without a rule pack, and organization-specific standards from the knowledge base.
 
 Inputs: the stack subgraph (IDs, types, non-secret properties), deterministic findings and mechanisms, matched configuration facts (names only, never values), the IaC source of the stack's resources (section 61), knowledge-base retrievals and relevant skills (sections 69.3, 69.4). When a stack contains an out-of-scope or unmodeled resource type whose DR behaviour is not yet in the local knowledge base, the agent may use `web_search` and `web_fetch` (section 69.3) to fetch official documentation, persist and index it into the local knowledge base, and cite those chunks in its proposals.

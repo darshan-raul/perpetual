@@ -474,6 +474,8 @@ Every candidate is a complete stack plan: a mechanism for every in-scope resourc
 
 # 56.1 LLM Candidate Planner
 
+Ships in v0.2 (decision 2026-10-27). v0.1 uses only deterministic candidates (56).
+
 Strategy templates give good starting points, but the best design often mixes them: for example Aurora Global Database for the orders database, backup and restore for a reporting database, and warm standby for the API tier. An LLM planner agent proposes such candidates.
 
 Loop:
@@ -539,7 +541,8 @@ class DRSpec(BaseModel):
     findings_remaining: list[str]
 
     rationale: str
-    # LLM-written; cites knowledge-base documents and skills.
+    # v0.1: deterministic summary of engine results. From v0.2: LLM-written,
+    # citing knowledge-base documents and skills.
 
     assumptions: list[str]
 

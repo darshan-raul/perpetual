@@ -85,6 +85,8 @@ Multi-AZ protects against Availability Zone failures; it does not provide recove
 
 ## LLM proposes, engine verifies
 
+LLM features arrive in v0.2; v0.1 is fully deterministic.
+
 LLMs are good at reading your code and AWS documentation and proposing changes. They are not a source of truth. So in Perpetual:
 
 - every number you see (cost, RTO, RPO, durations) comes from the engine, never from a model;
@@ -171,17 +173,14 @@ perpetual transform checkout --terraform ./infra/prod --k8s ./deploy/prod --open
 
 Perpetual is pre-alpha: the design is complete and implementation is starting. Development is engine-first, ECS before EKS:
 
-| Phase | Delivers |
+| Milestone | Delivers |
 |---|---|
-| P0–P1 | Data model, dependency graph, simulator and recovery planning, run from the CLI on test fixtures |
-| P1b | Terraform import, local web UI, graph editor |
-| P2–P3 | Live AWS scanning, CloudTrail and flow-log evidence, stack grouping |
-| P3b | LLM foundation: providers, LangGraph, knowledge base, skills, guardrails |
-| P4–P6 | DR rules and advisory review, simulation and recovery plans on real accounts |
-| P7 | EKS support |
-| P8–P9 | RPO, cost, DR design with LLM-proposed candidates, DR spec |
-| P10 | Changing your Terraform and manifests, with verification and pull requests |
-| P11–P12 | Recovery artifacts (runbook, scripts, ARC plan), first release |
+| M0 PoC | Graph, simulator and recovery planning on test fixtures, plus a first generated fix and recovery script |
+| M1 Alpha | Terraform import, local web UI and graph editor, live AWS scanning with CloudTrail and flow-log evidence, stacks, DR rules, RTO and RPO on real accounts |
+| v0.1 | EKS, DR design within budget, companion Terraform and suggested edits as a PR, runbook, recovery scripts and ARC Region switch plans. No LLM. |
+| v0.2 | LLM advisor and planner, in-place edits to your Terraform and manifests in an isolated runner |
+| v0.3 | Proven readiness from game days and ARC execution reports; drift |
+| v1.0 | Packaged, upgradeable, audited release with a published service matrix |
 
 ## Tech stack
 

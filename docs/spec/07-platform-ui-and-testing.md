@@ -1186,6 +1186,18 @@ Do not mark it green.
 
 The order is engine-first. The DR model is what has to be correct, so it is proven from the CLI against fixtures before any web UI or server infrastructure is built.
 
+Release milestones (decision 2026-10-27):
+
+```text
+M0 PoC         phases 0-1 plus a fixture-only compile loop: fix -> Terraform -> re-simulate
+M1 Alpha       phases 1b, 2, 2b, 3, 4 (without advisory review), 5, 6, 7 (RPO)
+M2 v0.1        EKS slice, optimizer, IaC delivery, recovery artifacts; fully deterministic
+M3 v0.2        LLM features: phase 3b, advisory review, LLM candidate planner,
+               transformation agent with enforced isolation, explainer
+M4 v0.3        proven readiness from drills, drift
+M5 v1.0        production release
+```
+
 ## Phase 0 — Engine Foundation (CLI only)
 
 Deliver:
@@ -1329,7 +1341,7 @@ Perpetual understands "checkout" as a stack rather than unrelated AWS resources.
 
 ---
 
-## Phase 3b — LLM Foundation
+## Phase 3b — LLM Foundation (v0.2)
 
 Deliver:
 
@@ -1374,13 +1386,13 @@ WAF
 CloudWatch Logs
 ```
 
-Then the advisory review (section 28.2).
+Then the advisory review (section 28.2), in v0.2.
 
 Exit criterion:
 
 ```text
-Stack assessment produces evidence-backed findings; advisory items appear with
-citations and can be accepted or dismissed.
+Stack assessment produces evidence-backed findings. From v0.2, advisory items
+appear with citations and can be accepted or dismissed.
 ```
 
 ---
@@ -1447,13 +1459,13 @@ and:
 "What is the best DR posture for this budget?"
 ```
 
-Includes the LLM candidate planner (section 56.1) and the DR spec (section 56.2).
+Includes the DR spec (section 56.2). The LLM candidate planner (section 56.1) arrives in v0.2.
 
 Exit criterion:
 
 ```text
-Several architecture candidates, deterministic and LLM-proposed, can be compared,
-and an approved DR spec exists for each demo stack.
+Several deterministic architecture candidates can be compared, and an approved
+DR spec exists for each demo stack. LLM-proposed candidates join in v0.2.
 ```
 
 ---
@@ -1462,26 +1474,33 @@ and an approved DR spec exists for each demo stack.
 
 Deliver:
 
+v0.1:
+
+- companion Terraform for new DR resources, and suggested edits by Terraform address for resources the user's IaC already manages (section 62.1);
+- verification from static checks of the generated code and a saved plan the user supplies (section 61.1);
+- change delivery: branch, commits, patch, optional PR (section 62).
+
+v0.2:
+
 - resource-to-code mapping for Terraform and Kubernetes (section 61);
-- transformation agent in a git worktree with the tool allowlist;
-- verification loop (section 61.1), including static fallback;
-- change delivery: branch, commits, patch, optional PR (section 62);
-- companion fallback templates (section 62.1);
+- transformation agent in a git worktree with the tool allowlist and enforced isolation;
+- runner-executed plans in the verification loop (section 61.1);
 - evaluation suite runs on `examples/` (section 69.6).
 
 Exit criterion:
 
 ```text
-For the broken ECS and EKS demos, `perpetual transform` changes the example
-Terraform and manifests, verification passes, and the re-simulated stack meets
-its targets.
+v0.1: for the broken ECS and EKS demos, `perpetual transform` produces companion
+Terraform and suggested edits, design verification passes from a supplied saved
+plan, and the re-simulated stack meets its targets. v0.2: the same with in-place
+edits to the example Terraform and manifests.
 ```
 
 ---
 
-## Phase 10 — Runbook Generator
+## Phase 10 — Recovery Artifacts
 
-Generate failover and failback runbooks from recovery plans.
+Generate the runbook, prerequisite scripts, recovery scripts and ARC Region switch plans from recovery plans (section 63).
 
 ---
 
@@ -1529,18 +1548,22 @@ The first genuinely usable release is achieved when this workflow works:
    estimated RTO with its breakdown and buffer
    estimated RPO
 
-9. Perpetual compares candidate architectures (deterministic and
-   LLM-proposed) and the user approves a DR spec:
+9. Perpetual compares candidate architectures (deterministic in v0.1;
+   LLM-proposed candidates join in v0.2) and the user approves a DR spec:
    current vs target architecture
    RTO, RPO, total steady-state DR cost and incremental cost
 
-10. Perpetual changes the user's Terraform and Kubernetes manifests,
-    verifies the design by re-simulating, and delivers a branch or PR
-    with deployment prerequisites and stage-specific results.
+10. Perpetual generates companion Terraform for new DR resources and
+    suggested edits for resources the user's IaC already manages,
+    verifies the design by re-simulating a saved plan the user supplies,
+    and delivers a branch or PR with deployment prerequisites and
+    stage-specific results. In-place edits by the transformation agent
+    arrive in v0.2.
 
-11. Perpetual generates:
-    failover runbook
-    failback runbook
+11. Perpetual generates, from one recovery DAG:
+    failover and failback runbooks (explanatory)
+    prerequisite scripts and SOPs
+    recovery scripts, or an ARC Region switch plan
 
 12. After the user deploys and completes prerequisites, a fresh scan
     establishes observed readiness; design verification alone cannot.

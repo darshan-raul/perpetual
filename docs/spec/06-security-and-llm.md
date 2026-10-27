@@ -94,6 +94,8 @@ Requirements:
 
 # 69. LLM Architecture
 
+LLM features (69–70) ship in v0.2 (decision 2026-10-27). v0.1 is fully deterministic: no LLM dependency is installed or called.
+
 Discovery, the graph, assessment, simulation, the deterministic optimizer and companion Terraform work without an LLM. Advisory review (28.2), the candidate planner (56.1), DR spec rationale (56.2), IaC transformation (61) and the explainer (70) need one.
 
 ## 69.1 Provider Abstraction
