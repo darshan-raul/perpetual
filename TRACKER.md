@@ -4,7 +4,7 @@ Plan: [IMPL_PLAN.md](IMPL_PLAN.md) (locked 2026-10-25; milestones restructured 2
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-03**.
+**Current focus:** M0 PoC · next task **P0-04a**.
 
 ## Milestones
 
@@ -118,7 +118,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [x] P0-01 Repo skeleton, `mise.toml` with tasks, root-installable `uv` workspace, `__init__.py` subpackage stubs, ruff, mypy strict, pytest
 - [x] P0-02 import-linter contracts
-- [ ] P0-03 GitHub Actions CI
+- [x] P0-03 GitHub Actions CI
 - [ ] P0-04a Core graph and stack models, status enums
 - [ ] P0-04b Typed properties: compute and containers
 - [ ] P0-04c Typed properties: data and storage
@@ -505,6 +505,11 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-03 CI
+
+- `.github/workflows/ci.yml`: Ubuntu, actions pinned by SHA (checkout v7.0.1, mise-action v5.2.4), mise 2026.9.1, read-only token, `uv sync --locked`, then `mise run check`. actionlint clean; first run on `aefbacf` green.
+- **Carry-over:** P0-04a (core graph and stack models).
 
 ### 2026-10-28 — P0-02 import contracts
 
