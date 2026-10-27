@@ -413,7 +413,24 @@ POST /edges/{id}/confirm
 POST /edges/{id}/reject
 ```
 
-LLM-assisted:
+DR design and delivery (v0.1):
+
+```text
+POST /stacks/{id}/dr-spec              # from the selected candidate
+GET  /dr-specs/{id}
+POST /dr-specs/{id}/approve
+
+POST /dr-specs/{id}/transform          # v0.1: companion Terraform + suggested edits;
+                                       # v0.2: in-place edits. Body: IaC paths, open_pr
+GET  /transformations/{id}             # progress, diff, verification report
+POST /transformations/{id}/verify      # body: saved plan JSON (+ rendered manifests)
+
+POST /stacks/{id}/recovery-artifacts   # runbook, prerequisite scripts, recovery
+                                       # scripts, ARC plan for the DR spec's method
+GET  /stacks/{id}/recovery-artifacts
+```
+
+LLM-assisted (v0.2):
 
 ```text
 POST /stacks/{id}/advise
@@ -421,27 +438,12 @@ GET  /stacks/{id}/advisories
 POST /advisories/{id}/accept
 POST /advisories/{id}/dismiss
 
-POST /stacks/{id}/dr-spec              # from the selected candidate
-GET  /dr-specs/{id}
-POST /dr-specs/{id}/approve
-
-POST /dr-specs/{id}/transform          # body: IaC paths, open_pr
-GET  /transformations/{id}             # progress, diff, verification report
-
 GET    /llm/calls
 POST   /kb/sync
 GET    /kb/documents
 POST   /kb/documents
 GET    /kb/documents/{id}
 DELETE /kb/documents/{id}
-```
-
-Later:
-
-```text
-POST /stacks/{id}/terraform/companion
-
-POST /stacks/{id}/runbook/generate
 ```
 
 ---
@@ -477,8 +479,9 @@ perpetual simulate checkout \
 perpetual optimize checkout \
   --rto 30m \
   --rpo 5m \
-  --budget 1200            # includes LLM candidates unless --no-llm
+  --budget 1200            # v0.2+: includes LLM candidates unless --no-llm
 
+# from v0.2
 perpetual llm configure
 perpetual llm test
 perpetual llm log
@@ -491,12 +494,14 @@ perpetual kb remove <doc-id>
 
 perpetual skills list
 
-perpetual advise checkout
+perpetual advise checkout                 # v0.2
 perpetual dr-spec checkout [--approve]
 perpetual transform checkout \
   --terraform ./infra/live/prod \
   --k8s ./deploy/overlays/prod \
-  [--open-pr]
+  [--open-pr]                # v0.1: companion + suggested edits; v0.2: in-place
+perpetual verify checkout --plan-json plan.json [--manifests ./rendered]
+perpetual recovery checkout  # runbook, prerequisite + recovery scripts, ARC plan
 ```
 
 CLI can initially call local Python services directly rather than requiring the API.

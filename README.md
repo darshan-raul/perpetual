@@ -137,7 +137,10 @@ Deployment        Pending; fresh scan required for observed READY
 
 - ECS, EC2 and Serverless stacks: Route 53, WAF, ALB/NLB, CloudFront, ACM, ECS on Fargate/EC2, EC2 instances and Auto Scaling groups, Lambda, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, RDS/Aurora, basic DynamoDB recovery, S3, EBS/EFS, CloudWatch Logs, VPC networking;
 - EKS stacks: clusters, node groups, add-ons, IRSA and Pod Identity, persistent volumes on EBS/EFS;
-- code changes to Terraform, plain Kubernetes manifests, Kustomize overlays and Helm values.
+- companion Terraform for new DR resources, and suggested edits for resources your Terraform and Kubernetes manifests already manage, delivered as a pull request;
+- a runbook, prerequisite scripts, recovery scripts and optional ARC Region switch plans.
+
+In-place edits to Terraform, plain Kubernetes manifests, Kustomize overlays and Helm values arrive in v0.2.
 
 **Checked but not counted in the RTO:** monitoring, logging and CI/CD.
 
