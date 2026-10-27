@@ -7,7 +7,7 @@ its layers, its role and its VPC configuration all exist there. Layer ARNs and
 image URIs embed a Region, which is how the rules spot primary-only references.
 """
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -17,6 +17,7 @@ from perpetual.models.properties.base import TypedProperties
 
 class LambdaFunctionProperties(TypedProperties):
     type_key: Literal["lambda/function"] = "lambda/function"
+    required_fields: ClassVar[frozenset[str]] = frozenset({"role_arn"})
     function_name: NonEmptyStr
     package_type: Literal["Zip", "Image"]
     runtime: str | None = None
@@ -26,7 +27,7 @@ class LambdaFunctionProperties(TypedProperties):
     code_s3_key: str | None = None
     image_uri: str | None = None
     layer_arns: list[NonEmptyStr] = Field(default_factory=list)
-    role_arn: NonEmptyStr
+    role_arn: NonEmptyStr | None = None
     subnet_ids: list[NonEmptyStr] = Field(default_factory=list)
     security_group_ids: list[NonEmptyStr] = Field(default_factory=list)
     environment_names: list[NonEmptyStr] = Field(default_factory=list)
@@ -59,13 +60,15 @@ class LambdaEventSourceMappingProperties(TypedProperties):
     """A poller that reads a queue or stream and invokes a function (SQS, DynamoDB, Kinesis)."""
 
     type_key: Literal["lambda/event-source-mapping"] = "lambda/event-source-mapping"
-    uuid: NonEmptyStr
-    function_arn: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"function_arn", "state", "uuid"})
+    uuid: NonEmptyStr | None = None
+    function_arn: NonEmptyStr | None = None
     event_source_arn: str | None = None
     """None for sources without an ARN, e.g. self-managed Kafka."""
-    state: Literal[
-        "Creating", "Enabling", "Enabled", "Disabling", "Disabled", "Updating", "Deleting"
-    ]
+    state: (
+        Literal["Creating", "Enabling", "Enabled", "Disabling", "Disabled", "Updating", "Deleting"]
+        | None
+    ) = None
     batch_size: int | None = Field(default=None, ge=1)
     maximum_retry_attempts: int | None = Field(default=None, ge=-1)
     """-1 means retry until the record expires."""

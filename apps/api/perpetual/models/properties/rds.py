@@ -6,7 +6,7 @@ recovery comes from a cross-Region replica, an Aurora Global Database secondary,
 or a restore from a recovery point copied to the DR Region.
 """
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import AwareDatetime, Field, model_validator
 
@@ -84,7 +84,10 @@ class AuroraClusterProperties(TypedProperties):
     @model_validator(mode="after")
     def _global_role_matches_membership(self) -> Self:
         # A role without a global cluster, or membership without a role, means the
-        # import lost information the promotion path depends on.
+        # import lost information the promotion path depends on. A value only known
+        # after apply is neither, so the check skips it.
+        if self.is_unknown("global_cluster_identifier") or self.is_unknown("global_cluster_role"):
+            return self
         if (self.global_cluster_identifier is None) != (self.global_cluster_role is None):
             raise ValueError(
                 "global_cluster_identifier and global_cluster_role are set together or not at all"
@@ -100,10 +103,11 @@ class RDSSnapshotProperties(TypedProperties):
     """
 
     type_key: Literal["rds/snapshot", "rds/cluster-snapshot"]
+    required_fields: ClassVar[frozenset[str]] = frozenset({"snapshot_type"})
     snapshot_identifier: NonEmptyStr
     source_identifier: NonEmptyStr
     """The DB instance or cluster it was taken from."""
-    snapshot_type: Literal["automated", "manual", "shared", "public", "awsbackup"]
+    snapshot_type: Literal["automated", "manual", "shared", "public", "awsbackup"] | None = None
     status: str | None = None
     created_at: AwareDatetime | None = None
     """Its age bounds the RPO of a restore from it (spec §51)."""

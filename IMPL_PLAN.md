@@ -224,7 +224,7 @@ Spec: §15, §15.1–15.3, §16–§23, §24, §26, §27.1 (models), §30.1, §4
 | P0-04c | Typed properties, data and storage: RDS instance/Aurora cluster, DynamoDB table/replica/backup, S3 bucket, EFS filesystem/replication, EBS volume/snapshot. |
 | P0-04d | Typed properties, messaging, network, edge and supporting services: SQS, SNS, VPC, subnet, security group, ALB/listener/target group, Route 53 zone/record, WAF web ACL, ECR, Secrets Manager, SSM parameter, KMS, IAM role/policy, CloudWatch log group; Route 53 zone Accelerated Recovery status; ARC routing control, Region switch plan (evaluation status, report location) and legacy readiness check; IAM Identity Center instance (home and replica Regions). |
 | P0-04e | `CodePipelineProperties` (out of scope), `ExternalResourceProperties`, `GenericResourceProperties`; typed quota, availability and metric facts. |
-| P0-04f | `ScanCoverage`, `EvaluationInput`, `WorkloadProfile`, `CostEstimate`, deployment prerequisite, verification-stage, `BufferPolicy` and `DRDrill` models; `OperatorAccessProfile` for the `operator_access` section of `perpetual.yaml` (§28.1). |
+| P0-04f | `ScanCoverage`, `EvaluationInput`, `WorkloadProfile`, `CostEstimate`, deployment prerequisite, verification-stage, `BufferPolicy` and `DRDrill` models; `OperatorAccessProfile` for the `operator_access` section of `perpetual.yaml` (§28.1); the resolved-observation model with `attribution = exact | ambiguous`, sorted candidate resource-ID sets, resolution evidence IDs and observation window (§14.1), so persistence (P0-07) can store it. P2b-09 builds the review flow on it. |
 | P0-05 | `ids/`: canonical IDs, global IDs, planned `tf:` IDs, parsing and tests. |
 | P0-06 | `config/`: typed loading of defaults (evidence weights, correlation groups, thresholds, scoring, RTO-scope defaults, buffer defaults) with per-project override. |
 | P0-07 | `persistence/`: SQLAlchemy models for resources, edges, evidence, graph_overrides, stacks, stack_resources, stack_services, recovery_mechanisms, resource_versions, dependency_groups, scan_coverage, evaluation_inputs (+ projects, scans). Initial Alembic migration. Repositories scoped by `project_id`. SQL compilation / dialect test asserting all models and migrations compile cleanly against both `sqlite` and `postgresql` dialects (spec §71.1). |
@@ -356,7 +356,7 @@ Spec: §14.1 (CloudTrail, flow logs, persistence, contradictions), §16, §22, �
 | P2b-06 | Contradiction and "unobserved in window" flags; external-node proposals from unknown destinations. |
 | P2b-07 | Coverage report (trails, data events, flow-log destinations) in CLI and UI. |
 | P2b-08 | Real-AWS checkpoint: real CloudTrail and flow logs → observed edges. |
-| P2b-09 | Ambiguous observation model and review flow (§14.1): aggregate once per candidate set, no copied counts or exact-edge confidence uplift, explicit attribution gate, user resolution and evidence audit. Tests for shared task roles, Lambda ENIs, ENI reuse and exact positive attribution; run before P2b checkpoint. |
+| P2b-09 | Ambiguous observation review flow on the P0-04f model (§14.1): aggregate once per candidate set, no copied counts or exact-edge confidence uplift, explicit attribution gate, user resolution and evidence audit. Tests for shared task roles, Lambda ENIs, ENI reuse and exact positive attribution; run before P2b checkpoint. |
 
 Exit: every edge shows its basis; permitted-but-unobserved edges and observed-but-not-permitted flows are listed for review.
 

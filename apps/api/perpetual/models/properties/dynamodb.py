@@ -9,7 +9,31 @@ from typing import Literal, Self
 from pydantic import AwareDatetime, Field, model_validator
 
 from perpetual.models.common import NonEmptyStr
-from perpetual.models.properties.base import TypedProperties
+from perpetual.models.properties.base import PropertyPart, TypedProperties
+
+
+class DynamoDBReplica(PropertyPart):
+    """A Global Tables replica in another Region."""
+
+    region: NonEmptyStr
+    status: (
+        Literal[
+            "CREATING",
+            "CREATION_FAILED",
+            "UPDATING",
+            "DELETING",
+            "ACTIVE",
+            "REGION_DISABLED",
+            "INACCESSIBLE_ENCRYPTION_CREDENTIALS",
+            "ARCHIVING",
+            "ARCHIVED",
+            "REPLICATION_NOT_AUTHORIZED",
+        ]
+        | None
+    ) = None
+    kms_key_arn: str | None = None
+    """The replica's own key, which must be usable in its Region."""
+    table_class_override: Literal["STANDARD", "STANDARD_INFREQUENT_ACCESS"] | None = None
 
 
 class DynamoDBTableProperties(TypedProperties):
@@ -22,8 +46,8 @@ class DynamoDBTableProperties(TypedProperties):
     """None when the continuous-backup status could not be read."""
     latest_restorable_time: AwareDatetime | None = None
     global_table_version: Literal["2017.11.29", "2019.11.21"] | None = None
-    replica_regions: list[NonEmptyStr] = Field(default_factory=list)
-    """Other Regions holding a Global Tables replica of this table."""
+    replicas: list[DynamoDBReplica] = Field(default_factory=list)
+    """Global Tables replicas in other Regions."""
     stream_enabled: bool = False
     stream_view_type: str | None = None
     sse_type: Literal["AWS_OWNED", "AES256", "KMS"] | None = None
@@ -36,8 +60,11 @@ class DynamoDBTableProperties(TypedProperties):
 
     @model_validator(mode="after")
     def _replicas_mean_a_global_table(self) -> Self:
-        if self.replica_regions and self.is_missing("global_table_version"):
-            raise ValueError("a table with replica_regions is a global table: set its version")
+        if self.replicas and self.is_missing("global_table_version"):
+            raise ValueError("a table with replicas is a global table: set its version")
+        regions = [replica.region for replica in self.replicas]
+        if len(set(regions)) != len(regions):
+            raise ValueError("a table has at most one replica per Region")
         return self
 
 

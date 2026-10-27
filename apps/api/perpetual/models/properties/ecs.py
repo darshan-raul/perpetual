@@ -6,15 +6,15 @@ References to other resources (roles, images, secrets, target groups) are kept a
 ARNs or URIs so edge resolvers can turn them into dependency edges.
 """
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 
-from perpetual.models.common import DomainModel, NonEmptyStr
-from perpetual.models.properties.base import TypedProperties
+from perpetual.models.common import NonEmptyStr
+from perpetual.models.properties.base import PropertyPart, TypedProperties
 
 
-class CapacityProviderStrategyItem(DomainModel):
+class CapacityProviderStrategyItem(PropertyPart):
     capacity_provider: NonEmptyStr
     """e.g. FARGATE, FARGATE_SPOT, or an Auto Scaling group capacity provider."""
     weight: int = Field(default=0, ge=0)
@@ -30,15 +30,16 @@ class ECSClusterProperties(TypedProperties):
     )
 
 
-class ServiceLoadBalancer(DomainModel):
+class ServiceLoadBalancer(PropertyPart):
     """A target group the service registers tasks with."""
 
-    target_group_arn: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"target_group_arn"})
+    target_group_arn: NonEmptyStr | None = None
     container_name: NonEmptyStr
     container_port: int = Field(ge=1, le=65535)
 
 
-class ServiceAutoScaling(DomainModel):
+class ServiceAutoScaling(PropertyPart):
     """Application Auto Scaling bounds registered for the service."""
 
     min_capacity: int = Field(ge=0)
@@ -53,9 +54,10 @@ class ServiceAutoScaling(DomainModel):
 
 class ECSServiceProperties(TypedProperties):
     type_key: Literal["ecs/service"] = "ecs/service"
+    required_fields: ClassVar[frozenset[str]] = frozenset({"cluster_arn", "task_definition_arn"})
     service_name: NonEmptyStr
-    cluster_arn: NonEmptyStr
-    task_definition_arn: NonEmptyStr
+    cluster_arn: NonEmptyStr | None = None
+    task_definition_arn: NonEmptyStr | None = None
     launch_type: Literal["FARGATE", "EC2", "EXTERNAL"] | None = None
     """None when the service uses a capacity provider strategy instead."""
     capacity_provider_strategy: list[CapacityProviderStrategyItem] = Field(default_factory=list)
@@ -74,18 +76,20 @@ class ECSServiceProperties(TypedProperties):
     auto_scaling: ServiceAutoScaling | None = None
 
 
-class SecretReference(DomainModel):
+class SecretReference(PropertyPart):
     """A secret injected into a container: the reference, never the value (spec §67)."""
 
+    required_fields: ClassVar[frozenset[str]] = frozenset({"value_from"})
     name: NonEmptyStr
     """The environment variable name the secret is exposed as."""
-    value_from: NonEmptyStr
+    value_from: NonEmptyStr | None = None
     """ARN of a Secrets Manager secret or SSM parameter."""
 
 
-class ContainerDefinition(DomainModel):
+class ContainerDefinition(PropertyPart):
+    required_fields: ClassVar[frozenset[str]] = frozenset({"image"})
     name: NonEmptyStr
-    image: NonEmptyStr
+    image: NonEmptyStr | None = None
     """Image URI, e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com/checkout:1.4."""
     essential: bool = True
     secrets: list[SecretReference] = Field(default_factory=list)
@@ -98,8 +102,9 @@ class ContainerDefinition(DomainModel):
 
 class ECSTaskDefinitionProperties(TypedProperties):
     type_key: Literal["ecs/task-definition"] = "ecs/task-definition"
+    required_fields: ClassVar[frozenset[str]] = frozenset({"revision"})
     family: NonEmptyStr
-    revision: int = Field(ge=1)
+    revision: int | None = Field(default=None, ge=1)
     task_role_arn: str | None = None
     execution_role_arn: str | None = None
     network_mode: Literal["awsvpc", "bridge", "host", "none"] | None = None

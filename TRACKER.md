@@ -6,7 +6,7 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-04d**.
+**Current focus:** M0 PoC · next task **P0-04e**.
 
 ## Milestones
 
@@ -124,9 +124,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-04a Core graph and stack models, status enums
 - [x] P0-04b Typed properties: compute and containers
 - [x] P0-04c Typed properties: data and storage
-- [ ] P0-04d Typed properties: messaging, network, edge and supporting services
+- [x] P0-04d Typed properties: messaging, network, edge and supporting services
 - [ ] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
-- [ ] P0-04f Evaluation, coverage, workload/cost, prerequisite, verification and drill models
+- [ ] P0-04f Evaluation, coverage, workload/cost, prerequisite, verification and drill models; operator access profile; resolved-observation model (exact | ambiguous, §14.1)
 - [ ] P0-05 Canonical resource IDs
 - [ ] P0-06 Typed config + defaults
 - [ ] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
@@ -227,7 +227,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P2b-06 Contradictions, unobserved, external proposals
 - [ ] P2b-07 Coverage report
 - [ ] P2b-08 Real-AWS checkpoint
-- [ ] P2b-09 Ambiguous observation attribution, candidate-set aggregation and review gates
+- [ ] P2b-09 Ambiguous observation review flow, candidate-set aggregation and review gates (model in P0-04f)
 
 ### P3 Stack and service discovery
 
@@ -484,6 +484,8 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | Fixes from an external review of P0-04a–d. (1) `is_missing()` treats None and empty strings/collections as missing, never 0 or False (the review's `is None` fix would let an HTTPS listener with `[]` certificates pass). (2) AWS-assigned values (IDs, ARNs, URIs, computed numbers) are declared in `required_fields`, typed nullable, and must be present or listed in `unknown_fields`; nested parts inherit `PropertyPart`, and an unknown nested value marks the parent field unknown (one level deep). (3) Every "set together" pairing check skips when a side is unknown (Aurora global membership, SQS redrive, KMS multi-Region role, Route 53 failover role), and S3's versioning check respects unknown versioning. (4) DynamoDB replicas are structured (`DynamoDBReplica`: Region, status, KMS key, table-class override). (5) `unknown_fields` is sorted and rejects repeats. (6) The resolved-observation model (§14.1) moves to P0-04f so persistence (P0-07) can store it; P2b-09 keeps the review flow. | §15.4 forbids inventing ARNs for planned resources, and the Terraform importer needs this before P1b; stable hashes need normalized lists (§56.3); per-replica KMS decides whether a replica can be read in DR. |
+| 2026-10-28 | P0-04d scope and rules: also models route tables, NAT and internet gateways, VPC endpoints, Transit Gateway attachments, Route 53 health checks, CloudFront, ACM, ECR registry (replication is per registry) and ECR images, which P2 collectors gather but the P0-04d list omitted. SNS subscription endpoints are stored only for AWS-resource protocols (email/SMS/HTTP endpoints are personal data). IAM policies are stored as structured statements for XREG-IAM-002. `accelerated_recovery_enabled` is a nullable bool rather than an API enum. A test fails if a properties model is not registered in the union. The typed-properties docs moved to `docs/code/packages/models-properties.md`. | Collectors need somewhere typed to put every fact they gather; personal data has no DR value; a forgotten union registration would otherwise surface only when a fixture fails to parse. |
 | 2026-10-28 | P0-04c: `type_key` follows the service name in each resource's ARN (`ec2/volume`, `ec2/snapshot`, `elasticfilesystem/file-system`, `backup/recovery-point`); one `RDSSnapshotProperties` model takes both `rds/snapshot` and `rds/cluster-snapshot`; AWS Backup vaults and recovery points are modelled here because restores depend on them; volumetric fields (§42) live on the models while fast-changing metrics wait for P0-04e facts; validators use `TypedProperties.is_missing()` so values known only after apply never fail a prerequisite check. | One naming rule for keys and IDs; restore mechanisms need recovery points as typed resources; metrics need freshness handling that configuration does not. |
 | 2026-10-28 | P0-04b typed-property conventions: (1) each model's `type_key` is `SERVICE/TYPE` from the canonical ID (`ecs/service`, `autoscaling/group`, `ec2/launch-template`, `ec2/image`, `lambda/function`, …) and is the discriminator of the `ResourceProperties` union; `ResourceNode.typed_properties` holds it and must match the node's type. (2) None means absent/null; `unknown_fields` lists fields unknown until apply (§15.4); an empty list means known-empty. (3) Secrets are stored as references, env vars as names only, launch-template user data as a presence flag; there is no field for the values (§67). (4) Lambda module is `awslambda.py` (`lambda` is a keyword). | `resource_type` alone repeats across services (`cluster`); a key aligned with the ID is unambiguous. Unknown plan values must never read as absent or as the old live value. Making secret values unstorable is stronger than a rule saying not to store them. |
 | 2026-10-28 | Add a code walkthrough in `docs/code/`: an index with a package status table, `architecture.md` (pipeline as built), `tooling.md`, one page per package with real code (`packages/<name>.md`, from `_template.md`) and, later, end-to-end `flows/<name>.md`. Every task that changes code updates it in the same change; it is part of the definition of done (IMPL_PLAN §4 note, CLAUDE.md). Code comments explain the *why* of validators and engine rules, citing spec sections. | User request: a scalable, always-current document to understand the code before reading it, as the codebase grows. |
@@ -511,6 +513,13 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-04d typed properties: messaging, network, edge, supporting
+
+- 33 models in `messaging.py`, `network.py`, `elb.py`, `edge.py`, `supporting.py`, `recovery_control.py` (SQS, SNS, VPC networking, ELB, Route 53, CloudFront, ACM, WAF, ECR, Secrets Manager, SSM, KMS, IAM, Logs, ARC routing controls, Region switch plans, readiness checks, Identity Center). 54 type keys in the union.
+- 31 new tests including union registration and key uniqueness. Typed-properties docs split into `models-properties.md`.
+- External review fixes (decision log): required-or-unknown fields for planned resources with `PropertyPart` for nested models, `is_missing()` semantics, sorted `unknown_fields`, structured DynamoDB replicas, unknown-aware Aurora and S3 checks; resolved-observation model scheduled in P0-04f. 11 more tests; `mise run check`: 9 contracts, mypy strict on 60 files, 171 tests.
+- **Carry-over:** P0-04e (external/generic properties; quota, availability and metric facts).
 
 ### 2026-10-28 — P0-04c typed properties: data and storage
 

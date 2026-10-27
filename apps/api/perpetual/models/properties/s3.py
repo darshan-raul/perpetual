@@ -5,18 +5,19 @@ bucket in the DR Region. Replication copies only objects written after the rule
 exists; older objects need a one-off Batch Replication job (spec §63.1).
 """
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 
-from perpetual.models.common import DomainModel, NonEmptyStr
-from perpetual.models.properties.base import TypedProperties
+from perpetual.models.common import NonEmptyStr
+from perpetual.models.properties.base import PropertyPart, TypedProperties
 
 
-class S3ReplicationRule(DomainModel):
+class S3ReplicationRule(PropertyPart):
+    required_fields: ClassVar[frozenset[str]] = frozenset({"destination_bucket_arn"})
     rule_id: NonEmptyStr
     status: Literal["Enabled", "Disabled"]
-    destination_bucket_arn: NonEmptyStr
+    destination_bucket_arn: NonEmptyStr | None = None
     destination_account_id: str | None = None
     destination_storage_class: str | None = None
     prefix: str | None = None
@@ -32,8 +33,9 @@ class S3ReplicationRule(DomainModel):
 
 class S3BucketProperties(TypedProperties):
     type_key: Literal["s3/bucket"] = "s3/bucket"
+    required_fields: ClassVar[frozenset[str]] = frozenset({"versioning"})
     bucket_name: NonEmptyStr
-    versioning: Literal["Enabled", "Suspended", "Disabled"]
+    versioning: Literal["Enabled", "Suspended", "Disabled"] | None = None
     """Disabled means versioning was never turned on."""
     replication_role_arn: str | None = None
     replication_rules: list[S3ReplicationRule] = Field(default_factory=list)
@@ -53,7 +55,9 @@ class S3BucketProperties(TypedProperties):
         # S3 requires versioning and a replication role before any rule can exist,
         # so rules without them mean a broken import.
         if self.replication_rules:
-            if self.versioning != "Enabled":
+            # Versioning is often a separate Terraform resource, so it may be unknown
+            # in a plan; a known value must be Enabled.
+            if self.versioning is not None and self.versioning != "Enabled":
                 raise ValueError("S3 replication requires versioning Enabled")
             if self.is_missing("replication_role_arn"):
                 raise ValueError("S3 replication requires a replication_role_arn")

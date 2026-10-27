@@ -58,7 +58,7 @@ def test_unknown_fields_mark_plan_values_known_after_apply() -> None:
     props = ECSServiceProperties.model_validate(
         {**SERVICE_PROPS, "unknown_fields": ["subnet_ids", "security_group_ids"]}
     )
-    assert props.unknown_fields == ["subnet_ids", "security_group_ids"]
+    assert props.unknown_fields == ["security_group_ids", "subnet_ids"]  # normalized order
     assert props.subnet_ids == []  # the stored default; rules must read it as UNKNOWN
 
 

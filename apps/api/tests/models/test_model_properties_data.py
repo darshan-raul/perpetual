@@ -115,11 +115,30 @@ def test_aurora_cluster_rejects_non_aurora_engine_and_zero_retention() -> None:
 
 def test_dynamodb_replicas_need_a_global_table_version() -> None:
     with pytest.raises(ValidationError, match="global table"):
-        DynamoDBTableProperties(table_name="orders", replica_regions=["ap-south-2"])
-    table = DynamoDBTableProperties(
-        table_name="orders", replica_regions=["ap-south-2"], global_table_version="2019.11.21"
+        DynamoDBTableProperties.model_validate(
+            {"table_name": "orders", "replicas": [{"region": "ap-south-2"}]}
+        )
+    table = DynamoDBTableProperties.model_validate(
+        {
+            "table_name": "orders",
+            "global_table_version": "2019.11.21",
+            "replicas": [
+                {"region": "ap-south-2", "status": "ACTIVE", "kms_key_arn": "arn:aws:kms:x"}
+            ],
+        }
     )
-    assert table.replica_regions == ["ap-south-2"]
+    assert table.replicas[0].kms_key_arn == "arn:aws:kms:x"
+
+
+def test_dynamodb_has_one_replica_per_region() -> None:
+    with pytest.raises(ValidationError, match="one replica per Region"):
+        DynamoDBTableProperties.model_validate(
+            {
+                "table_name": "orders",
+                "global_table_version": "2019.11.21",
+                "replicas": [{"region": "ap-south-2"}, {"region": "ap-south-2"}],
+            }
+        )
 
 
 REPLICATION_RULE: dict[str, Any] = {

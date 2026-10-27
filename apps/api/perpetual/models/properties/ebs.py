@@ -7,7 +7,7 @@ works there. EBS matters most for EKS persistent volumes (spec §40).
 The `type_key` uses `ec2`, the service name in EBS ARNs.
 """
 
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import AwareDatetime, Field
 
@@ -17,8 +17,9 @@ from perpetual.models.properties.base import TypedProperties
 
 class EBSVolumeProperties(TypedProperties):
     type_key: Literal["ec2/volume"] = "ec2/volume"
-    volume_id: NonEmptyStr
-    size_gib: int = Field(ge=1)
+    required_fields: ClassVar[frozenset[str]] = frozenset({"size_gib", "volume_id"})
+    volume_id: NonEmptyStr | None = None
+    size_gib: int | None = Field(default=None, ge=1)
     volume_type: str | None = None
     iops: int | None = Field(default=None, ge=0)
     throughput_mibps: int | None = Field(default=None, ge=0)
@@ -31,7 +32,8 @@ class EBSVolumeProperties(TypedProperties):
 
 class EBSSnapshotProperties(TypedProperties):
     type_key: Literal["ec2/snapshot"] = "ec2/snapshot"
-    snapshot_id: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"snapshot_id"})
+    snapshot_id: NonEmptyStr | None = None
     volume_id: str | None = None
     """The source volume, when known. Copied snapshots point at a placeholder volume."""
     volume_size_gib: int | None = Field(default=None, ge=1)

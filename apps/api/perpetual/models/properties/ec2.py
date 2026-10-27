@@ -9,15 +9,15 @@ An AMI is Regional, and its snapshots are only usable in the DR Region if the
 image was copied there and the snapshot's KMS key can be used there.
 """
 
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 
-from perpetual.models.common import DomainModel, NonEmptyStr
-from perpetual.models.properties.base import TypedProperties
+from perpetual.models.common import NonEmptyStr
+from perpetual.models.properties.base import PropertyPart, TypedProperties
 
 
-class BlockDeviceMapping(DomainModel):
+class BlockDeviceMapping(PropertyPart):
     device_name: NonEmptyStr
     snapshot_id: str | None = None
     volume_size_gib: int | None = Field(default=None, ge=1)
@@ -28,10 +28,13 @@ class BlockDeviceMapping(DomainModel):
 
 class EC2InstanceProperties(TypedProperties):
     type_key: Literal["ec2/instance"] = "ec2/instance"
-    instance_id: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"image_id", "instance_id", "state"})
+    instance_id: NonEmptyStr | None = None
     instance_type: NonEmptyStr
-    image_id: NonEmptyStr
-    state: Literal["pending", "running", "stopping", "stopped", "shutting-down", "terminated"]
+    image_id: NonEmptyStr | None = None
+    state: (
+        Literal["pending", "running", "stopping", "stopped", "shutting-down", "terminated"] | None
+    ) = None
     lifecycle: Literal["on-demand", "spot", "scheduled", "capacity-block"] = "on-demand"
     subnet_id: str | None = None
     security_group_ids: list[NonEmptyStr] = Field(default_factory=list)
@@ -42,9 +45,10 @@ class EC2InstanceProperties(TypedProperties):
     launch_template_id: str | None = None
 
 
-class LaunchTemplateRef(DomainModel):
-    launch_template_id: NonEmptyStr
-    version: NonEmptyStr
+class LaunchTemplateRef(PropertyPart):
+    required_fields: ClassVar[frozenset[str]] = frozenset({"launch_template_id", "version"})
+    launch_template_id: NonEmptyStr | None = None
+    version: NonEmptyStr | None = None
     """A number, or "$Default" / "$Latest"."""
 
 
@@ -73,8 +77,9 @@ class AutoScalingGroupProperties(TypedProperties):
 
 class LaunchTemplateProperties(TypedProperties):
     type_key: Literal["ec2/launch-template"] = "ec2/launch-template"
+    required_fields: ClassVar[frozenset[str]] = frozenset({"version"})
     launch_template_name: NonEmptyStr
-    version: int = Field(ge=1)
+    version: int | None = Field(default=None, ge=1)
     image_id: str | None = None
     image_ssm_parameter: str | None = None
     """Set when the AMI is resolved from an SSM parameter (resolve:ssm:...). The
@@ -95,10 +100,13 @@ class LaunchTemplateProperties(TypedProperties):
 
 class AMIProperties(TypedProperties):
     type_key: Literal["ec2/image"] = "ec2/image"
-    image_id: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"image_id", "owner_id", "state"})
+    image_id: NonEmptyStr | None = None
     name: str | None = None
-    owner_id: NonEmptyStr
-    state: Literal["pending", "available", "invalid", "deregistered", "failed", "error"]
+    owner_id: NonEmptyStr | None = None
+    state: Literal["pending", "available", "invalid", "deregistered", "failed", "error"] | None = (
+        None
+    )
     architecture: str | None = None
     root_device_type: Literal["ebs", "instance-store"] = "ebs"
     block_device_mappings: list[BlockDeviceMapping] = Field(default_factory=list)

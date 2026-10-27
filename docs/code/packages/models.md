@@ -1,7 +1,7 @@
 # `models` package
 
 **Owns:** the shared vocabulary every other package passes around: resources, evidence, edges, stacks, requirements, mechanisms, user edits and status values.
-**Spec:** §5.1, §5.3, §5.4, §6, §7, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a to P0-04c (P0-04d to P0-04f add more).
+**Spec:** §5–§8.1, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §30.1, §49, §49.2. **Tracker:** P0-04a to P0-04d (P0-04e and P0-04f add more).
 **Depends on:** nothing else in Perpetual (an import rule enforces this); only Pydantic. **Used by:** every other package, as they are built.
 
 ## In one paragraph
@@ -21,7 +21,7 @@ These are plain data classes built with Pydantic. They hold no logic beyond vali
 | `stack.py` | `Stack`, `StackService`, `StackResource`, `RtoScope` (§24, §24.1) |
 | `requirement.py` | `RecoveryRequirement`, `DurationEstimate`, `BufferPolicy`, `DRStrategy`, `FailureScope` (§26, §27, §49) |
 | `mechanism.py` | `RecoveryMechanism`, `MechanismKind`: the DR overlay (§27.1) |
-| `properties/` | Typed per-resource-type properties (§15.3): `base.py` (`TypedProperties`), one file per service (`ecs.py`, `ec2.py`, `awslambda.py`, `rds.py`, `dynamodb.py`, `s3.py`, `ebs.py`, `efs.py`, `backup.py`), and `__init__.py`, which builds the `ResourceProperties` union |
+| `properties/` | Typed per-resource-type properties, one file per service area. See [models-properties.md](models-properties.md) |
 | `__init__.py` | Re-exports every public name: `from perpetual.models import DependencyEdge` |
 
 ## How it works
@@ -51,51 +51,9 @@ asserted     a person said so             (user confirmation)
 
 ### Typed properties
 
-Rules read a resource's configuration from `typed_properties`, a model specific to its type. Each model has a `type_key` equal to the `SERVICE/TYPE` part of the resource ID, and `ResourceProperties` is a union of all of them. Pydantic reads `type_key` and builds the matching model, so a plain dict from a fixture or importer becomes the right class:
+Rules read a resource's configuration from `typed_properties`, a model specific to its type (54 type keys so far), never from the raw `properties` dict. Pydantic picks the model from its `type_key`, which matches the `SERVICE/TYPE` part of the resource ID. The node checks they agree. Missing values come in three kinds (absent, unknown until apply, known empty), and secret values have no field to live in.
 
-```python
-node = ResourceNode.model_validate({
-    "id": "aws://123456789012/ap-south-1/ecs/service/checkout",
-    "provider": "aws", "service": "ecs", "resource_type": "service",
-    "typed_properties": {"type_key": "ecs/service", "service_name": "checkout",
-                         "cluster_arn": "...", "task_definition_arn": "...", "desired_count": 3},
-    "discovered_at": "2026-10-28T12:00:00Z",
-})
-type(node.typed_properties)  # ECSServiceProperties
-```
-
-The node checks that `type_key` matches its own `service/resource_type`.
-
-| `type_key` | Model | What rules use it for |
-|---|---|---|
-| `ecs/cluster` | `ECSClusterProperties` | capacity providers |
-| `ecs/service` | `ECSServiceProperties` | task definition, launch type, desired count, subnets, security groups, target groups, Cloud Map, scaling |
-| `ecs/task-definition` | `ECSTaskDefinitionProperties` | roles, containers: images, secret references, env var names, health checks |
-| `ec2/instance` | `EC2InstanceProperties` | AMI, instance type, subnet, profile, volumes |
-| `autoscaling/group` | `AutoScalingGroupProperties` | sizes, launch template, instance types, subnets, target groups |
-| `ec2/launch-template` | `LaunchTemplateProperties` | AMI (or SSM parameter), profile, block devices and their KMS keys |
-| `ec2/image` | `AMIProperties` | owner, state, backing snapshots and KMS keys |
-| `lambda/function` | `LambdaFunctionProperties` | package type, S3 code or ECR image, layers, role, VPC, env var names, destinations, concurrency |
-| `lambda/event-source-mapping` | `LambdaEventSourceMappingProperties` | source queue/stream, target function, state, failure destination |
-| `rds/db` | `RDSInstanceProperties` | engine, size, Multi-AZ (AZ only), backups and latest restorable time, cross-Region backup Regions, replicas, subnet group, KMS |
-| `rds/cluster` | `AuroraClusterProperties` | members, writer, Global Database role (primary/secondary), replication source, backups, KMS |
-| `rds/snapshot`, `rds/cluster-snapshot` | `RDSSnapshotProperties` | one model for both: source, type, age, source Region of a copy, KMS |
-| `dynamodb/table` | `DynamoDBTableProperties` | PITR, Global Tables version and replica Regions, streams, encryption, size |
-| `dynamodb/backup` | `DynamoDBBackupProperties` | table, type, age, size |
-| `s3/bucket` | `S3BucketProperties` | versioning, replication rules (destination, KMS replication, RTC), encryption, size |
-| `ec2/volume` | `EBSVolumeProperties` | size, type, encryption and KMS, source snapshot, attachments |
-| `ec2/snapshot` | `EBSSnapshotProperties` | source volume, age, encryption and KMS |
-| `elasticfilesystem/file-system` | `EFSFileSystemProperties` | mount targets, KMS, replication destinations and last sync time, replica flag, backups |
-| `backup/backup-vault` | `BackupVaultProperties` | KMS, Vault Lock |
-| `backup/recovery-point` | `BackupRecoveryPointProperties` | protected resource, vault, status, age, cross-Region copy source, KMS |
-
-`type_key` follows the service name in the resource's ARN, so EBS uses `ec2/…` and EFS uses `elasticfilesystem/…`. Volumetric fields (storage size, IOPS, item counts, bucket size) are here because they drive recovery time (data gravity, §42); fast-changing metrics such as replication lag are separate measurements (P0-04e).
-
-**Three kinds of missing.** A field set to None means absent or null in the source. A field named in `unknown_fields` is *unknown*, for example a Terraform plan value only known after apply; rules must treat it as UNKNOWN, never as absent or as the old live value (§15.4). An empty list means known to be empty. Validators use `is_missing(field)` (empty *and* not marked unknown), so a value known only after apply never fails a rule such as "an Image function needs `image_uri`".
-
-**What is never stored.** Secrets appear only as references (`SecretReference.value_from` is an ARN). Environment variables keep only their names. Launch templates record only whether user data exists. The models have no field for these values, so a collector that tried to store one would fail validation (§67).
-
-To add a resource type: write a model in `properties/` with a unique `type_key` literal and add it to the union in `properties/__init__.py`.
+Everything about them, including the full list of types, is on its own page: **[models-properties.md](models-properties.md)**.
 
 ### Edges and groups
 
@@ -155,18 +113,7 @@ stack_state([ResourceState.SURVIVES, ResourceState.UNKNOWN])  # StackState.UNKNO
 | Duration bounds are ordered; unknown bounds stay None | `DurationEstimate` | Unknown is never zero (§30, §49.1) |
 | A mechanism's groups are DR-side | `RecoveryMechanism` | §27.1 |
 | Typed properties match the node's `service/resource_type` | `ResourceNode` | §15.3 |
-| `unknown_fields` names only real configuration fields | `TypedProperties` | Unknown must stay distinct from absent (§15.4) |
-| Secret values, env values and user data have no field to live in | `ecs.py`, `awslambda.py`, `ec2.py` | §67 |
-| Auto Scaling sizes satisfy min ≤ desired ≤ max | `AutoScalingGroupProperties` | AWS rejects anything else; such data means a broken import |
-| A launch template has one image source: AMI ID or SSM parameter | `LaunchTemplateProperties` | §5.3 |
-| An Image function has an image and no S3 package or layers; a Zip function has no image | `LambdaFunctionProperties` | §5.4 |
-| A task definition has at least one container | `ECSTaskDefinitionProperties` | §5.1 |
-| An Aurora instance belongs to a cluster | `RDSInstanceProperties` | Data and recovery settings live on the cluster (§6.2) |
-| A Global Database member has both its global cluster ID and its role | `AuroraClusterProperties` | The secondary is the promotion path (§6.2) |
-| Aurora keeps at least one day of backups | `AuroraClusterProperties` | AWS minimum |
-| A DynamoDB table with replicas names its global-table version | `DynamoDBTableProperties` | §6.3 |
-| S3 replication needs versioning Enabled and a replication role; rule IDs are distinct | `S3BucketProperties` | AWS prerequisites (§7) |
-| A recovery point can't complete before it was created | `BackupRecoveryPointProperties` | Its age bounds RPO (§51) |
+| Rules of each resource type | `properties/` | see [models-properties.md](models-properties.md#rules-they-enforce-and-why) |
 | Combining no states is an error, not SURVIVES | `worst_state` | Missing evidence must never read as healthy (§30) |
 
 Rules that need the whole graph, such as "group members share one dependent" and "an edge is in at most one group", are checked when the graph is built (P0-11).
@@ -179,11 +126,10 @@ Rules that need the whole graph, such as "group members share one dependent" and
 - `test_model_evidence.py`: observation windows, confidence bounds, timezones, unknown fields, immutability.
 - `test_model_edge.py`: bases, user edges, review-state consistency, relationship vocabulary, group rules.
 - `test_model_stack_and_requirement.py`: stack roots, requirements, durations, mechanisms, override payloads.
-- `test_model_properties_compute.py`: union selection by `type_key`, type mismatch, `unknown_fields`, no secret/env/user-data values, ECS/EC2/Lambda rules.
-- `test_model_properties_data.py`: both RDS snapshot keys, Multi-AZ default, Aurora and Global Database rules, DynamoDB replicas, S3 replication prerequisites, recovery-point times.
+- `test_model_properties_*.py`: typed properties; see [models-properties.md](models-properties.md#tests).
 
 ## Not here yet
 
-- Typed properties for messaging, network and supporting services (P0-04d), external/generic resources and quota/metric facts (P0-04e).
+- External and generic resource properties, and quota, availability and metric facts: P0-04e.
 - Evaluation, coverage, cost, verification and drill models: P0-04f.
 - Canonical ID helpers: P0-05.

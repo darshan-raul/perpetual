@@ -7,25 +7,27 @@ the typical RPO is 15 minutes (spec §63.2).
 The `type_key` uses `elasticfilesystem`, the service name in EFS ARNs.
 """
 
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import AwareDatetime, Field
 
-from perpetual.models.common import DomainModel, NonEmptyStr
-from perpetual.models.properties.base import TypedProperties
+from perpetual.models.common import NonEmptyStr
+from perpetual.models.properties.base import PropertyPart, TypedProperties
 
 
-class EFSReplicationDestination(DomainModel):
+class EFSReplicationDestination(PropertyPart):
+    required_fields: ClassVar[frozenset[str]] = frozenset({"status"})
     region: NonEmptyStr
     file_system_id: str | None = None
-    status: Literal["ENABLED", "ENABLING", "DELETING", "ERROR", "PAUSED", "PAUSING"]
+    status: Literal["ENABLED", "ENABLING", "DELETING", "ERROR", "PAUSED", "PAUSING"] | None = None
     last_replicated_at: AwareDatetime | None = None
     """When the last sync finished. Its age bounds RPO."""
 
 
 class EFSFileSystemProperties(TypedProperties):
     type_key: Literal["elasticfilesystem/file-system"] = "elasticfilesystem/file-system"
-    file_system_id: NonEmptyStr
+    required_fields: ClassVar[frozenset[str]] = frozenset({"file_system_id"})
+    file_system_id: NonEmptyStr | None = None
     lifecycle_state: str | None = None
     performance_mode: Literal["generalPurpose", "maxIO"] | None = None
     throughput_mode: Literal["bursting", "provisioned", "elastic"] | None = None
