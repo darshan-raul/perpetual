@@ -12,7 +12,7 @@ Perpetual is a local, single-user tool that decides whether an AWS **stack** (on
 
 ## Status
 
-Milestone M0 PoC in progress: P0-01 to P0-07 are done (repo, CI, import rules, domain models, resource IDs, config, persistence); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
+Milestone M0 PoC in progress: P0-01 to P0-08 are done (repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
 
 ## Commands (from P0-01)
 
@@ -26,6 +26,7 @@ mise run test                # pytest (fixtures + moto); no AWS, no Docker
 mise run check               # lint + typecheck + test
 
 uv run pytest apps/api/tests/simulator/test_rto.py::test_refined_dag -q   # one test
+uv run perpetual fixtures validate                  # check every fixture in fixtures/graphs
 uv run perpetual graph --fixture ecs-broken
 uv run perpetual simulate checkout --fixture ecs-broken --failure region:ap-south-1
 uv run perpetual ui          # API + UI on http://127.0.0.1:8000

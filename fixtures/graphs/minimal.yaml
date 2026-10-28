@@ -1,0 +1,62 @@
+# Smallest useful fixture: one service that needs one database, in one stack.
+# Shows the format; the canonical demo fixtures arrive in P0-13.
+# Provider, account, Region, service and type come from each resource's id;
+# missing discovery and collection times default to captured_at.
+format: perpetual-fixture
+version: 1
+name: minimal
+description: An ECS service that depends on an RDS instance with no DR copy.
+captured_at: 2026-10-28T12:00:00Z
+
+resources:
+  - id: aws://123456789012/ap-south-1/ecs/service/checkout
+    name: checkout
+  - id: aws://123456789012/ap-south-1/rds/db/checkout
+    name: checkout
+
+edges:
+  - id: checkout-needs-db
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout
+    to_resource_id: aws://123456789012/ap-south-1/rds/db/checkout
+    relationship_type: connects_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-tf-db-host
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra-prod/default
+        attribute: container_definitions.environment.DB_HOST
+        confidence: 1.0
+
+mechanisms:
+  - id: db-dr
+    primary_resource_id: aws://123456789012/ap-south-1/rds/db/checkout
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: false
+    confidence: 0.9
+
+stacks:
+  - id: checkout
+    name: checkout
+    criticality: critical
+    root_resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/checkout
+    resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/checkout
+      - aws://123456789012/ap-south-1/rds/db/checkout
+    primary_region: ap-south-1
+    discovery_confidence: 0.9
+
+requirements:
+  - id: checkout-region
+    revision: 1
+    stack_id: checkout
+    failure_scope: region
+    target_rto_seconds: 1800
+    target_rpo_seconds: 300
+    target_region: ap-south-2
