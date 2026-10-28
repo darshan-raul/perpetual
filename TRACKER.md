@@ -6,7 +6,7 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-06**.
+**Current focus:** M0 PoC · next task **P0-07**.
 
 ## Milestones
 
@@ -128,7 +128,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
 - [x] P0-04f Evaluation, coverage, workload/cost, prerequisite, verification and drill models; operator access profile; resolved-observation model (exact | ambiguous, §14.1)
 - [x] P0-05 Canonical resource IDs
-- [ ] P0-06 Typed config + defaults
+- [x] P0-06 Typed config + defaults
 - [ ] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
 - [ ] P0-08 Fixture format v1, loader, validator, JSON Schema
 - [ ] P0-09 Evidence combination + fingerprints
@@ -484,6 +484,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | P0-06 config. **Review confidence threshold defaults to 0.90**: the spec requires one (§23) but gives no number. At 0.90, Terraform references, AWS relationships and mapped CloudTrail calls pass alone; an endpoint match (0.85) or IAM permission (0.80) alone needs review; IAM plus SG path (0.95 combined) passes. Evidence kinds named after the §22 table; `name_only_heuristic` gets its own `heuristics` group (the spec's initial groups don't cover it); Kubernetes, ECS-secret and endpoint references go in `configuration_references`. Freshness, alternative-selection cap (32) and cost units (730 h, 30-day price age) are config too (D12). Out-of-scope defaults are by type key; role-based cases (log buckets, OpenSearch for logs) stay with rule packs. Buffer defaults name duration-catalog keys rather than durations, since the catalog (P1-09) owns durations. Overrides merge mappings and replace lists; changed paths are recorded. `config` keeps its own `FreshnessConfig` because it may not import `models`; a test keeps it in step with `FreshnessPolicy`. PyYAML added. | Every tuning number in YAML (D12); the threshold needs a value before readiness gates exist, and 0.90 keeps single weak signals in review. |
 | 2026-10-28 | P0-05 IDs: `SERVICE/TYPE` in an ID is the type key (so `route53/hostedzone`, not the spec example's `hosted-zone`). Account is 12 digits; Region matches any partition or is `global`; names are lowercase letters, digits and `-`; the identifier is the last part and may contain `/`. Planned IDs put the Terraform address last because `for_each` keys may contain `:`; root ID and workspace may not; a live identifier may not start with `tf:`. External nodes get `external://SERVICE/NAME`, which the spec does not define. `ids` does not decide which services are global, and the node-vs-ID consistency check lives in the fixture validator and graph build because `models` may not import `ids`. | One key per type everywhere; an ID that can't round-trip would break overrides and digests; fixtures need a format for external nodes. |
 | 2026-10-28 | P0-04f shapes. `BufferPolicy` already existed (P0-04a), so it was not redone. Digests are typed `sha256:<64 lowercase hex>`; ID sets use `SortedIds` (repeats rejected, stored sorted). `FreshnessPolicy` has no default values: the §76.1 numbers go into YAML in P0-06. `ScanCoverage` complete needs a completion time, finished pagination and no error codes; denied needs error codes. An exact `ResolvedObservation` must cite resolution evidence. `CostEstimate` totals are computed properties (any unknown line gives an unknown total), and a zero line needs `zero_reason`. `VerificationReport` enforces the §61.1 pass gates and refuses observed READY unless every prerequisite is satisfied; settled prerequisites cite evidence. `ReadinessTier` (§3) added to `status.py`. `OperatorIdentity.replica_regions` is None for unknown, `[]` for declared none. Budget comparison and canonical digests stay in their owning tasks (costing, P9-08). | Each rule turns a spec "never" into a construction error; computed totals can't drift from their lines; keeping config values and digest computation out of `models` follows the layer rules. |
 | 2026-10-28 | P0-04e: `external/dependency` properties are matched on `provider="external"` (user-chosen service names, §15.2); `generic/resource` is allowed only for types without a model (`SPECIFIC_TYPE_KEYS`); CodePipeline records action Regions and providers for the §24.1 in-scope exception. Facts live in `models/facts.py`, separate from resources: `QuotaFact` (headroom None unless limit and usage known), `InstanceTypeOfferingFact` (sorted set), `CapabilityFact` (catalog answers name a version), `MetricFact` (ok/no_data/access_denied/error; only ok has samples, ordered and inside the window). Every fact has account, Region, collection time, coverage ID and `carried_forward`. | Missing data must stay unknown (§28.1, §76.1); facts change faster than configuration and need their own freshness handling; a fallback must not bypass a type's validation. |
@@ -516,6 +517,13 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-06 typed config and defaults
+
+- `perpetual.config`: six YAML sections in `config/defaults/` (evidence, scoring, rto_scope, buffer, freshness, limits) loaded into typed models; `load_config(overrides)` and `load_config_file(path)` merge project overrides, validate the whole, and record `overridden_paths`. Defaults confirmed in the built wheel. PyYAML and its stubs added.
+- 26 new tests; `mise run check`: 9 contracts kept, mypy strict on 78 files, 290 tests. New `docs/code/packages/config.md`; README and architecture updated.
+- **Open question for the user:** review confidence threshold 0.90 (decision log).
+- **Carry-over:** P0-07 (persistence + initial Alembic migration).
 
 ### 2026-10-28 — P0-05 canonical resource IDs
 

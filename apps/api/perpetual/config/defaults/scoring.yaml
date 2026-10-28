@@ -1,0 +1,9 @@
+# Finding severity weights for the descriptive readiness score (spec §31).
+# Scores never decide readiness; the ordered table in §31 does.
+version: "1"
+severity_weights:
+  critical: -25
+  high: -10
+  medium: -5
+  low: -2
+  info: 0

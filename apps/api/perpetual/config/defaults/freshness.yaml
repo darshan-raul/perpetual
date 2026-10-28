@@ -1,0 +1,6 @@
+# Maximum fact ages by family (spec §76.1). Conservative product defaults, not
+# service guarantees. ISO 8601 durations.
+version: "1"
+inventory_max_age: PT24H
+measurement_max_age: PT15M
+primary_dr_max_skew: PT30M

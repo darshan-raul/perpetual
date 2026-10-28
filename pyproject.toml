@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 authors = [{ name = "Darshan Raul" }]
 dependencies = [
     "pydantic>=2.14.1",
+    "pyyaml>=6.0.2",
 ]
 
 [dependency-groups]
@@ -15,6 +16,7 @@ dev = [
     "mypy",
     "pytest",
     "ruff",
+    "types-pyyaml>=6.0.12.20260906",
 ]
 
 [build-system]

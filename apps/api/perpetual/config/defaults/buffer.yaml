@@ -1,0 +1,6 @@
+# Plan buffer defaults (spec §49.2). Handoff and stack-validation durations come
+# from the duration catalog (P1-09) under these keys; a requirement may override.
+version: "1"
+contingency_percent: 10
+handoff_catalog_key: handoff_default
+stack_validation_catalog_key: stack_validation_default

@@ -1,0 +1,41 @@
+# Evidence weights and correlation groups (spec §22).
+# The spec calls these initial, illustrative values; they are tuned later against
+# confirmed and rejected edges.
+version: "1"
+
+# How confidences from different correlation groups combine. Within a group the
+# maximum is taken; across groups this function applies. The evidence package
+# (P0-09) owns the implementations; noisy_or is 1 - product(1 - confidence).
+combination: noisy_or
+
+# Edges on a required path below this confidence must be reviewed before a stack
+# can be READY (spec §23). The spec gives no number; see the TRACKER decision log.
+review_confidence_threshold: 0.90
+
+# Evidence that may be correlated shares a group. Observed sources are
+# independent of configuration sources.
+correlation_groups:
+  - terraform
+  - aws_relationships
+  - network_permissions
+  - iam_permissions
+  - configuration_references
+  - cloudtrail
+  - flow_logs
+  - heuristics
+
+weights:
+  terraform_reference:          {weight: 1.00, group: terraform}
+  aws_resource_relationship:    {weight: 0.95, group: aws_relationships}
+  kubernetes_object_reference:  {weight: 1.00, group: configuration_references}
+  ecs_secret_arn_reference:     {weight: 1.00, group: configuration_references}
+  iam_resource_permission:      {weight: 0.80, group: iam_permissions}
+  security_group_path:          {weight: 0.75, group: network_permissions}
+  network_policy_service_match: {weight: 0.70, group: network_permissions}
+  endpoint_string_match:        {weight: 0.85, group: configuration_references}
+  cloudtrail_mapped_principal:  {weight: 0.95, group: cloudtrail}
+  flow_log_resolved_flow:       {weight: 0.90, group: flow_logs}
+  name_only_heuristic:          {weight: 0.40, group: heuristics}
+  # Too broad to suggest a dependency alone; they only support other evidence.
+  security_group_open_range:    {weight: 0.00, group: network_permissions, supporting_only: true}
+  iam_wildcard_resource:        {weight: 0.00, group: iam_permissions, supporting_only: true}

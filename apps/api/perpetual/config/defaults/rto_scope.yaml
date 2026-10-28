@@ -1,0 +1,18 @@
+# Resource types that are out of RTO scope by default (spec §24.1), by type key.
+# Rule packs propose scope from these; users change it per resource (§23).
+# Role-based cases (a log bucket, an OpenSearch domain used for logs) can't be
+# known from type alone, so rule packs decide those.
+version: "1"
+out_of_scope:
+  monitoring:
+    - aps/workspace
+    - cloudwatch/alarm
+    - cloudwatch/dashboard
+    - grafana/workspace
+    - xray/group
+  logging:
+    - logs/log-group
+  cicd:
+    - codebuild/project
+    - codedeploy/application
+    - codepipeline/pipeline
