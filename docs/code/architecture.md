@@ -15,7 +15,7 @@ Every stage passes **models** to the next. That is why `models` is built first a
 
 | Stage | Package | State |
 |---|---|---|
-| Shared vocabulary | `models` | **Built** (P0-04a to P0-04e): resources with typed properties for all first-slice AWS types plus external/generic fallbacks (57 type keys); quota, capability and metric facts, evidence, edges, groups, overrides, stacks, requirements, mechanisms, status vocabulary |
+| Shared vocabulary | `models` | **Built** (P0-04a to P0-04f): resources with typed properties for all first-slice AWS types plus external/generic fallbacks (57 type keys); quota, capability and metric facts, evidence, edges, groups, overrides, stacks, requirements, mechanisms, status vocabulary; scan coverage, resolved observations, workload/cost, evaluation inputs, verification reports, drills, operator access |
 | Everything else | — | Empty subpackages with a docstring; layer rules already enforced |
 
 ## How the built pieces connect
@@ -54,4 +54,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-04f adds the evaluation, coverage, cost, verification, drill, operator-access and resolved-observation models to `models`. P0-05 to P0-12 add IDs, config, persistence, fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).
+P0-05 to P0-12 add IDs, config, persistence, fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).

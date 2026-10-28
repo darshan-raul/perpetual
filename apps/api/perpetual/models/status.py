@@ -83,3 +83,18 @@ class TargetComparison(StrEnum):
     """Predicted low bound exceeds the target."""
     UNCERTAIN = "UNCERTAIN"
     """The target lies within the predicted range, or the estimate is unknown."""
+
+
+class ReadinessTier(StrEnum):
+    """How strong the evidence behind a result is (spec §3, "Readiness tiers").
+
+    A label on the evidence, not an extra state: observed READY is CONFIGURED,
+    not PROVEN. Reports and the UI show which tier a stack has reached.
+    """
+
+    DESIGN_VERIFIED = "DESIGN_VERIFIED"
+    """The proposed change meets targets on the planned graph (spec §61.1)."""
+    CONFIGURED = "CONFIGURED"
+    """Deployed and observed: a fresh scan shows the DR design in place (spec §31)."""
+    PROVEN = "PROVEN"
+    """A drill, ARC execution report or fault-injection test measured recovery (§53)."""

@@ -1,6 +1,27 @@
 """Pydantic domain models, enums and the status vocabulary (spec §15, §30.1). No I/O."""
 
-from perpetual.models.common import Confidence, DomainModel, NonEmptyStr
+from perpetual.models.common import Confidence, Digest, DomainModel, NonEmptyStr, SortedIds
+from perpetual.models.cost import (
+    CostEstimate,
+    CostKind,
+    CostLineItem,
+    CostScope,
+    QuantityKind,
+    QuantitySource,
+    WorkloadProfile,
+    WorkloadQuantity,
+)
+from perpetual.models.coverage import (
+    CoverageStatus,
+    FreshnessPolicy,
+    Presence,
+    ScanCoverage,
+)
+from perpetual.models.drill import (
+    DRDrill,
+    DrillSource,
+    DrillStatus,
+)
 from perpetual.models.edge import (
     Criticality,
     DependencyEdge,
@@ -10,6 +31,14 @@ from perpetual.models.edge import (
     GroupScope,
     RelationshipType,
     ReviewState,
+)
+from perpetual.models.evaluation import (
+    CompanionDesign,
+    EvaluationInput,
+    IaCBaseline,
+    IaCRoot,
+    InputKind,
+    InputRef,
 )
 from perpetual.models.evidence import Basis, Evidence, SourceType
 from perpetual.models.facts import (
@@ -22,6 +51,17 @@ from perpetual.models.facts import (
     QuotaFact,
 )
 from perpetual.models.mechanism import MechanismKind, RecoveryMechanism
+from perpetual.models.observation import (
+    Attribution,
+    ResolvedObservation,
+)
+from perpetual.models.operator_access import (
+    BreakGlass,
+    IdentitySource,
+    NetworkPath,
+    OperatorAccessProfile,
+    OperatorIdentity,
+)
 from perpetual.models.override import (
     DrPosture,
     GraphOverride,
@@ -48,52 +88,98 @@ from perpetual.models.stack import (
 )
 from perpetual.models.status import (
     Readiness,
+    ReadinessTier,
     ResourceState,
     StackState,
     TargetComparison,
     stack_state,
     worst_state,
 )
+from perpetual.models.verification import (
+    CheckResult,
+    DeploymentPrerequisite,
+    DesignVerification,
+    PrerequisiteKind,
+    PrerequisiteStatus,
+    StaticChecks,
+    VerificationMode,
+    VerificationReport,
+    combined_prerequisite_status,
+)
 
 __all__ = [
+    "Attribution",
     "Basis",
+    "BreakGlass",
     "BufferPolicy",
     "CapabilityFact",
     "CapabilityStatus",
+    "CheckResult",
+    "CompanionDesign",
     "Confidence",
+    "CostEstimate",
+    "CostKind",
+    "CostLineItem",
+    "CostScope",
+    "CoverageStatus",
     "Criticality",
+    "DRDrill",
     "DRStrategy",
     "DependencyEdge",
     "DependencyGroup",
+    "DeploymentPrerequisite",
+    "DesignVerification",
+    "Digest",
     "DomainModel",
     "DrPosture",
+    "DrillSource",
+    "DrillStatus",
     "DurationEstimate",
     "EdgeOrigin",
     "EstimateConfidence",
+    "EvaluationInput",
     "Evidence",
     "FactRecord",
     "FailureScope",
+    "FreshnessPolicy",
     "GraphOverride",
     "GroupMode",
     "GroupScope",
+    "IaCBaseline",
+    "IaCRoot",
+    "IdentitySource",
+    "InputKind",
+    "InputRef",
     "InstanceTypeOfferingFact",
     "MechanismKind",
     "MetricFact",
     "MetricSample",
+    "NetworkPath",
     "NodeKind",
     "NonEmptyStr",
+    "OperatorAccessProfile",
+    "OperatorIdentity",
     "OverrideKind",
     "OverrideStatus",
+    "PrerequisiteKind",
+    "PrerequisiteStatus",
+    "Presence",
+    "QuantityKind",
+    "QuantitySource",
     "QuotaFact",
     "Readiness",
+    "ReadinessTier",
     "RecoveryMechanism",
     "RecoveryRequirement",
     "RelationshipType",
+    "ResolvedObservation",
     "ResourceNode",
     "ResourceState",
     "ReviewState",
     "RtoScope",
+    "ScanCoverage",
     "ScopeSource",
+    "SortedIds",
     "SourceReference",
     "SourceType",
     "Stack",
@@ -101,7 +187,13 @@ __all__ = [
     "StackResource",
     "StackService",
     "StackState",
+    "StaticChecks",
     "TargetComparison",
+    "VerificationMode",
+    "VerificationReport",
+    "WorkloadProfile",
+    "WorkloadQuantity",
+    "combined_prerequisite_status",
     "stack_state",
     "worst_state",
 ]
