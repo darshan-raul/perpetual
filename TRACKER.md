@@ -6,7 +6,7 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-05**.
+**Current focus:** M0 PoC · next task **P0-06**.
 
 ## Milestones
 
@@ -127,7 +127,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-04d Typed properties: messaging, network, edge and supporting services
 - [x] P0-04e Out-of-scope, external and generic properties; quota/availability/metric facts
 - [x] P0-04f Evaluation, coverage, workload/cost, prerequisite, verification and drill models; operator access profile; resolved-observation model (exact | ambiguous, §14.1)
-- [ ] P0-05 Canonical resource IDs
+- [x] P0-05 Canonical resource IDs
 - [ ] P0-06 Typed config + defaults
 - [ ] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
 - [ ] P0-08 Fixture format v1, loader, validator, JSON Schema
@@ -484,6 +484,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-28 | P0-05 IDs: `SERVICE/TYPE` in an ID is the type key (so `route53/hostedzone`, not the spec example's `hosted-zone`). Account is 12 digits; Region matches any partition or is `global`; names are lowercase letters, digits and `-`; the identifier is the last part and may contain `/`. Planned IDs put the Terraform address last because `for_each` keys may contain `:`; root ID and workspace may not; a live identifier may not start with `tf:`. External nodes get `external://SERVICE/NAME`, which the spec does not define. `ids` does not decide which services are global, and the node-vs-ID consistency check lives in the fixture validator and graph build because `models` may not import `ids`. | One key per type everywhere; an ID that can't round-trip would break overrides and digests; fixtures need a format for external nodes. |
 | 2026-10-28 | P0-04f shapes. `BufferPolicy` already existed (P0-04a), so it was not redone. Digests are typed `sha256:<64 lowercase hex>`; ID sets use `SortedIds` (repeats rejected, stored sorted). `FreshnessPolicy` has no default values: the §76.1 numbers go into YAML in P0-06. `ScanCoverage` complete needs a completion time, finished pagination and no error codes; denied needs error codes. An exact `ResolvedObservation` must cite resolution evidence. `CostEstimate` totals are computed properties (any unknown line gives an unknown total), and a zero line needs `zero_reason`. `VerificationReport` enforces the §61.1 pass gates and refuses observed READY unless every prerequisite is satisfied; settled prerequisites cite evidence. `ReadinessTier` (§3) added to `status.py`. `OperatorIdentity.replica_regions` is None for unknown, `[]` for declared none. Budget comparison and canonical digests stay in their owning tasks (costing, P9-08). | Each rule turns a spec "never" into a construction error; computed totals can't drift from their lines; keeping config values and digest computation out of `models` follows the layer rules. |
 | 2026-10-28 | P0-04e: `external/dependency` properties are matched on `provider="external"` (user-chosen service names, §15.2); `generic/resource` is allowed only for types without a model (`SPECIFIC_TYPE_KEYS`); CodePipeline records action Regions and providers for the §24.1 in-scope exception. Facts live in `models/facts.py`, separate from resources: `QuotaFact` (headroom None unless limit and usage known), `InstanceTypeOfferingFact` (sorted set), `CapabilityFact` (catalog answers name a version), `MetricFact` (ok/no_data/access_denied/error; only ok has samples, ordered and inside the window). Every fact has account, Region, collection time, coverage ID and `carried_forward`. | Missing data must stay unknown (§28.1, §76.1); facts change faster than configuration and need their own freshness handling; a fallback must not bypass a type's validation. |
 | 2026-10-28 | Fixes from an external review of P0-04a–d. (1) `is_missing()` treats None and empty strings/collections as missing, never 0 or False (the review's `is None` fix would let an HTTPS listener with `[]` certificates pass). (2) AWS-assigned values (IDs, ARNs, URIs, computed numbers) are declared in `required_fields`, typed nullable, and must be present or listed in `unknown_fields`; nested parts inherit `PropertyPart`, and an unknown nested value marks the parent field unknown (one level deep). (3) Every "set together" pairing check skips when a side is unknown (Aurora global membership, SQS redrive, KMS multi-Region role, Route 53 failover role), and S3's versioning check respects unknown versioning. (4) DynamoDB replicas are structured (`DynamoDBReplica`: Region, status, KMS key, table-class override). (5) `unknown_fields` is sorted and rejects repeats. (6) The resolved-observation model (§14.1) moves to P0-04f so persistence (P0-07) can store it; P2b-09 keeps the review flow. | §15.4 forbids inventing ARNs for planned resources, and the Terraform importer needs this before P1b; stable hashes need normalized lists (§56.3); per-replica KMS decides whether a replica can be read in DR. |
@@ -515,6 +516,12 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-10-28 — P0-05 canonical resource IDs
+
+- `perpetual.ids`: build (`aws_id`, `global_id`, `planned_id`, `external_id`), parse (`parse`, `parse_aws`, `is_valid`) into frozen `AwsResourceId` / `ExternalResourceId` with `PlannedAddress`; strict validation and exact round-trip.
+- 26 new tests; `mise run check`: lint and contracts clean, mypy strict on 75 files, 264 tests. New `docs/code/packages/ids.md`; README, architecture and models page updated.
+- **Carry-over:** P0-06 (typed config + defaults).
 
 ### 2026-10-28 — P0-04f evaluation-side models
 

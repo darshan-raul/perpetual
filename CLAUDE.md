@@ -12,7 +12,7 @@ Perpetual is a local, single-user tool that decides whether an AWS **stack** (on
 
 ## Status
 
-Milestone M0 PoC in progress: P0-01 to P0-04f are done (repo, CI, import rules, domain models); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
+Milestone M0 PoC in progress: P0-01 to P0-05 are done (repo, CI, import rules, domain models, resource IDs); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
 
 ## Commands (from P0-01)
 

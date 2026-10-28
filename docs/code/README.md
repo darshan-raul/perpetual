@@ -19,7 +19,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 |---|---|---|---|
 | `models` | Domain models, enums, status vocabulary. No I/O. | Core graph and stack models (P0-04a); typed properties for compute, data/storage, messaging, network, edge, supporting services, ARC and Identity Center (P0-04b to P0-04d); external/generic fallbacks and quota, capability and metric facts (P0-04e); coverage, resolved observations, workload/cost, evaluation inputs, verification, drills and operator access (P0-04f) | [packages/models.md](packages/models.md), [models-properties.md](packages/models-properties.md) |
 | `config` | Typed configuration and versioned defaults | stub | — |
-| `ids` | Canonical resource IDs | stub | — |
+| `ids` | Canonical resource IDs | Live, global, planned (`tf:`) and external IDs: build, parse, validate (P0-05) | [packages/ids.md](packages/ids.md) |
 | `fixtures` | Fixture format, loader, validator | stub | — |
 | `persistence` | SQLAlchemy models, repositories, migrations | stub | — |
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |

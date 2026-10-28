@@ -46,7 +46,7 @@ Timestamps use `AwareDatetime`, so a time without a timezone is rejected.
 
 ### Resources and evidence
 
-A `ResourceNode` is one resource, whatever source it came from. Its `id` is the canonical form `aws://ACCOUNT/REGION/SERVICE/TYPE/IDENTIFIER` (helpers for building and parsing it arrive in P0-05). `properties` is the raw store, which rules never read; `typed_properties` holds the typed configuration (next section). `planned=True` marks a resource that exists only in a Terraform plan.
+A `ResourceNode` is one resource, whatever source it came from. Its `id` is the canonical form `aws://ACCOUNT/REGION/SERVICE/TYPE/IDENTIFIER` (built and parsed only through [`ids`](ids.md)). `properties` is the raw store, which rules never read; `typed_properties` holds the typed configuration (next section). `planned=True` marks a resource that exists only in a Terraform plan.
 
 `Evidence` is one traceable fact. For dependency evidence, `basis` says what kind of fact it is:
 
@@ -213,6 +213,5 @@ Rules that need the whole graph, such as "group members share one dependent" and
 
 ## Not here yet
 
-- Canonical ID helpers: P0-05.
 - Freshness and coverage values (YAML config): P0-06.
 - Canonical digests over these models: P9-08.
