@@ -16,6 +16,9 @@ Every stage passes **models** to the next. That is why `models` is built first a
 | Stage | Package | State |
 |---|---|---|
 | Shared vocabulary | `models` | **Built** (P0-04a to P0-04f): resources with typed properties for all first-slice AWS types plus external/generic fallbacks (57 type keys); quota, capability and metric facts, evidence, edges, groups, overrides, stacks, requirements, mechanisms, status vocabulary; scan coverage, resolved observations, workload/cost, evaluation inputs, verification reports, drills, operator access |
+| Resource IDs | `ids` | **Built** (P0-05): build and parse live, global, planned (`tf:`) and external IDs |
+| Configuration | `config` | **Built** (P0-06): versioned YAML defaults (evidence weights, review threshold, scoring, RTO scope, buffer, freshness, limits) with project overrides |
+| Storage | `persistence` | **Built** (P0-07): 17 tables, project-scoped repository, frozen published snapshots, initial Alembic migration tested on SQLite and PostgreSQL |
 | Everything else | — | Empty subpackages with a docstring; layer rules already enforced |
 
 ## How the built pieces connect
@@ -54,4 +57,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-07 to P0-12 add persistence, fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).
+`persistence` saves and loads `models` objects: lookup columns for queries plus the full model as JSON, validated again on load. P0-08 to P0-12 add fixtures, evidence combination, overrides, the graph and the first CLI command, which will be the first [flow](README.md#flows).

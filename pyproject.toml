@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 authors = [{ name = "Darshan Raul" }]
 dependencies = [
+    "alembic>=1.14",
     "pydantic>=2.14.1",
     "pyyaml>=6.0.2",
+    "sqlalchemy>=2.0.36",
 ]
 
 [dependency-groups]

@@ -21,7 +21,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `config` | Typed config loading + versioned defaults | Evidence weights and groups, review threshold, scoring, RTO-scope defaults, buffer, freshness, limits and cost units, with project overrides (P0-06) | [packages/config.md](packages/config.md) |
 | `ids` | Canonical resource IDs | Live, global, planned (`tf:`) and external IDs: build, parse, validate (P0-05) | [packages/ids.md](packages/ids.md) |
 | `fixtures` | Fixture format, loader, validator | stub | — |
-| `persistence` | SQLAlchemy models, repositories, migrations | stub | — |
+| `persistence` | SQLAlchemy models, repositories, migrations | 17 tables (projects, scans, snapshots, coverage, resources and versions, evidence, edges, groups, observations, mechanisms, stacks, overrides, evaluation inputs), `ProjectRepository`, initial migration (P0-07) | [packages/persistence.md](packages/persistence.md) |
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
