@@ -515,6 +515,13 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
 
+### 2026-10-28 — Project site (`site/`)
+
+- Added the Astro marketing and docs site in `site/` (outside the Python package; excluded from ruff, build output git-ignored). Not part of `mise run check` yet.
+- Content corrected to match the project's state: the setup command is clone + `mise install` (not on PyPI until v1.0), CLI commands are marked as planned, the nav badge says M0, the roadmap shows P0-04e done, and the example RTO cites spec §109. Images compressed (hero 1.7 MB → 59 KB WebP; logo trimmed to 128 px), and the mobile hero overflow is fixed.
+- Follow-ups, not scheduled: move the docs from HTML strings in `siteData.ts` to Markdown content collections; merge `global.css` and `cinematic.css`; add a site build to CI; confirm the `perpetual.sh` domain.
+- **Carry-over:** P0-04f (unchanged).
+
 ### 2026-10-28 — P0-04e fallbacks and facts
 
 - `properties/other.py`: external, generic and CodePipeline properties; `SPECIFIC_TYPE_KEYS`; node check handles the two fallbacks. `models/facts.py`: quota, instance-type offering, capability and metric facts with `FactRecord`.

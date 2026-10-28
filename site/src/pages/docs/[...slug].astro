@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { DOC_ARTICLES, DOC_CATEGORIES, type DocArticle } from '../../data/siteData';
+
+export function getStaticPaths() {
+  return DOC_ARTICLES.map((article, idx) => ({
+    params: { slug: article.slug },
+    props: {
+      article,
+      prev: idx > 0 ? DOC_ARTICLES[idx - 1] : null,
+      next: idx < DOC_ARTICLES.length - 1 ? DOC_ARTICLES[idx + 1] : null,
+    },
+  }));
+}
+
+interface Props {
+  article: DocArticle;
+  prev: DocArticle | null;
+  next: DocArticle | null;
+}
+
+const { article, prev, next } = Astro.props;
+---
+
+<BaseLayout title={`${article.title} — Perpetual Docs`} description={article.description}>
+  <main id="main-content" class="doc-page">
+    <div class="wrap">
+      <!-- Clean Breadcrumb Row -->
+      <nav class="breadcrumbs" aria-label="Breadcrumb" style="justify-content:space-between;margin-bottom:28px;">
+        <div class="crumb-trail">
+          <a href="/">perpetual</a>
+          <span class="crumb-sep">/</span>
+          <a href="/docs">docs</a>
+          <span class="crumb-sep">/</span>
+          <a href={`/docs#${article.category}`} class="crumb-cat">{article.categoryTitle}</a>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">{article.title}</span>
+        </div>
+        <a href="/architecture" class="crumb-report">
+          <span>§ Spec Index ({article.specRef}) &rarr;</span>
+        </a>
+      </nav>
+
+      <div class="doc-layout">
+        <!-- Sticky Left Sidebar -->
+        <aside class="doc-sidebar" aria-label="Documentation Navigation">
+          {DOC_CATEGORIES.map((cat) => {
+            const items = DOC_ARTICLES.filter((a) => a.category === cat.id);
+            return (
+              <div class="doc-side-group">
+                <div class="doc-side-title">{cat.title}</div>
+                {items.map((item) => (
+                  <a
+                    href={`/docs/${item.slug}`}
+                    class={`doc-side-link ${item.slug === article.slug ? 'active' : ''}`}
+                  >
+                    {item.title}
+                  </a>
+                ))}
+              </div>
+            );
+          })}
+        </aside>
+
+        <!-- Main Article Prose -->
+        <article class="prose">
+          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">
+            <span class="mark mark--write">{article.specRef}</span>
+            <span class="lbl">{article.categoryTitle}</span>
+          </div>
+          <h1>{article.title}</h1>
+          <p style="font-size:14.5px;color:var(--txt);border-bottom:1px solid var(--bdr);padding-bottom:18px;margin-bottom:28px;">
+            {article.description}
+          </p>
+
+          {article.sections.map((sec) => (
+            <section>
+              <h2>{sec.heading}</h2>
+              <Fragment set:html={sec.bodyHtml} />
+            </section>
+          ))}
+
+          <!-- Prev / Next Navigation -->
+          <div class="doc-nav-foot">
+            {prev ? (
+              <a href={`/docs/${prev.slug}`} class="doc-nav-card prev">
+                <span class="doc-nav-dir">&larr; Previous</span>
+                <span class="doc-nav-title">{prev.title}</span>
+              </a>
+            ) : (
+              <div></div>
+            )}
+            {next ? (
+              <a href={`/docs/${next.slug}`} class="doc-nav-card next">
+                <span class="doc-nav-dir">Next &rarr;</span>
+                <span class="doc-nav-title">{next.title}</span>
+              </a>
+            ) : (
+              <a href="/architecture" class="doc-nav-card next">
+                <span class="doc-nav-dir">Explore Architecture &rarr;</span>
+                <span class="doc-nav-title">System Pipeline &amp; §1–§109 Index</span>
+              </a>
+            )}
+          </div>
+        </article>
+      </div>
+    </div>
+  </main>
+</BaseLayout>

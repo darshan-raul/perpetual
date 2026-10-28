@@ -11,9 +11,11 @@ dist/
 .coverage
 htmlcov/
 
-# Node (web UI, from P1b-07)
+# Node (web UI, from P1b-07, and site/)
 node_modules/
 apps/web/dist/
+site/.astro/
+site/dist/
 
 # Built UI copied into the package at build time (IMPL_PLAN D5)
 apps/api/perpetual/web/static/

@@ -1,0 +1,276 @@
+---
+import { SEARCH_INDEX } from '../data/siteData';
+---
+
+<div id="search-modal" class="search-modal" role="dialog" aria-modal="true" aria-label="Site Search" hidden>
+  <div class="search-backdrop" data-close-search></div>
+  <div class="search-box">
+    <!-- Header with prompt and input -->
+    <div class="search-header">
+      <span class="search-prompt" aria-hidden="true">&gt;</span>
+      <input
+        aria-label="Search documentation"
+        type="search"
+        id="search-input"
+        class="search-input"
+        placeholder="Search specification, DR rule packs, CLI commands, AWS services..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+      />
+      <button class="search-close-btn" data-close-search aria-label="Close search (Esc)" type="button">
+        <kbd class="key-hint">ESC</kbd>
+      </button>
+    </div>
+
+    <!-- Modal Content Body -->
+    <div class="search-body">
+      <!-- Default state: Quick navigation shortcuts -->
+      <div id="search-empty" class="search-empty" style="padding: 8px 16px;">
+        <div class="empty-header" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.1em;">
+          <span class="empty-prompt" style="color:var(--amber);font-weight:700;">//</span>
+          <span class="empty-title">Core Specification &amp; Guides</span>
+        </div>
+        <div class="quick-links" style="display:flex;flex-direction:column;gap:6px;">
+          <a href="/docs/getting-started/overview" class="quick-link search-result-item">
+            <div class="result-top">
+              <div class="result-badges">
+                <span class="result-badge badge-docs">Docs</span>
+                <span class="result-cat">spec §1–§4</span>
+              </div>
+              <span class="result-url">/docs/getting-started/overview</span>
+            </div>
+            <div class="result-title-row">
+              <span class="result-title">Product Overview &amp; Why Stack-Level DR Matters</span>
+              <span class="result-enter-icon">&crarr;</span>
+            </div>
+          </a>
+          <a href="/docs/getting-started/quickstart" class="quick-link search-result-item">
+            <div class="result-top">
+              <div class="result-badges">
+                <span class="result-badge badge-docs">CLI</span>
+                <span class="result-cat">spec §71–§79</span>
+              </div>
+              <span class="result-url">/docs/getting-started/quickstart</span>
+            </div>
+            <div class="result-title-row">
+              <span class="result-title">Installation, Local Web UI &amp; CLI Workflow</span>
+              <span class="result-enter-icon">&crarr;</span>
+            </div>
+          </a>
+          <a href="/architecture" class="quick-link search-result-item">
+            <div class="result-top">
+              <div class="result-badges">
+                <span class="result-badge badge-blog">Spec</span>
+                <span class="result-cat">§1–§109 index</span>
+              </div>
+              <span class="result-url">/architecture</span>
+            </div>
+            <div class="result-title-row">
+              <span class="result-title">System Architecture, Pipeline &amp; Non-Negotiable Invariants</span>
+              <span class="result-enter-icon">&crarr;</span>
+            </div>
+          </a>
+          <a href="/docs/engine/iac-and-runbooks" class="quick-link search-result-item">
+            <div class="result-top">
+              <div class="result-badges">
+                <span class="result-badge badge-docs">Engine</span>
+                <span class="result-cat">spec §61–§64</span>
+              </div>
+              <span class="result-url">/docs/engine/iac-and-runbooks</span>
+            </div>
+            <div class="result-title-row">
+              <span class="result-title">Isolated IaC Transformation, 4-Stage Verification &amp; Runbooks</span>
+              <span class="result-enter-icon">&crarr;</span>
+            </div>
+          </a>
+          <a href="/scope" class="quick-link search-result-item">
+            <div class="result-top">
+              <div class="result-badges">
+                <span class="result-badge badge-changelog">AWS</span>
+                <span class="result-cat">25+ services</span>
+              </div>
+              <span class="result-url">/scope</span>
+            </div>
+            <div class="result-title-row">
+              <span class="result-title">AWS Service Scope Matrix &amp; checkout Stack Benchmark</span>
+              <span class="result-enter-icon">&crarr;</span>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- No Results State -->
+      <div id="search-no-results" class="search-state" hidden>
+        <p class="no-res-msg">No results matching "<span id="no-match-term"></span>"</p>
+        <p class="no-res-hint">
+          Try searching for keywords like <code>rto</code>, <code>eks</code>, <code>terraform</code>, <code>simulator</code>, <code>kms</code>, or <code>worktree</code>.
+        </p>
+      </div>
+
+      <!-- Live Search Results List -->
+      <ul id="search-results-list" class="search-results-list" role="listbox" hidden></ul>
+    </div>
+
+    <!-- Modal Footer with command keys and count -->
+    <div class="search-footer">
+      <div class="footer-nav-hints">
+        <span class="hint-item"><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span>
+        <span class="hint-item"><kbd>&crarr;</kbd> select</span>
+        <span class="hint-item"><kbd>esc</kbd> close</span>
+      </div>
+      <div id="search-count" class="search-count">perpetual search · spec rev 4</div>
+    </div>
+  </div>
+</div>
+
+<script is:inline define:vars={{ SEARCH_INDEX }}>
+  (() => {
+    const modal = document.getElementById('search-modal');
+    const input = document.getElementById('search-input');
+    const emptyBox = document.getElementById('search-empty');
+    const noResBox = document.getElementById('search-no-results');
+    const noMatchTerm = document.getElementById('no-match-term');
+    const listEl = document.getElementById('search-results-list');
+    const countEl = document.getElementById('search-count');
+    if (!modal || !input || !listEl) return;
+
+    let previousFocus = null;
+    let selectedIdx = 0;
+    let currentResults = [];
+
+    function openSearch() {
+      previousFocus = document.activeElement;
+      modal.hidden = false;
+      document.body.style.overflow = "hidden";
+      input.value = '';
+      renderResults('');
+      setTimeout(() => input.focus(), 10);
+    }
+
+    function closeSearch() {
+      modal.hidden = true;
+      document.body.style.overflow = "";
+      previousFocus?.focus();
+    }
+
+    function highlightText(text, query) {
+      if (!query) return text;
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return text.replace(new RegExp(`(${escaped})`, 'gi'), '<span class="search-highlight">$1</span>');
+    }
+
+    function renderResults(rawQuery) {
+      const q = rawQuery.trim().toLowerCase();
+      if (!q) {
+        emptyBox.hidden = false;
+        noResBox.hidden = true;
+        listEl.hidden = true;
+        countEl.textContent = 'perpetual search · spec rev 4';
+        return;
+      }
+
+      emptyBox.hidden = true;
+      currentResults = SEARCH_INDEX.filter((item) => {
+        const hay = `${item.title} ${item.description} ${item.keywords} ${item.category}`.toLowerCase();
+        return q.split(/\s+/).every((tok) => hay.includes(tok));
+      });
+
+      if (currentResults.length === 0) {
+        noResBox.hidden = false;
+        listEl.hidden = true;
+        if (noMatchTerm) noMatchTerm.textContent = rawQuery;
+        countEl.textContent = '0 matches';
+        return;
+      }
+
+      noResBox.hidden = true;
+      listEl.hidden = false;
+      selectedIdx = 0;
+      countEl.textContent = `${currentResults.length} result${currentResults.length === 1 ? '' : 's'}`;
+
+      listEl.innerHTML = currentResults
+        .map((item, idx) => {
+          const badgeClass =
+            item.badge === 'Docs'
+              ? 'badge-docs'
+              : item.badge === 'Spec'
+              ? 'badge-blog'
+              : 'badge-changelog';
+          return `
+            <li role="option" aria-selected="${idx === 0}">
+              <a href="${item.url}" class="search-result-item ${idx === 0 ? 'selected' : ''}" data-result-idx="${idx}">
+                <div class="result-top">
+                  <div class="result-badges">
+                    <span class="result-badge ${badgeClass}">${item.badge}</span>
+                    <span class="result-cat">${item.category}</span>
+                  </div>
+                  <span class="result-url">${item.url}</span>
+                </div>
+                <div class="result-title-row">
+                  <span class="result-title">${highlightText(item.title, q)}</span>
+                  <span class="result-enter-icon">&crarr;</span>
+                </div>
+                <p class="result-desc">${highlightText(item.description, q)}</p>
+              </a>
+            </li>
+          `;
+        })
+        .join('');
+    }
+
+    function updateSelection(newIdx) {
+      const items = listEl.querySelectorAll('.search-result-item');
+      if (!items.length) return;
+      selectedIdx = (newIdx + items.length) % items.length;
+      items.forEach((el, i) => {
+        el.classList.toggle('selected', i === selectedIdx);
+        el.closest('[role=option]')?.setAttribute('aria-selected', String(i === selectedIdx));
+      });
+      items[selectedIdx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    document.querySelectorAll('[data-open-search]').forEach((btn) => {
+      btn.addEventListener('click', openSearch);
+    });
+    document.querySelectorAll('[data-close-search]').forEach((btn) => {
+      btn.addEventListener('click', closeSearch);
+    });
+
+    input.addEventListener('input', (e) => {
+      renderResults(e.target.value);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (modal.hidden) openSearch();
+        else closeSearch();
+      } else if (!modal.hidden) {
+        if (e.key === 'Tab') {
+          const focusable = [...modal.querySelectorAll('a[href], button, input')].filter(el => el.getClientRects().length);
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSearch();
+        } else if (e.target === input && e.key === 'ArrowDown') {
+          e.preventDefault();
+          updateSelection(selectedIdx + 1);
+        } else if (e.target === input && e.key === 'ArrowUp') {
+          e.preventDefault();
+          updateSelection(selectedIdx - 1);
+        } else if (e.target === input && e.key === 'Enter' && !listEl.hidden) {
+          const active = listEl.querySelector('.search-result-item.selected');
+          if (active && active.getAttribute('href')) {
+            e.preventDefault();
+            window.location.href = active.getAttribute('href');
+          }
+        }
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,181 @@
+---
+import '../styles/global.css';
+import '../styles/cinematic.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import SearchModal from '../components/SearchModal.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Perpetual: Local AWS Disaster Recovery Readiness, Outage Simulator & IaC Compiler',
+  description = 'Perpetual is a local AWS disaster recovery (DR) tool designed to find what would break during a Region outage and propose engine-verified fixes in your own Terraform and Kubernetes manifests.',
+} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/assets/favicon.png" />
+    <meta name="theme-color" content="#050b14" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL("/assets/og-image.jpg", Astro.site)} />
+
+    <!-- Cinematic display type, readable body text, and monospace code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;450;500;550;600;650;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem('perpetual-theme-cinematic');
+          const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="atmos" aria-hidden="true">
+      <div class="atmos-glow"></div>
+      <div class="atmos-grid"></div>
+      <div class="atmos-scan"></div>
+    </div>
+
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <Nav />
+    <slot />
+    <Footer />
+    <SearchModal />
+
+    <script is:inline>
+      (() => {
+        // Platform modifier detection (Mac vs Win/Linux)
+        const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+        if (isMac) {
+          document.querySelectorAll('.mod-mac').forEach((el) => (el.style.display = 'inline'));
+          document.querySelectorAll('.mod-win').forEach((el) => (el.style.display = 'none'));
+          document.querySelectorAll('.mod-key').forEach((el) => (el.textContent = '⌘'));
+          document.querySelectorAll('.alt-key').forEach((el) => (el.textContent = '⌥'));
+        }
+
+        // Theme toggle
+        const themeBtn = document.getElementById('theme-toggle');
+        if (themeBtn) {
+          themeBtn.addEventListener('click', () => {
+            const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+            const next = cur === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            try {
+              localStorage.setItem('perpetual-theme-cinematic', next);
+            } catch (e) {}
+          });
+        }
+
+        // Copyline buttons
+        document.querySelectorAll('.copyline').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const text = btn.getAttribute('data-copy') || btn.innerText.trim();
+            try {
+              await navigator.clipboard.writeText(text);
+              btn.classList.add('copied');
+              setTimeout(() => btn.classList.remove('copied'), 1800);
+            } catch (e) {}
+          });
+        });
+
+        // Reveal on scroll
+        const reveals = document.querySelectorAll('.reveal');
+        if ('IntersectionObserver' in window) {
+          const io = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                  entry.target.classList.add('in');
+                  io.unobserve(entry.target);
+                }
+              });
+            },
+            { threshold: 0.08 }
+          );
+          reveals.forEach((el) => io.observe(el));
+        } else {
+          reveals.forEach((el) => el.classList.add('in'));
+        }
+
+        // Scroll progress bar
+        const prog = document.getElementById('nav-progress');
+        if (prog) {
+          const onScroll = () => {
+            const max = document.documentElement.scrollHeight - window.innerHeight;
+            const ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+            prog.style.transform = `scaleX(${ratio})`;
+          };
+          window.addEventListener('scroll', onScroll, { passive: true });
+          onScroll();
+        }
+
+        // Code block header + copy button injection for .prose pre
+        document.querySelectorAll('.prose pre').forEach((pre) => {
+          if (pre.parentElement?.classList.contains('code-block')) return;
+          const codeEl = pre.querySelector('code');
+          const langMatch = codeEl?.className.match(/language-([a-z0-9_-]+)/i);
+          const lang = langMatch ? langMatch[1].toUpperCase() : 'SHELL';
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'code-block';
+          const hdr = document.createElement('div');
+          hdr.className = 'code-block-header';
+          hdr.innerHTML = `
+            <div class="code-block-left">
+              <span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="code-lang">${lang}</span>
+            </div>
+            <button class="code-copy-btn" type="button" aria-label="Copy code to clipboard">
+              <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <svg class="check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span class="copy-label">Copy</span>
+            </button>
+          `;
+          const copyBtn = hdr.querySelector('.code-copy-btn');
+          const copyLbl = hdr.querySelector('.copy-label');
+          copyBtn?.addEventListener('click', async () => {
+            const raw = (codeEl ? codeEl.innerText : pre.innerText).replace(/\n$/, '');
+            try {
+              await navigator.clipboard.writeText(raw);
+              copyBtn.classList.add('copied');
+              if (copyLbl) copyLbl.textContent = 'Copied!';
+              setTimeout(() => {
+                copyBtn.classList.remove('copied');
+                if (copyLbl) copyLbl.textContent = 'Copy';
+              }, 1800);
+            } catch (e) {}
+          });
+          pre.parentNode?.insertBefore(wrapper, pre);
+          wrapper.appendChild(hdr);
+          wrapper.appendChild(pre);
+        });
+      })();
+    </script>
+  </body>
+</html>

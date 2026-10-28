@@ -1,0 +1,277 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const specParts = [
+  {
+    part: 'Part I',
+    doc: '01-product-and-aws-scope.md',
+    sections: '§1–§8.1',
+    summary:
+      'Product definition, "LLM proposes, engine verifies" principle, positioning, and AWS services in scope (ECS, EKS, EC2/ASG, Lambda, RDS/Aurora, DynamoDB, S3, EBS, EFS, SQS, SNS, WAF, CloudWatch Logs, ECR, Secrets/SSM, KMS, IAM, Route 53, ELB, VPC, Quotas, Control vs Data Plane).',
+  },
+  {
+    part: 'Part II',
+    doc: '02-discovery-and-graph.md',
+    sections: '§9–§26',
+    summary:
+      'Input sources (Terraform saved-plan/state JSON, AWS APIs, Resource Explorer, Config, Kubernetes Levels 1 & 2), dependency evidence (permitted, referenced, observed, asserted), ambiguous attribution, ResourceNode & planned snapshot semantics (§15.4), DependencyEdge & ALL/ANY/quorum groups (§19.1), GraphOverride review gate, stacks, RTO scope (§24.1), and RecoveryRequirement.',
+  },
+  {
+    part: 'Part III',
+    doc: '03-rules-and-simulator.md',
+    sections: '§27–§46',
+    summary:
+      'DR strategies, RecoveryMechanism overlay & strict rebuild_from_iac definition (§27.1), DRRulePack protocol, cross-cutting rules (§28.1), LLM advisory review (§28.2), Finding model, readiness dimensions, canonical status vocabulary (§30.1), ordered readiness table (§31), ECS/EKS/RDS checks, data gravity, and the two-pass failure simulator (§43–§46).',
+  },
+  {
+    part: 'Part IV',
+    doc: '04-recovery-and-optimizer.md',
+    sections: '§47–§60',
+    summary:
+      'Stack-level recovery DAG (phase template + refinement, §47.1), RecoveryAction, versioned duration catalog (§49.1), explicit plan buffer (§49.2), critical-path RTO (§50), data-store & stateful-SQS RPO (§51), optimizer & LLM candidate planner (§54–§56.1), DRSpec (§56.2), immutable EvaluationInput & approval digests (§56.3), Pareto frontier (§57), and CostProvider (§58–§59.1).',
+  },
+  {
+    part: 'Part V',
+    doc: '05-iac-and-runbooks.md',
+    sections: '§61–§64',
+    summary:
+      'Resource-to-code mapping, git worktree transformation agent with mandatory OS/container isolation (§61), four-stage verification separating design verification from observed readiness (§61.1), branch/PR delivery (§62), deterministic companion Terraform (§62.1), and recovery artifacts: runbook, prerequisite scripts, recovery scripts, and ARC Region switch plans (§63–§64).',
+  },
+  {
+    part: 'Part VI',
+    doc: '06-security-and-llm.md',
+    sections: '§65–§70',
+    summary:
+      'Read-only security model, cross-account DR access (§66), secret/env/state redaction (§67–§68), replaceable LLM provider abstraction (§69.1), LangGraph agents (§69.2), local hybrid RAG knowledge base (knowledge/domain/, sources.yaml, sanitized web_search/web_fetch, §69.3), versioned DR skills (§69.4), guardrails (§69.5), and offline evals (§69.6).',
+  },
+  {
+    part: 'Part VII',
+    doc: '07-platform-ui-and-testing.md',
+    sections: '§71–§109',
+    summary:
+      'Backend & local single-process deployment (§71–§71.1), React/React Flow UI (§72, §80–§84), monorepo & SQLite persistence (§73–§75), scan coverage/freshness/absence contract (§76–§76.1), drift (§77), REST API & CLI (§78–§79), canonical fixtures (ecs-broken, ecs-remediated, EKS fixture B, §85–§89), four-tier testing (§90–§94), and engineering constraints (§99–§109).',
+  },
+];
+
+const invariants = [
+  {
+    num: '01',
+    ref: '§1 · §47 · §107',
+    title: 'Stack-Level Survivability Only',
+    desc: 'One recovery plan, one RTO, one RPO, and one steady-state cost estimate per stack and failure scenario. Per-resource durations, options, and costs are inputs only.',
+  },
+  {
+    num: '02',
+    ref: '§2 · §102 Rule 11',
+    title: 'LLM Proposes; Engine Verifies',
+    desc: 'Every number (RTO, RPO, durations, cost, confidence) comes from the deterministic engine. An LLM output can never upgrade a resource or stack state, and uncited proposals are discarded.',
+  },
+  {
+    num: '03',
+    ref: '§30 · §31 · §76.1',
+    title: 'Missing Evidence is UNKNOWN, Never PASS',
+    desc: 'Missing catalog entries, stale metrics, failed collectors, unreviewed low-confidence edges on required paths (graph_not_reviewed), or unresolved blocking advisories (advisory_unresolved) prevent READY.',
+  },
+  {
+    num: '04',
+    ref: '§30.1 · §31',
+    title: 'Ordered Readiness Composition',
+    desc: 'Simulation recoverability (RECOVERABLE / UNKNOWN / UNAVAILABLE) is separate from overall stack readiness (READY / DEGRADED / NOT_READY / UNKNOWN). A stack whose recovery path works but misses RPO or budget is RECOVERABLE in simulation and NOT_READY overall.',
+  },
+  {
+    num: '05',
+    ref: '§15.4 · §61.1',
+    title: 'Planned Snapshots vs. Observed Readiness',
+    desc: 'Design verification re-evaluates a planned snapshot (terraform show -json <saved_plan_file> + rendered manifests) and strips obsolete live operational proof on modified resources. Only a fresh scan after deployment establishes observed READY.',
+  },
+  {
+    num: '06',
+    ref: '§56.3',
+    title: 'Immutable Digests & Approval Binding',
+    desc: 'Every evaluation, DRSpec approval, and verification report is bound to an immutable EvaluationInput SHA-256 digest (scan IDs, overrides, requirements, catalog/pricing versions, base git tree).',
+  },
+  {
+    num: '07',
+    ref: '§61 · §62 · §65',
+    title: 'Code Only, in an Isolated Sandbox',
+    desc: 'Perpetual never calls GetSecretValue, never persists secret/env values or raw logs, never sends state or secrets to an LLM, and runs repository tools only inside an OS/container-isolated git worktree with apply/destroy/state unreachable.',
+  },
+];
+---
+
+<BaseLayout
+  title="System Architecture & Specification (§1–§109) — Perpetual"
+  description="End-to-end architecture pipeline, non-negotiable engineering invariants, import-linter layer boundaries, and modular §1–§109 specification index for Perpetual."
+>
+  <main id="main-content" class="page-container">
+    <div class="wrap">
+      <header class="page-header">
+        <div class="breadcrumbs">
+          <a href="/">perpetual</a>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">architecture</span>
+        </div>
+
+        <div class="headline-row">
+          <div>
+            <p class="kicker"><span>//</span> engineering specification rev 4 · pipeline &amp; invariants</p>
+            <h1 class="page-title">System Architecture</h1>
+          </div>
+        </div>
+
+        <p class="page-sub">
+          How Perpetual transforms raw AWS, Terraform, Kubernetes, and runtime log evidence into a deterministic two-pass outage simulation, stack-level Recovery DAG, and 4-stage verified pull request.
+        </p>
+
+        <div class="quickjump-bar">
+          <span class="qj-label">Jump to:</span>
+          <a href="#pipeline-diagram" class="qj-pill"><span>Architecture Diagram</span></a>
+          <a href="#invariants" class="qj-pill"><span>7 Invariants</span></a>
+          <a href="#layer-contracts" class="qj-pill"><span>Layer Contracts</span></a>
+          <a href="#spec-index" class="qj-pill"><span>Spec Index (§1–§109)</span></a>
+        </div>
+      </header>
+
+      <!-- 1. Architecture SVG Diagram -->
+      <section id="pipeline-diagram" style="margin-bottom:64px;">
+        <div class="pnl">
+          <div class="pnl-h">
+            <span><b>end-to-end pipeline architecture</b> · deterministic engine + opt-in v0.2 langgraph agents</span>
+            <span class="mark mark--write">IMPL_PLAN §3.1</span>
+          </div>
+          <div class="arch-diagram-frame">
+            <img
+              src="/assets/architecture.svg"
+              alt="Perpetual planned architecture: AWS, Terraform/Kubernetes and observed evidence inputs feed a local discovery, dependency graph, rule-pack/simulator assessment and recovery planning pipeline."
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Non-Negotiable Architectural Invariants -->
+      <section id="invariants" style="margin-bottom:64px;">
+        <div class="section-header" style="margin-bottom:24px;">
+          <div class="section-title-wrap">
+            <span class="section-kicker">// spec §3</span>
+            <h2 class="section-title">7 Non-Negotiable Architectural Invariants</h2>
+          </div>
+          <p class="section-desc">Enforced across models, validators, engine stages, and CI</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;">
+          {invariants.map((inv) => (
+            <article class="card" style="padding:20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="color:var(--amber);font-weight:700;font-size:12px;">[{inv.num}]</span>
+                <span class="mark mark--write">{inv.ref}</span>
+              </div>
+              <h3 style="font-size:15.5px;color:var(--txt);margin-bottom:8px;">{inv.title}</h3>
+              <p style="font-size:12.5px;color:var(--txt-2);line-height:1.65;">{inv.desc}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <!-- 3. Layer Boundaries (import-linter) -->
+      <section id="layer-contracts" style="margin-bottom:64px;">
+        <div class="section-header" style="margin-bottom:24px;">
+          <div class="section-title-wrap">
+            <span class="section-kicker">// IMPL_PLAN §3.3 · spec §102</span>
+            <h2 class="section-title">Strict Layer Boundaries (import-linter Contracts)</h2>
+          </div>
+          <p class="section-desc">Verified on every commit via mise run lint</p>
+        </div>
+
+        <div class="pnl">
+          <div class="pnl-h">
+            <span><b>pyproject.toml</b> · [tool.importlinter.contracts]</span>
+            <span class="mark mark--read">8 contracts enforced</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Source Modules</th>
+                  <th>Architectural Contract</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b style="color:var(--amber)">Foundation</b></td>
+                  <td><code>perpetual.models, ids, config</code></td>
+                  <td>Import nothing else from <code>perpetual</code>; domain models never import FastAPI or SQLAlchemy.</td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--amber)">Rule 1</b></td>
+                  <td><code>models .. runbooks</code></td>
+                  <td>Nothing below <code>perpetual.api</code> and <code>perpetual.cli</code> ever imports them.</td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--amber)">Rule 2</b></td>
+                  <td><code>perpetual.collectors</code></td>
+                  <td>Collectors only collect; never import <code>rules</code>, <code>simulator</code>, <code>recovery</code>, or <code>optimizer</code>.</td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--amber)">Rule 4</b></td>
+                  <td><code>perpetual.rules</code></td>
+                  <td>Rule packs operate purely on normalized graph snapshots; never call AWS collectors.</td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--amber)">Rule 5</b></td>
+                  <td><code>perpetual.simulator</code></td>
+                  <td>Simulator never rediscovers AWS or re-imports Terraform; runs strictly on the graph &amp; DR overlay.</td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--amber)">Rule 11</b></td>
+                  <td><code>models .. runbooks</code></td>
+                  <td>The deterministic engine never calls an LLM agent (<code>perpetual.llm</code> / <code>perpetual.knowledge</code>). Only <code>perpetual.llm</code> imports LangChain/LangGraph.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Specification Parts Table -->
+      <section id="spec-index">
+        <div class="section-header" style="margin-bottom:24px;">
+          <div class="section-title-wrap">
+            <span class="section-kicker">// docs/spec/</span>
+            <h2 class="section-title">Modular Engineering Specification (§1–§109)</h2>
+          </div>
+          <p class="section-desc">7 modular documents preserving 1:1 section numbering</p>
+        </div>
+
+        <div class="pnl">
+          <div class="pnl-h">
+            <span><b>specification reader's guide</b> · revision 4</span>
+            <a href="/docs" style="color:var(--amber);">Browse Interactive Docs &rarr;</a>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Part</th>
+                  <th>Document</th>
+                  <th>Sections</th>
+                  <th>Scope &amp; Coverage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {specParts.map((sp) => (
+                  <tr>
+                    <td><b style="color:var(--txt)">{sp.part}</b></td>
+                    <td><code>docs/spec/{sp.doc}</code></td>
+                    <td><span class="mark mark--write">{sp.sections}</span></td>
+                    <td style="white-space:normal;min-width:340px;line-height:1.55;">{sp.summary}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</BaseLayout>

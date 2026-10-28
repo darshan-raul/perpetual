@@ -1,0 +1,175 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const serviceMatrix = [
+  {
+    category: 'Containers & Compute (§5.1–§5.4)',
+    services: 'Amazon ECS (Fargate & EC2), Amazon EKS, EC2 Instances, Auto Scaling Groups, AWS Lambda',
+    checks:
+      'Task definition parity, cross-Region ECR image availability, ASG launch templates & AMIs in DR Region, Lambda code/layer replication, event source mapping readiness, DR Region vCPU quotas.',
+  },
+  {
+    category: 'Relational & NoSQL Data (§6.1–§6.3)',
+    services: 'Amazon RDS, Amazon Aurora (Provisioned & Serverless v2), Amazon DynamoDB',
+    checks:
+      'Cross-Region read replicas, Aurora Global Database secondary clusters, DynamoDB Global Tables, automated snapshot copy & PITR windows, target RPO calculation, replica KMS encryption keys.',
+  },
+  {
+    category: 'Storage & Messaging (§7–§7.1)',
+    services: 'Amazon S3, Amazon EBS, Amazon EFS, Amazon SQS (incl. stateful queues), Amazon SNS',
+    checks:
+      'S3 Cross-Region Replication (CRR) & KMS policies, EBS snapshot copy & volume restore durations, EFS cross-Region replication, stateful SQS message RPO impact, SNS topic/subscription parity.',
+  },
+  {
+    category: 'Edge, DNS & Networking (§8)',
+    services: 'Route 53, Route 53 ARC, CloudFront, AWS WAF, ALB / NLB, ACM, VPC Networking',
+    checks:
+      'Route 53 health checks & ARC routing controls, ACM certificates issued in DR Region, WAF WebACL parity, VPC subnets/NAT/endpoints/peering/TGW topology in DR Region.',
+  },
+  {
+    category: 'Security, Secrets & Governance (§8, §28.1)',
+    services: 'AWS KMS, Secrets Manager, SSM Parameter Store, IAM Roles & Policies, Service Quotas',
+    checks:
+      'Multi-Region KMS keys & decrypt grants, Secrets Manager replica status, SSM Parameter Store cross-Region parity (SSM-PARITY-001), hardcoded primary-Region ARNs in IAM (XREG-*), control-plane independence (CTRL-PLANE-001).',
+  },
+  {
+    category: 'Kubernetes / EKS Deep Pack (§33–§40)',
+    services: 'EKS Control Plane, Managed Node Groups, Karpenter, Add-ons, IRSA, Pod Identity, PVCs',
+    checks:
+      'Cluster version parity, EBS/EFS CSI driver add-ons, CoreDNS/VPC CNI readiness, OIDC issuer & IRSA/Pod Identity role trust in DR cluster, StorageClass & PVC topology constraints.',
+  },
+];
+---
+
+<BaseLayout
+  title="AWS Service Scope & Checkout Benchmark — Perpetual"
+  description="First-release AWS service matrix (ECS, EKS, EC2, Lambda, RDS, Aurora, DynamoDB, S3, KMS, IAM, Route 53), cross-cutting DR rule packs, and checkout stack evaluation."
+>
+  <main id="main-content" class="page-container">
+    <div class="wrap">
+      <header class="page-header">
+        <div class="breadcrumbs">
+          <a href="/">perpetual</a>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">scope</span>
+        </div>
+
+        <div class="headline-row">
+          <div>
+            <p class="kicker"><span>//</span> spec §4–§8.1 · §28–§42 · service coverage &amp; sample evaluation</p>
+            <h1 class="page-title">AWS Scope &amp; Rules</h1>
+          </div>
+        </div>
+
+        <p class="page-sub">
+          What Perpetual models in its first release across ECS, EKS, EC2, Serverless, Data, Storage, and Networking stacks—plus an illustrative end-to-end evaluation of a production <code>checkout</code> stack.
+        </p>
+      </header>
+
+      <!-- Example Result Terminal Showcase -->
+      <section style="margin-bottom:64px;">
+        <div class="section-header" style="margin-bottom:20px;">
+          <div class="section-title-wrap">
+            <span class="section-kicker">// illustrative output</span>
+            <h2 class="section-title">Checkout Stack Evaluation (Before vs. After Proposed DR Spec)</h2>
+          </div>
+          <p class="section-desc">Sample values for ap-south-1 &rarr; ap-south-2 failover</p>
+        </div>
+
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="term-title">perpetual simulate &amp; transform — stack: checkout</span>
+          </div>
+          <div class="term-body">
+            <pre>Stack             <b style="color:var(--txt)">checkout</b>
+Primary Region    <span class="s-tag">ap-south-1</span>  -&gt;  DR Region <span class="s-tag">ap-south-2</span>
+
+                  <b class="s-bad">Today</b>        <b class="s-ok">After proposed change</b>
+Status            <span class="s-bad">NOT READY</span>    <span class="s-ok">Design meets targets</span>
+RTO (target 30m)  <span class="s-bad">74-110m</span>      <span class="s-ok">21-29m</span>
+RPO (target 5m)   <span class="s-warn">UNKNOWN</span>      <span class="s-ok">1-3m</span>
+DR cost / month   $0           <span class="s-tag">$640</span>
+
+<b style="color:var(--txt)">Blocking findings fixed</b>
+1. checkout-api image unavailable in DR ECR       -&gt; <span class="s-ok">ECR replication rule</span>
+2. DR execution role cannot decrypt the KMS key   -&gt; <span class="s-ok">multi-Region key + policy</span>
+3. Database recovery exceeds the RTO              -&gt; <span class="s-ok">cross-Region read replica</span>
+
+Pull request      <span class="s-warn">perpetual/dr/checkout/2026-11-02</span>  (7 files, design verified)
+Deployment        Pending; fresh scan required for observed READY</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- AWS Service Matrix -->
+      <section style="margin-bottom:64px;">
+        <div class="section-header" style="margin-bottom:20px;">
+          <div class="section-title-wrap">
+            <span class="section-kicker">// spec §5–§8 · §28–§42</span>
+            <h2 class="section-title">In-Scope AWS Services &amp; DR Rule Pack Checks</h2>
+          </div>
+          <p class="section-desc">Evaluated deterministically in v0.1</p>
+        </div>
+
+        <div class="pnl">
+          <div class="pnl-h">
+            <span><b>aws service matrix</b> · 25+ core services &amp; cross-cutting rules</span>
+            <span class="mark mark--read">v0.1 Scope</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th>In-Scope AWS Services</th>
+                  <th>Key Readiness &amp; Simulation Checks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serviceMatrix.map((row) => (
+                  <tr>
+                    <td><b style="color:var(--amber)">{row.category}</b></td>
+                    <td style="white-space:normal;min-width:220px;color:var(--txt);font-weight:500;">{row.services}</td>
+                    <td style="white-space:normal;min-width:340px;line-height:1.55;">{row.checks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scope Boundaries -->
+      <section>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;">
+          <div class="card" style="padding:22px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+              <span class="lbl">Spec §24.1 · §62.1</span>
+              <span class="mark mark--read">Included &amp; Scoped</span>
+            </div>
+            <h3 style="font-size:16px;color:var(--txt);margin-bottom:10px;">Deliverables &amp; RTO Scope Rules</h3>
+            <ul style="margin-left:18px;font-size:12.5px;color:var(--txt-2);display:flex;flex-direction:column;gap:8px;">
+              <li><b>v0.1 IaC delivery:</b> Companion Terraform for new DR resources + suggested edits for existing Terraform &amp; Kubernetes manifests, delivered as a pull request.</li>
+              <li><b>v0.2 IaC delivery:</b> In-place edits to Terraform, plain Kubernetes manifests, Kustomize overlays, and Helm values in an isolated runner.</li>
+              <li><b>Checked but out of RTO scope by default:</b> Monitoring, logging (CloudWatch Logs), and CI/CD pipelines are assessed and displayed, but never block or inflate the critical-path RTO unless explicitly opted in.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:22px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+              <span class="lbl">Spec §101 Non-Goals</span>
+              <span class="mark mark--danger">Outside First Release</span>
+            </div>
+            <h3 style="font-size:16px;color:var(--txt);margin-bottom:10px;">Explicit Non-Goals</h3>
+            <ul style="margin-left:18px;font-size:12.5px;color:var(--txt-2);display:flex;flex-direction:column;gap:8px;">
+              <li><b>No live mutations:</b> Never runs <code>terraform apply</code>, <code>kubectl apply</code>, automatic live failover, or automated destructive DR drills.</li>
+              <li><b>Single-cloud &amp; local first:</b> Focused exclusively on AWS Region recovery running locally on your machine (no hosted multi-tenant SaaS in v0.1).</li>
+              <li><b>IaC formats outside v0.1/v0.2:</b> Code generation for CloudFormation, AWS CDK, or Pulumi is outside the first release.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</BaseLayout>

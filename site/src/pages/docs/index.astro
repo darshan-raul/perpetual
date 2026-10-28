@@ -1,0 +1,87 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { DOC_CATEGORIES, DOC_ARTICLES } from '../../data/siteData';
+---
+
+<BaseLayout
+  title="Docs & Specification Guides — Perpetual"
+  description="Technical manuals, architectural guides, and CLI references for Perpetual: local AWS disaster-recovery readiness, simulation, and IaC compiler."
+>
+  <main id="main-content" class="page-container">
+    <div class="wrap">
+      <header class="page-header">
+        <div class="breadcrumbs">
+          <a href="/">perpetual</a>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">docs</span>
+        </div>
+
+        <div class="headline-row">
+          <div>
+            <p class="kicker"><span>//</span> technical manuals, engine specification &amp; cli guides</p>
+            <h1 class="page-title">Docs</h1>
+          </div>
+        </div>
+
+        <p class="page-sub">
+          Guides, architectural invariants, and reference documentation for running Perpetual as a local, evidence-backed AWS disaster recovery readiness and IaC verification workbench.
+        </p>
+
+        <!-- Quick filter jump pills -->
+        <div class="quickjump-bar">
+          <span class="qj-label">Categories:</span>
+          {DOC_CATEGORIES.map((cat) => {
+            const count = DOC_ARTICLES.filter((a) => a.category === cat.id).length;
+            return (
+              <a href={`#${cat.id}`} class="qj-pill">
+                <span>{cat.title}</span>
+                <small>({count})</small>
+              </a>
+            );
+          })}
+          <span class="qj-total">{DOC_ARTICLES.length} articles · spec rev 4 (§1–§109)</span>
+        </div>
+      </header>
+
+      <!-- Sequential List Layout -->
+      <div class="sections-stream">
+        {DOC_CATEGORIES.map((cat) => {
+          const articles = DOC_ARTICLES.filter((a) => a.category === cat.id);
+          return (
+            <section class="section-block" id={cat.id}>
+              <div class="section-header">
+                <div class="section-title-wrap">
+                  <span class="section-kicker">{cat.kicker}</span>
+                  <h2 class="section-title">{cat.title}</h2>
+                </div>
+                <p class="section-desc">{cat.desc}</p>
+              </div>
+
+              <div class="articles-list">
+                {articles.map((art) => (
+                  <a href={`/docs/${art.slug}`} class="article-row">
+                    <div class="article-index">
+                      <span>{art.index}</span>
+                    </div>
+                    <div class="article-main">
+                      <div class="article-heading-row">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                          <h3 class="article-title">{art.title}</h3>
+                          <span class="chip" style="font-size:10px;height:20px;color:var(--amber);border-color:var(--amber-line);background:var(--amber-wash);">
+                            {art.specRef}
+                          </span>
+                        </div>
+                        <span class="article-arrow">&rarr;</span>
+                      </div>
+                      <p class="article-desc">{art.description}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  </main>
+</BaseLayout>

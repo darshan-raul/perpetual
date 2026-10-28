@@ -1,0 +1,523 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Perpetual — Find your way back from an AWS outage">
+  <main id="main-content" class="recovery-home">
+    <!-- ================= HERO ================= -->
+    <section class="recovery-hero wrap">
+      <div class="recovery-intro">
+        <a class="release-note" href="/roadmap">
+          <span class="status-dot"></span> Pre-alpha in development <span class="release-divider">/</span> Follow the roadmap ↗
+        </a>
+        <p class="eyebrow">A clearer path to AWS recovery</p>
+        <h1>When a Region<br />goes dark.<br /><span>Know your way back.</span></h1>
+        <p class="hero-description">
+          Understand what breaks, map the whole-stack recovery path, and plan verified fixes in your own Terraform and Kubernetes code.
+        </p>
+
+        <!-- Click-to-copy install command -->
+        <div class="recovery-install">
+          <button
+            class="copyline"
+            type="button"
+            data-copy="git clone https://github.com/darshan-raul/perpetual && cd perpetual && mise install"
+            aria-label="Copy setup command"
+          >
+            <span class="copyline-p">$</span>
+            <code><span>git clone https://github.com/darshan-raul/perpetual &amp;&amp; cd perpetual &amp;&amp; mise install</span></code>
+            <span class="copyline-s"></span>
+          </button>
+        </div>
+
+        <div class="recovery-actions">
+          <a class="action-primary" href="/docs/getting-started/overview">Explore Perpetual <span aria-hidden="true">↗</span></a>
+          <a class="action-text" href="https://github.com/darshan-raul/perpetual" target="_blank" rel="noopener noreferrer">View on GitHub <span aria-hidden="true">↗</span></a>
+        </div>
+
+        <!-- CLI Quick Reference Deck -->
+        <div class="recovery-cli-deck">
+          <div class="rc-item">
+            <span class="rc-cmd"><code>$ perpetual ui</code></span>
+            <span class="rc-desc">planned · local web console (:8000)</span>
+          </div>
+          <div class="rc-item">
+            <span class="rc-cmd"><code>$ perpetual simulate</code></span>
+            <span class="rc-desc">planned · region outage failure trace</span>
+          </div>
+          <div class="rc-item">
+            <span class="rc-cmd"><code>$ perpetual transform</code></span>
+            <span class="rc-desc">planned · isolated IaC branch / PR</span>
+          </div>
+        </div>
+
+        <p class="availability">Pre-alpha (milestone M0). Not on PyPI yet; the commands above are planned. The engine is being built in the open (Python 3.13 + FastAPI + SQLite).</p>
+      </div>
+
+      <figure class="recovery-art">
+        <img
+          src="/assets/recovery-hero.webp"
+          width="1536"
+          height="1024"
+          fetchpriority="high"
+          alt="A small robot guides a glowing recovery path from an offline cloud to healthy blue cloud infrastructure."
+        />
+        <figcaption><span class="status-dot"></span> An outage is a starting point. Recovery is a path.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ================= AWS SERVICES MARQUEE STRIP ================= -->
+    <div class="service-marquee-section" aria-label="AWS services covered by Perpetual">
+      <div class="wrap service-marquee-head">
+        <div class="smh-left">
+          <span class="status-dot"></span>
+          <span class="smh-title">Full-stack evaluation across 25+ AWS services, Terraform &amp; Kubernetes</span>
+        </div>
+        <a class="text-link" href="/scope">Explore the AWS scope <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="marquee-wrapper">
+        <div class="marquee-track">
+          {[0, 1].map(() => (
+            <div class="marquee-group">
+              <div class="logo-item"><span class="logo-icon">▣</span><span class="logo-name">Amazon ECS (Fargate &amp; EC2)</span></div>
+              <div class="logo-item"><span class="logo-icon">☸</span><span class="logo-name">Amazon EKS &amp; Add-ons</span></div>
+              <div class="logo-item"><span class="logo-icon">🗄</span><span class="logo-name">RDS &amp; Aurora Global</span></div>
+              <div class="logo-item"><span class="logo-icon">⚡</span><span class="logo-name">DynamoDB Global Tables</span></div>
+              <div class="logo-item"><span class="logo-icon">🔑</span><span class="logo-name">AWS KMS Multi-Region</span></div>
+              <div class="logo-item"><span class="logo-icon">🔒</span><span class="logo-name">Secrets Manager &amp; SSM</span></div>
+              <div class="logo-item"><span class="logo-icon">📦</span><span class="logo-name">Amazon ECR Replication</span></div>
+              <div class="logo-item"><span class="logo-icon">🌐</span><span class="logo-name">Route 53 &amp; ARC Region Switch</span></div>
+              <div class="logo-item"><span class="logo-icon">🛡</span><span class="logo-name">ALB / NLB / CloudFront / WAF</span></div>
+              <div class="logo-item"><span class="logo-icon">λ</span><span class="logo-name">AWS Lambda &amp; Event Sources</span></div>
+              <div class="logo-item"><span class="logo-icon">📨</span><span class="logo-name">Amazon SQS &amp; SNS</span></div>
+              <div class="logo-item"><span class="logo-icon">💾</span><span class="logo-name">Amazon S3, EBS &amp; EFS</span></div>
+              <div class="logo-item"><span class="logo-icon">🪪</span><span class="logo-name">IAM Roles, IRSA &amp; Pod Identity</span></div>
+              <div class="logo-item"><span class="logo-icon">📊</span><span class="logo-name">VPC Flow Logs &amp; CloudTrail</span></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= INTERACTIVE WORKBENCH ================= -->
+    <section class="system-section wrap" id="graph">
+      <header class="section-intro">
+        <div>
+          <p class="overline">The whole stack. One recovery story.</p>
+          <h2>See the connections.<br /><span>Find the weak links.</span></h2>
+        </div>
+        <p>A healthy database doesn’t mean a healthy application. Explore how discovery, outage modeling, and a recovery plan fit together.</p>
+      </header>
+      <div class="system-workbench" data-view="discover">
+        <div class="workbench-top">
+          <span><i class="live-dot"></i> checkout / recovery explorer</span>
+          <span class="demo-label">Interactive concept · illustrative data</span>
+        </div>
+        <div class="explorer-tabs" role="tablist" aria-label="Explore the recovery workflow">
+          <button id="tab-discover" role="tab" aria-selected="true" aria-controls="explorer-panel" data-explore="discover"><span>01</span> Discover</button>
+          <button id="tab-outage" role="tab" aria-selected="false" aria-controls="explorer-panel" tabindex="-1" data-explore="outage"><span>02</span> Model an outage</button>
+          <button id="tab-plan" role="tab" aria-selected="false" aria-controls="explorer-panel" tabindex="-1" data-explore="plan"><span>03</span> Plan recovery</button>
+        </div>
+        <div id="explorer-panel" class="explorer-panel" role="tabpanel" aria-labelledby="tab-discover" tabindex="0">
+          <div class="topology" aria-label="Illustrative dependency graph">
+            <!-- Primary Region Topology (01 Discover & 02 Outage) -->
+            <div class="topology-primary">
+              <div class="topology-label"><span>checkout stack</span><span id="region-label">ap-south-1 / primary</span></div>
+              <div class="flow-node entry-node">
+                <span class="node-icon" aria-hidden="true">↗</span>
+                <div class="node-text">
+                  <small>Traffic entry</small>
+                  <strong>Route 53</strong>
+                </div>
+                <span class="outage-pill pill-online">ONLINE</span>
+                <i class="node-status-dot"></i>
+              </div>
+              <div class="flow-wire" aria-hidden="true"></div>
+              <div class="flow-node app-node">
+                <span class="node-icon" aria-hidden="true">⌘</span>
+                <div class="node-text">
+                  <small>Application</small>
+                  <strong>Checkout · ECS</strong>
+                </div>
+                <span class="outage-pill pill-fail">UNAVAILABLE</span>
+                <i class="node-status-dot"></i>
+              </div>
+              <div class="flow-branches" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="dependency-row">
+                <div class="flow-node dependency dep-rds">
+                  <div class="dep-header">
+                    <span class="node-icon" aria-hidden="true">▤</span>
+                    <strong>RDS</strong>
+                  </div>
+                  <small>Customer data</small>
+                  <div class="dep-state-normal"><code>prod-mysql</code></div>
+                  <div class="dep-state-outage">
+                    <span class="blocker-tag">BLOCKER 1</span>
+                    <span class="blocker-msg">No replica · 74–110m RTO</span>
+                  </div>
+                  <i class="node-status-dot"></i>
+                </div>
+                <div class="flow-node dependency dep-ecr">
+                  <div class="dep-header">
+                    <span class="node-icon" aria-hidden="true">▧</span>
+                    <strong>ECR</strong>
+                  </div>
+                  <small>Container images</small>
+                  <div class="dep-state-normal"><code>checkout-api:v2.4</code></div>
+                  <div class="dep-state-outage">
+                    <span class="blocker-tag">BLOCKER 2</span>
+                    <span class="blocker-msg">Pull fails · Not in DR</span>
+                  </div>
+                  <i class="node-status-dot"></i>
+                </div>
+                <div class="flow-node dependency dep-kms">
+                  <div class="dep-header">
+                    <span class="node-icon" aria-hidden="true">⌁</span>
+                    <strong>KMS</strong>
+                  </div>
+                  <small>Encryption keys</small>
+                  <div class="dep-state-normal"><code>mrk-disabled</code></div>
+                  <div class="dep-state-outage">
+                    <span class="blocker-tag">BLOCKER 3</span>
+                    <span class="blocker-msg">Access denied · Primary key</span>
+                  </div>
+                  <i class="node-status-dot"></i>
+                </div>
+              </div>
+              <div class="graph-legend">
+                <span><i class="legend-dot"></i> <span id="graph-status">Mapped dependency</span></span>
+                <span>Example topology</span>
+              </div>
+            </div>
+
+            <!-- Dedicated Recovery Architecture View (03 Plan Recovery Visual) -->
+            <div class="topology-plan">
+              <div class="topology-label">
+                <span>checkout stack</span>
+                <span class="plan-region-pill">ap-south-2 / proposed recovery architecture</span>
+              </div>
+
+              <div class="plan-banner">
+                <span class="plan-banner-chip"><i class="live-dot"></i> ANALYSIS REMEDIATION</span>
+                <span class="plan-banner-text">3 recovery mechanisms placed in IaC</span>
+              </div>
+
+              <!-- Traffic Cutover -->
+              <div class="flow-node entry-node plan-node">
+                <span class="node-icon" aria-hidden="true">↗</span>
+                <div class="node-text">
+                  <small>DNS Failover Switch</small>
+                  <strong>Route 53 ARC</strong>
+                  <span class="node-detail">Routing control rule → ap-south-2</span>
+                </div>
+                <span class="plan-mech-pill chip-cutover">CUTOVER</span>
+              </div>
+
+              <div class="flow-wire plan-flow-wire" aria-hidden="true"></div>
+
+              <!-- Recovery Application -->
+              <div class="flow-node app-node plan-node">
+                <span class="node-icon" aria-hidden="true">⌘</span>
+                <div class="node-text">
+                  <small>Recovery Application (Standby)</small>
+                  <strong>Checkout · ECS Fargate</strong>
+                  <span class="node-detail">Standby task definition in ap-south-2</span>
+                </div>
+                <span class="plan-mech-pill chip-standby">STANDBY</span>
+              </div>
+
+              <div class="flow-branches plan-flow-branches" aria-hidden="true"><i></i><i></i><i></i></div>
+
+              <!-- Placed Recovery Mechanisms Grid -->
+              <div class="plan-mechanisms-grid">
+                <!-- Mechanism 1: RDS Replica -->
+                <div class="flow-node plan-mech-card">
+                  <div class="mech-card-top">
+                    <span class="mech-num">MECHANISM 01</span>
+                    <span class="mech-pill-placed">+ PLACED</span>
+                  </div>
+                  <div class="mech-card-main">
+                    <div class="mech-title-row">
+                      <span class="node-icon" aria-hidden="true">▤</span>
+                      <div>
+                        <strong>RDS Read Replica</strong>
+                        <small>Database recovery</small>
+                      </div>
+                    </div>
+                    <div class="mech-code"><code>aws_db_instance.orders_dr</code></div>
+                    <div class="mech-desc">Cross-Region replica with continuous binlog replication from primary.</div>
+                  </div>
+                  <div class="mech-card-stats">
+                    <div class="mech-stat">
+                      <span class="m-k">RPO</span>
+                      <span class="m-v ok">1–3m</span>
+                    </div>
+                    <div class="mech-stat">
+                      <span class="m-k">PROMOTE</span>
+                      <span class="m-v ok">6–9m</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Mechanism 2: ECR Replication -->
+                <div class="flow-node plan-mech-card">
+                  <div class="mech-card-top">
+                    <span class="mech-num">MECHANISM 02</span>
+                    <span class="mech-pill-placed">+ PLACED</span>
+                  </div>
+                  <div class="mech-card-main">
+                    <div class="mech-title-row">
+                      <span class="node-icon" aria-hidden="true">▧</span>
+                      <div>
+                        <strong>ECR Replication Rule</strong>
+                        <small>Image availability</small>
+                      </div>
+                    </div>
+                    <div class="mech-code"><code>aws_ecr_replication_cfg</code></div>
+                    <div class="mech-desc">Automated registry replication rule auto-syncing images to ap-south-2.</div>
+                  </div>
+                  <div class="mech-card-stats">
+                    <div class="mech-stat">
+                      <span class="m-k">PULL LAG</span>
+                      <span class="m-v ok">0m (cached)</span>
+                    </div>
+                    <div class="mech-stat">
+                      <span class="m-k">COLD START</span>
+                      <span class="m-v ok">Eliminated</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Mechanism 3: Multi-Region KMS Key -->
+                <div class="flow-node plan-mech-card">
+                  <div class="mech-card-top">
+                    <span class="mech-num">MECHANISM 03</span>
+                    <span class="mech-pill-placed">+ PLACED</span>
+                  </div>
+                  <div class="mech-card-main">
+                    <div class="mech-title-row">
+                      <span class="node-icon" aria-hidden="true">⌁</span>
+                      <div>
+                        <strong>Multi-Region KMS Key</strong>
+                        <small>Decryption authority</small>
+                      </div>
+                    </div>
+                    <div class="mech-code"><code>aws_kms_replica_key</code></div>
+                    <div class="mech-desc">Multi-Region replica key + IAM decrypt grant for DR execution role.</div>
+                  </div>
+                  <div class="mech-card-stats">
+                    <div class="mech-stat">
+                      <span class="m-k">DECRYPT</span>
+                      <span class="m-v ok">Local DR</span>
+                    </div>
+                    <div class="mech-stat">
+                      <span class="m-k">SECRETS</span>
+                      <span class="m-v ok">Available</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Modeled outcome strip inside the plan visual -->
+              <div class="plan-outcome-strip">
+                <div class="pos-item">
+                  <span class="pos-dot ok"></span>
+                  <span class="pos-text">RTO: <strong>21–29m</strong> <small>(was 74–110m · target &lt;30m)</small></span>
+                </div>
+                <div class="pos-item">
+                  <span class="pos-dot ok"></span>
+                  <span class="pos-text">RPO: <strong>1–3m</strong> <small>(was UNKNOWN · target &lt;5m)</small></span>
+                </div>
+                <span class="pos-badge">✓ 3 BLOCKERS FIXED IN IAC</span>
+              </div>
+            </div>
+          </div>
+          <div class="explorer-detail" aria-live="polite">
+            <span class="detail-step" id="detail-step">01 / DISCOVER</span>
+            <h3 id="detail-title">Your infrastructure,<br />with the context attached.</h3>
+            <p id="detail-copy">Bring resources and their dependencies together. Keep observed behavior separate from references and permissions, so you know what each connection actually proves.</p>
+            <ul id="detail-facts"><li>AWS resource inventory</li><li>Terraform &amp; Kubernetes references</li><li>Evidence attached to every edge</li></ul>
+            <a id="detail-link" class="text-link" href="/docs/engine/discovery-and-graph">Explore discovery <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= OUTCOME SECTION ================= -->
+    <section class="outcome-section" id="simulate">
+      <div class="wrap outcome-grid">
+        <div class="outcome-copy">
+          <p class="overline">From uncertainty to a plan</p>
+          <h2>Recovery time.<br />Made tangible.</h2>
+          <p>Model the path from outage to recovery. Then compare the designs that bring your stack closer to its targets.</p>
+          <a class="text-link" href="/scope">Inside the checkout example ↗</a>
+        </div>
+        <div class="outcome-metrics">
+          <div class="metric-context"><span>checkout</span><span>Illustrative recovery time</span></div>
+          <div class="metric-before"><span>Current design</span><strong>74–110<small> min</small></strong><div class="metric-track"><i></i></div></div>
+          <div class="metric-after"><span>Proposed design</span><strong>21–29<small> min</small></strong><div class="metric-track"><i></i></div></div>
+          <p>Specification example (spec §109). Not a live benchmark or recovery guarantee.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PROOF & VERIFICATION SECTION ================= -->
+    <section class="proof-section wrap" id="features">
+      <header class="section-intro">
+        <div>
+          <p class="overline">A plan is only as good as its proof</p>
+          <h2>Every proposal.<br /><span>Something you can inspect.</span></h2>
+        </div>
+        <p>AI can propose a change. The engine’s job is to check it. The planned verification pipeline keeps that boundary explicit.</p>
+      </header>
+      <div class="proof-layout">
+        <div class="change-preview">
+          <div class="change-header"><span class="file-icon" aria-hidden="true">&#123; &#125;</span><span>infra / recovery.tf</span><span>Concept preview</span></div>
+          <pre aria-label="Illustrative Terraform change"><code><span class="code-muted"># A proposed recovery configuration</span>
+<span class="code-muted"># Review before deployment</span>
+
+<span class="code-keyword">provider</span> <span class="code-string">"aws"</span> &#123;
+  alias  = <span class="code-string">"recovery"</span>
+<span class="code-added">+ region = "ap-south-2"</span>
+&#125;
+
+<span class="code-muted"># Engine checks the planned snapshot</span>
+<span class="code-muted"># against the recovery design</span></code></pre>
+          <div class="change-footer"><span class="live-dot"></span> Isolated changes. Reviewable output.</div>
+        </div>
+        <div class="verification-list">
+          <article><span>01</span><div><h3>Start with your code</h3><p>Propose changes in an isolated worktree, grounded in your Terraform and Kubernetes configuration.</p></div></article>
+          <article><span>02</span><div><h3>Check the modeled result</h3><p>Re-evaluate the planned infrastructure against recovery requirements and simulation outcomes.</p></div></article>
+          <article><span>03</span><div><h3>Keep approval explicit</h3><p>A verified design still needs deployment and fresh evidence before it can mean live readiness.</p></div></article>
+          <a class="text-link" href="/docs/engine/iac-and-runbooks">Read the verification design ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CONTROL & BOUNDARIES ================= -->
+    <section class="control-section wrap" id="security">
+      <div class="control-heading">
+        <p class="overline">Built around a simple boundary</p>
+        <h2>Your cloud.<br />Your code.<br /><span>Your call.</span></h2>
+        <a class="text-link" href="/docs/security/security-and-llm">The security architecture ↗</a>
+      </div>
+      <div class="control-details">
+        <article><span aria-hidden="true">↳</span><h3>Local by design</h3><p>The architecture keeps analysis, SQLite state, and evidence on your workstation.</p></article>
+        <article><span aria-hidden="true">◉</span><h3>Read-only discovery</h3><p>Inspect AWS resources without turning an assessment into a live infrastructure change.</p></article>
+        <article><span aria-hidden="true">⌥</span><h3>You review the changes</h3><p>Proposed code stays reviewable in a git branch. Deployment stays under your control.</p></article>
+        <p class="control-note">Design principles for the planned product. Perpetual is currently pre-alpha.</p>
+      </div>
+    </section>
+
+    <!-- ================= NEXT CHAPTER ================= -->
+    <section class="next-section wrap">
+      <div class="next-intro"><span class="live-dot"></span><p>Building in the open</p></div>
+      <div class="next-heading">
+        <h2>The next chapter<br />is being written.</h2>
+        <p>Start with the design. Follow the build.<br />Bring a recovery problem worth solving.</p>
+      </div>
+      <div class="next-links">
+        <a href="/docs"><span>Understand the thinking</span><strong>Read the docs <i aria-hidden="true">↗</i></strong></a>
+        <a href="/roadmap"><span>Follow the progress</span><strong>Explore the roadmap <i aria-hidden="true">↗</i></strong></a>
+        <a href="https://github.com/darshan-raul/perpetual" target="_blank" rel="noopener noreferrer"><span>Build with us</span><strong>Find us on GitHub <i aria-hidden="true">↗</i></strong></a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const views = {
+      discover: {
+        step: '01 / DISCOVER',
+        title: 'Your infrastructure, with the context attached.',
+        copy: 'Bring resources and their dependencies together. Keep observed behavior separate from references and permissions, so you know what each connection actually proves.',
+        facts: ['AWS resource inventory', 'Terraform & Kubernetes references', 'Evidence attached to every edge'],
+        link: '/docs/engine/discovery-and-graph',
+        label: 'Explore discovery',
+        region: 'ap-south-1 / primary',
+        status: 'Mapped dependency',
+      },
+      outage: {
+        step: '02 / MODEL AN OUTAGE',
+        title: 'Follow the failure beyond the first resource.',
+        copy: 'Simulating a region failure in ap-south-1 exposes 3 critical blockers: database restore from snapshot exceeds target RTO, container images are not available in DR, and KMS keys cannot decrypt in the secondary region.',
+        facts: [
+          'RDS: No replica (74–110m snapshot restore vs 30m target)',
+          'ECR: Image missing in recovery Region (pull fails)',
+          'KMS: Primary-only key blocks DR task decryption',
+        ],
+        link: '/docs/engine/rules-and-simulator',
+        label: 'Explore the simulator',
+        region: 'ap-south-1 / outage scenario',
+        status: '3 blocking findings prevent recovery',
+      },
+      plan: {
+        step: '03 / PLAN RECOVERY',
+        title: 'Analysis places 3 concrete recovery mechanisms.',
+        copy: 'Perpetual transforms the 3 outage blockers into concrete Terraform and Kubernetes changes: placing an RDS cross-Region read replica, an ECR replication rule, and a multi-Region KMS key with DR execution role permissions in ap-south-2.',
+        facts: [
+          'Mechanism 01: RDS read replica in ap-south-2 (1–3m RPO, 6–9m promotion)',
+          'Mechanism 02: ECR cross-Region replication rule (pre-cached images)',
+          'Mechanism 03: Multi-Region KMS key + DR execution role decrypt grant',
+          'Modeled outcome: 74–110m → 21–29m RTO · All 3 blockers cleared',
+        ],
+        link: '/docs/engine/recovery-and-optimizer',
+        label: 'Explore recovery planning',
+        region: 'ap-south-2 / proposed recovery architecture',
+        status: '3 recovery mechanisms placed in IaC',
+      },
+    };
+    type View = keyof typeof views;
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-explore]')];
+    function selectView(key: View) {
+      const view = views[key];
+      const workbench = document.querySelector<HTMLElement>('.system-workbench');
+      if (!workbench) return;
+      workbench.dataset.view = key;
+      tabs.forEach((tab) => {
+        const selected = tab.dataset.explore === key;
+        tab.setAttribute('aria-selected', String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+      });
+      document.getElementById('explorer-panel')?.setAttribute('aria-labelledby', `tab-${key}`);
+      for (const [id, text] of Object.entries({
+        'detail-step': view.step,
+        'detail-title': view.title,
+        'detail-copy': view.copy,
+        'region-label': view.region,
+        'graph-status': view.status,
+      })) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
+      const facts = document.getElementById('detail-facts');
+      if (facts) {
+        facts.replaceChildren(
+          ...view.facts.map((text) => {
+            const li = document.createElement('li');
+            li.textContent = text;
+            return li;
+          })
+        );
+      }
+      const link = document.getElementById('detail-link') as HTMLAnchorElement | null;
+      if (link) {
+        link.href = view.link;
+        link.textContent = `${view.label} ↗`;
+      }
+    }
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectView(tab.dataset.explore as View));
+      tab.addEventListener('keydown', (event) => {
+        let next = index;
+        if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        else return;
+        event.preventDefault();
+        tabs[next].focus();
+        selectView(tabs[next].dataset.explore as View);
+      });
+    });
+  </script>
+</BaseLayout>

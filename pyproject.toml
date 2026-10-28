@@ -33,7 +33,7 @@ include = ["apps/api/perpetual", "README.md"]
 target-version = "py313"
 line-length = 100
 src = ["apps/api"]
-extend-exclude = ["apps/web", "packages", "examples", "generated", "*.md"]
+extend-exclude = ["apps/web", "site", "packages", "examples", "generated", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "PT", "C4", "PL", "TID"]

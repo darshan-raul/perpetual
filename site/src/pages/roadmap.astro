@@ -1,0 +1,140 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const milestones = [
+  {
+    id: 'M0 PoC',
+    badge: 'IN PROGRESS',
+    badgeClass: 'mark--write',
+    title: 'M0 Proof of Concept — Core Engine & First Generated Fix',
+    delivers:
+      'Normalized resource models, dependency graph, two-pass failure simulator, and critical-path recovery planning on canonical test fixtures (ecs-broken, ecs-remediated), plus a first generated Terraform fix and laptop recovery script.',
+    highlights: [
+      'Repo layout, mise toolchain, ruff/mypy/pytest/import-linter CI gates (P0-01 to P0-04e done; see TRACKER.md)',
+      'NetworkX dependency graph with ALL / ANY / quorum groups and cycle termination',
+      'Two-pass simulator (Impact Pass + DR Overlay Recovery Pass) and FailureReasonChain',
+      'Phase-template + refinement Recovery DAG and catalog-backed RTO/RPO calculation',
+    ],
+  },
+  {
+    id: 'M1 Alpha',
+    badge: 'PLANNED',
+    badgeClass: 'mark--read',
+    title: 'M1 Alpha — Live AWS Scanning, Terraform Import & Local Web UI',
+    delivers:
+      'Terraform saved-plan/state import, local FastAPI + React Flow web UI and interactive graph editor, live AWS scanning with CloudTrail and VPC Flow Log evidence, stack grouping, DR rule packs, and RTO/RPO on real AWS accounts.',
+    highlights: [
+      'Read-only boto3 collectors with coverage, freshness, and confirmed-absence tracking (§76.1)',
+      'CloudTrail & VPC Flow Log aggregation + shared-role/ENI candidate set handling (§14.1)',
+      'Interactive React Flow graph workbench with persistent GraphOverride review gates (§23)',
+      'ECS, RDS, ECR, KMS, Secrets Manager, SSM, Route 53, and cross-cutting rule packs (§28–§32, §41)',
+    ],
+  },
+  {
+    id: 'v0.1',
+    badge: 'DETERMINISTIC RELEASE',
+    badgeClass: 'mark--read',
+    title: 'v0.1 — EKS Readiness, Budget Optimizer, Companion Terraform & Runbooks (No LLM)',
+    delivers:
+      'Full Amazon EKS deep readiness pack (§33–§40), Pareto DR design optimizer within monthly budget, companion Terraform and suggested edits delivered as a PR, explanatory runbook, prerequisite scripts, recovery scripts, and optional ARC Region switch plans. 100% deterministic.',
+    highlights: [
+      'EKS control plane, node groups, EBS/EFS CSI add-ons, IRSA/Pod Identity, and PVC validation',
+      'Pareto optimizer scoring Backup & Restore, Pilot Light, Warm Standby, and Hot Standby (§54–§60)',
+      'Immutable EvaluationInput SHA-256 digests binding scans, overrides, and DRSpec approvals (§56.3)',
+      '4-stage verification separating modeled design verification from live observed READY (§61.1)',
+    ],
+  },
+  {
+    id: 'v0.2',
+    badge: 'OPT-IN LLM AGENTS',
+    badgeClass: 'mark--read',
+    title: 'v0.2 — LangGraph Advisor, Candidate Planner & Sandboxed In-Place IaC Edits',
+    delivers:
+      'Opt-in LangGraph workflows for advisory review and candidate DR planning, plus in-place edits to your existing Terraform modules, plain Kubernetes manifests, Kustomize overlays, and Helm values inside an OS/container-isolated worktree runner.',
+    highlights: [
+      'Replaceable LLM provider abstraction via init_chat_model (Anthropic, Bedrock, OpenRouter, Ollama)',
+      'Local hybrid RAG knowledge base (knowledge/domain/ + versioned SKILL.md + sanitized web_fetch)',
+      'Strict redaction of Terraform state, secrets, and env values + full SQLite llm_calls audit log',
+      'Mandatory citation verification: uncited LLM proposals are automatically dropped (§2 Rule 11)',
+    ],
+  },
+  {
+    id: 'v0.3',
+    badge: 'OPERATIONAL PROOF',
+    badgeClass: 'mark--read',
+    title: 'v0.3 — Proven Readiness from Game Days, ARC Execution Reports & Drift',
+    delivers:
+      'Ingestion of game-day drill evidence (DRDrill, §53) and Route 53 ARC execution reports to compare predicted vs. proven RTO/RPO, plus continuous architectural drift detection across rescans (§77).',
+    highlights: [
+      'Tracks predicted vs. proven recovery durations from real game-day exercises',
+      'Detects configuration, quota, and dependency drift that invalidates previously READY stacks',
+    ],
+  },
+  {
+    id: 'v1.0',
+    badge: 'GA TARGET',
+    badgeClass: 'mark--read',
+    title: 'v1.0 — Packaged, Upgradeable, Audited Release',
+    delivers:
+      'Single-command uv tool installation, schema migration guarantees, comprehensive real-AWS contract test verification, and published AWS service readiness matrix.',
+    highlights: [
+      'Full 4-tier test verification (unit fixtures, moto, Floci emulator, opt-in real-AWS contract suite)',
+      'Audited sandbox isolation, versioned duration/pricing catalogs, and production documentation',
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Roadmap & Milestones (M0 PoC to v1.0) — Perpetual"
+  description="Engine-first development roadmap for Perpetual: M0 PoC, M1 Alpha, v0.1 deterministic engine, v0.2 LangGraph agents, v0.3 operational proof, and v1.0 release."
+>
+  <main id="main-content" class="page-container">
+    <div class="wrap">
+      <header class="page-header">
+        <div class="breadcrumbs">
+          <a href="/">perpetual</a>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">roadmap</span>
+        </div>
+
+        <div class="headline-row">
+          <div>
+            <p class="kicker"><span>//</span> engine-first · ecs before eks · deterministic before llm</p>
+            <h1 class="page-title">Milestone Roadmap</h1>
+          </div>
+        </div>
+
+        <p class="page-sub">
+          Perpetual is pre-alpha: the 7-part engineering specification (<code>§1–§109</code>) and implementation plan are locked, and Milestone M0 PoC is underway.
+        </p>
+      </header>
+
+      <div class="sections-stream">
+        {milestones.map((m) => (
+          <section class="card" style="padding:24px 28px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--bdr);padding-bottom:14px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:18px;font-weight:800;color:var(--amber);">{m.id}</span>
+                <span class={`mark ${m.badgeClass}`}>{m.badge}</span>
+              </div>
+              <span class="lbl">IMPL_PLAN.md &amp; TRACKER.md</span>
+            </div>
+
+            <h2 style="font-size:18px;color:var(--txt);margin-bottom:10px;">{m.title}</h2>
+            <p style="font-size:13.5px;color:var(--txt-2);line-height:1.7;margin-bottom:16px;">{m.delivers}</p>
+
+            <div style="background:var(--surface);border:1px solid var(--bdr);padding:14px 18px;">
+              <div class="lbl" style="margin-bottom:8px;">Key Engineering Deliverables</div>
+              <ul style="margin-left:18px;font-size:12.5px;color:var(--txt-2);display:flex;flex-direction:column;gap:6px;">
+                {m.highlights.map((h) => (
+                  <li>{h}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  </main>
+</BaseLayout>
