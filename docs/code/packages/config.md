@@ -8,6 +8,32 @@
 
 Rule and engine code never hard-codes a weight, threshold or limit. The shipped defaults are YAML files in `config/defaults/`, one per section, each with its own `version`. `load_config()` reads them, merges a project's overrides on top and validates the result as a whole, so an override can't produce a weight above 1 or point at a correlation group that doesn't exist. Unknown keys are rejected, so a typo fails loudly. The loaded `Config` records which dotted paths an override changed, so results can show which values were not product defaults.
 
+## How loading works
+
+```text
+ config/defaults/*.yaml (shipped, one per section, each with a version)
+   evidence.yaml  scoring.yaml  rto_scope.yaml  buffer.yaml  freshness.yaml  limits.yaml
+        │ load_defaults(): yaml.safe_load each file
+        ▼
+ {"evidence": {...}, "scoring": {...}, ...}             project override (dict or YAML file)
+        │                                               {"buffer": {"contingency_percent": 20}}
+        │                                                         │
+        │      unknown section name? ──> ConfigError <───────────┤
+        │                                                         │
+        ├──── _changed_paths(defaults, override) ─────────────────┤ -> ["buffer.contingency_percent"]
+        │                                                         │    (values equal to the default
+        ▼                                                         │     are not recorded)
+   _merge(defaults, override) <────────────────────────────────────┘
+        │   mapping + mapping -> merge key by key (recursively)
+        │   anything else     -> override replaces default (lists included)
+        ▼
+   Config.model_validate(merged + overridden_paths)
+        │   every section's model and cross-field rules run on the RESULT,
+        │   so an override can't sneak in a weight of 1.2 or an unknown group
+        ▼
+   Config (frozen)          failure anywhere -> ConfigError with the reason
+```
+
 ## Sections
 
 | File | Model | Holds |
@@ -46,6 +72,24 @@ config = load_config_file(Path("perpetual-config.yaml"))  # same, from YAML
 | Every severity has a weight; weights are ≤ 0 and less severe never costs more | A missing severity would silently score 0 |
 | Type keys are `SERVICE/TYPE` and appear in one category, once | They must match the keys in resource IDs and typed properties |
 | Durations and limits are positive | A zero freshness age would make every fact stale |
+
+## How the evidence section will be used
+
+P0-09 implements the combination; this is what the config describes:
+
+```text
+ edge evidence             kind (weight)                     group
+ ─────────────             ─────────────                     ─────
+ SG path                   security_group_path (0.75)        network_permissions ┐ max = 0.75
+ NetworkPolicy match       network_policy_service_match(0.70) network_permissions ┘
+ IAM permission            iam_resource_permission (0.80)    iam_permissions       max = 0.80
+ CloudTrail call           cloudtrail_mapped_principal (0.95) cloudtrail           max = 0.95
+
+ within a group: take the maximum (the items may come from the same source)
+ across groups:  combination = noisy_or = 1 - (1-0.75)(1-0.80)(1-0.95) = 0.9975
+
+ below review_confidence_threshold (0.90) on a required path -> needs review before READY
+```
 
 ## Relation to other packages
 

@@ -2,25 +2,38 @@
 
 **Owns:** the shared vocabulary every other package passes around: resources, evidence, edges, stacks, requirements, mechanisms, user edits and status values, plus the records around an evaluation: coverage, observations, cost, evaluation inputs, verification reports, drills and operator access.
 **Spec:** §3 (readiness tiers), §5–§8.1, §14.1, §15–§15.4, §16, §19–§20, §23, §24–§24.1, §26–§27.1, §28.1, §30.1, §49, §49.2, §53, §56.3, §59.1, §61.1, §76.1. **Tracker:** P0-04a to P0-04f.
-**Depends on:** nothing else in Perpetual (an import rule enforces this); only Pydantic. **Used by:** every other package, as they are built.
+**Depends on:** nothing else in Perpetual (an import rule enforces this); only Pydantic. **Used by:** every other package.
 
 ## In one paragraph
 
 These are plain data classes built with Pydantic. They hold no logic beyond validating themselves: they do no I/O and call no other package. Their job is to make bad data impossible to construct. If a fixture, importer or user edit produces something the spec forbids (an "observed" fact with no time window, a quorum of zero, a Region-failure requirement with no target Region), building the model fails immediately with a clear message, instead of the engine computing a wrong answer later.
+
+## Where the models sit
+
+```text
+   producers                        models                         consumers
+ ─────────────                ──────────────────               ───────────────────
+ fixtures (YAML)   ─┐                                     ┌──>  persistence (rows + JSON)
+ importers (P1b)   ─┼──build──>  ResourceNode, Edge,  ────┼──>  graph (P0-11, NetworkX)
+ collectors (P2)   ─┤            Stack, Mechanism, …      ├──>  rules, simulator, recovery
+ user edits (UI)   ─┘            (validated, frozen)      └──>  api / cli (JSON out)
+
+ Anything that reaches the right-hand side has already passed every rule on this page.
+```
 
 ## Files
 
 | File | What it holds |
 |---|---|
 | `common.py` | `DomainModel` (the base class) and shared field types `NonEmptyStr`, `Confidence`, `Digest` (`sha256:<hex>`), `SortedIds` (distinct, stored sorted) |
-| `status.py` | Status vocabulary (§30.1): `ResourceState`, `StackState`, `Readiness`, `TargetComparison`, and the evidence label `ReadinessTier` (§3); helpers `worst_state`, `stack_state` |
-| `evidence.py` | `Evidence`, `SourceType`, `Basis` (§16) |
 | `resource.py` | `ResourceNode`, `SourceReference` (§15) |
+| `evidence.py` | `Evidence`, `SourceType`, `Basis` (§16) |
 | `edge.py` | `DependencyEdge`, `DependencyGroup`, `RelationshipType` and their enums (§19–§20) |
-| `override.py` | `GraphOverride` and its per-kind payload schemas (§23) |
 | `stack.py` | `Stack`, `StackService`, `StackResource`, `RtoScope` (§24, §24.1) |
 | `requirement.py` | `RecoveryRequirement`, `DurationEstimate`, `BufferPolicy`, `DRStrategy`, `FailureScope` (§26, §27, §49) |
 | `mechanism.py` | `RecoveryMechanism`, `MechanismKind`: the DR overlay (§27.1) |
+| `override.py` | `GraphOverride` and its per-kind payload schemas (§23) |
+| `status.py` | Status vocabulary (§30.1): `ResourceState`, `StackState`, `Readiness`, `TargetComparison`, and the evidence label `ReadinessTier` (§3); helpers `worst_state`, `stack_state` |
 | `facts.py` | Measured facts that are not configuration: `QuotaFact`, `InstanceTypeOfferingFact`, `CapabilityFact`, `MetricFact`, and the `FactRecord` union (§28.1, §76.1) |
 | `coverage.py` | `ScanCoverage`, `CoverageStatus`, `Presence`, `FreshnessPolicy` (§76.1) |
 | `observation.py` | `ResolvedObservation` and `Attribution` (exact or ambiguous): CloudTrail and flow-log aggregates resolved to resources (§14.1) |
@@ -34,21 +47,58 @@ These are plain data classes built with Pydantic. They hold no logic beyond vali
 
 ## How it works
 
+The sections follow the pipeline: first the graph (resources, evidence, edges, groups), then stacks and targets, the DR overlay and user edits, the status vocabulary, and last the records that surround an evaluation.
+
 ### The base class
 
-Every model inherits `DomainModel` (`common.py`), which sets three behaviours:
+Every model inherits `DomainModel` (`common.py`). Building one runs these steps; any failure raises `ValidationError` and nothing is created:
 
-- **immutable** (`frozen=True`): a model can't be changed after it is built. Change means building a new one, e.g. `override.model_copy(update={"status": "orphaned"})`. This keeps snapshots and evaluation inputs stable, which later work hashes into digests (§56.3).
-- **unknown fields rejected** (`extra="forbid"`): a typo such as `confidance=0.9` in a fixture fails loudly instead of being ignored.
-- **validation on construction**: field types are checked first, then each model's `@model_validator(mode="after")` method checks rules that span several fields.
+```text
+ dict / kwargs
+      │
+      ▼
+ 1. unknown keys?            extra="forbid"   ── "confidance" ──> error
+      │
+      ▼
+ 2. field types              str, enums, AwareDatetime (naive time ──> error),
+      │                      Confidence 0..1, Digest pattern, SortedIds (sort, reject repeats)
+      ▼
+ 3. @field_validator         one field at a time   (e.g. sort unknown_fields)
+      │
+      ▼
+ 4. @model_validator(after)  rules across fields   (e.g. "observed needs a window")
+      │
+      ▼
+ frozen instance             can't be changed; change = model_copy(update=…) -> new object
+```
 
-Timestamps use `AwareDatetime`, so a time without a timezone is rejected.
+Immutability keeps snapshots and evaluation inputs stable, which later work hashes into digests (§56.3).
 
-### Resources and evidence
+### Resources, evidence and edges
 
-A `ResourceNode` is one resource, whatever source it came from. Its `id` is the canonical form `aws://ACCOUNT/REGION/SERVICE/TYPE/IDENTIFIER` (built and parsed only through [`ids`](ids.md)). `properties` is the raw store, which rules never read; `typed_properties` holds the typed configuration (next section). `planned=True` marks a resource that exists only in a Terraform plan.
+A `ResourceNode` is one resource, whatever source it came from. Its `id` is the canonical form `aws://ACCOUNT/REGION/SERVICE/TYPE/IDENTIFIER`, built and parsed only through [`ids`](ids.md). `properties` is the raw store, which rules never read; `typed_properties` holds the typed configuration. `planned=True` marks a resource that exists only in a Terraform plan.
 
-`Evidence` is one traceable fact. For dependency evidence, `basis` says what kind of fact it is:
+A `DependencyEdge` always points **dependent → dependency**, and carries the `Evidence` that supports it:
+
+```text
+   ResourceNode                                  ResourceNode
+ ┌───────────────────────┐   DependencyEdge     ┌───────────────────────┐
+ │ ecs/service/checkout  │ ───────────────────> │ rds/db/checkout       │
+ │ typed_properties:     │  connects_to         │ typed_properties:     │
+ │   ECSServiceProperties│  criticality=required│   RDSInstanceProperties
+ └───────────────────────┘  confidence=0.94     └───────────────────────┘
+                                 │
+                                 │ evidence[]
+                                 ▼
+          ┌─────────────────────────────────────────────────────┐
+          │ Evidence  source_type=terraform   basis=referenced  │
+          │ Evidence  source_type=cloudtrail  basis=observed    │
+          │           observed_from..observed_to, count=42      │
+          └─────────────────────────────────────────────────────┘
+   "checkout needs the database": if the database fails, checkout is impacted.
+```
+
+`Evidence.basis` says what kind of fact it is. An edge's `bases` property is computed from its evidence, never stored:
 
 ```text
 permitted    a connection is allowed      (security group, IAM policy)
@@ -57,108 +107,111 @@ observed     traffic was seen             (CloudTrail, flow logs; stored as wind
 asserted     a person said so             (user confirmation)
 ```
 
+`RelationshipType` is the fixed vocabulary from §20. Most relationships mean "needs". Four don't, and `is_operational_requirement` returns False for them, so the impact pass doesn't follow them:
+
+```text
+ followed by the impact pass            not requirements
+ ───────────────────────────            ──────────────────────────────────────
+ depends_on  connects_to  reads_from    contains, member_of   structure only
+ writes_to   encrypted_by uses_secret   replicates_to         a primary doesn't fail
+ uses_parameter  uses_image routes_to   backed_up_by          because its copy fails;
+ resolves_to mounted_from assumes_role                        only the DR overlay
+ scheduled_on targets attached_to                             follows these
+ deployed_to
+```
+
 ### Typed properties
 
-Rules read a resource's configuration from `typed_properties`, a model specific to its type (54 type keys so far), never from the raw `properties` dict. Pydantic picks the model from its `type_key`, which matches the `SERVICE/TYPE` part of the resource ID. The node checks they agree. Missing values come in three kinds (absent, unknown until apply, known empty), and secret values have no field to live in.
+Rules read a resource's configuration from `typed_properties`, a model specific to its type (57 type keys: 55 AWS types plus the external and generic fallbacks), never from the raw `properties` dict. Pydantic picks the model from its `type_key`, which matches the `SERVICE/TYPE` part of the resource ID, and the node checks they agree. Missing values come in three kinds (absent, unknown until apply, known empty), and secret values have no field to live in.
 
 Everything about them, including the full list of types, is on its own page: **[models-properties.md](models-properties.md)**.
 
-### Facts
+### Dependency groups
 
-Some things the rules need are not resource configuration: a Service Quotas limit and current usage, which instance types a Region offers, whether a feature exists in a Region, a CloudWatch series such as replica lag. They change much faster than configuration and have tighter freshness limits (§76.1: 15 minutes for the latest replication, usage or quota measurement), so they live in `facts.py`, apart from resources.
-
-Every fact records where and when it was collected, which coverage record produced it (§76.1, model in P0-04f), and whether it is `carried_forward` history that cannot satisfy a check by itself. `FactRecord` picks the fact type from `kind`.
-
-The guiding rule is that **missing data stays unknown**:
-
-- `QuotaFact.headroom` is None unless both the limit and current usage are known. A limit alone proves nothing: the account may already use most of it.
-- `MetricFact` separates `ok`, `no_data`, `access_denied` and `error`. Only an `ok` read has samples, and it always has at least one, so "no data" can never read as zero. `latest_sample_at` is what freshness is judged on, and `missing_samples` shows gaps.
-- `CapabilityFact` is `available`, `unavailable` or `unknown`. An answer from a catalog names the catalog version.
-
-### Coverage and freshness
-
-Every fact points at the `ScanCoverage` record of the collection that produced it: one record per account, Region (or global), service and operation family. Its status is `complete`, `partial`, `denied`, `unsupported` or `not_requested`, and only `complete` is authoritative. The model refuses to call a run complete if pagination stopped early or errors were recorded, and a denied run must record its error codes.
-
-`Presence` is how later stages say what coverage proved: `present`, `confirmed_absent` (only after complete inventory of the resource's scope) or `unknown`. Failed or skipped discovery gives `unknown`; it never deletes a resource or proves a mechanism is `none`.
-
-`FreshnessPolicy` has the shape of the maximum-age settings (inventory, latest measurement, primary/DR skew) but no default values. The values live in YAML config (P0-06), and the policy version goes into every evaluation input.
-
-### Resolved observations
-
-A `ResolvedObservation` is a CloudTrail or flow-log aggregate (window and count, never raw events) with the resources at each end. Shared roles and Lambda ENIs often leave several candidates:
+By default every required edge of a dependent is needed. A `DependencyGroup` changes how a set of one dependent's edges combine:
 
 ```text
-exact       one resource at each end; must cite the evidence that resolved it
-ambiguous   several candidates at one end; stored once against the sorted candidate sets
+ all      every member is needed            (the default for ungrouped required edges)
+ any      one member is enough              (e.g. two interchangeable endpoints)
+ quorum   minimum_healthy members needed    (e.g. 2 of 3)
+
+ Example: checkout can read from either cache.
+
+     ecs/service/checkout ──e1──> elasticache/primary  ┐  DependencyGroup
+                          ──e2──> elasticache/replica  ┘  mode=any, members=[e1,e2]
+                          ──e3──> rds/db/checkout         (ungrouped: needed)
+
+     primary cache fails  -> group still has e2    -> checkout survives
+     both caches fail     -> group needs 1, has 0  -> checkout impacted
 ```
 
-An ambiguous observation is not copied onto every possible edge, and its count is not multiplied. Edge resolvers and the review flow (P2b) build on this.
-
-### Workload and cost
-
-A `WorkloadProfile` is a versioned set of quantities for one stack (requests, stored GB, replication GB per month, and so on), each with low/expected/high bounds. A measured quantity carries its observation window; an estimate or forecast must record its assumptions. A quantity that isn't listed is unknown, never idle.
-
-A `CostEstimate` is a list of `CostLineItem`s with unique keys, so a shared foundation is counted once. Totals and the fixed/variable subtotals are computed from the lines, so they can't disagree. **One unknown line makes that total unknown**; a known fixed subtotal can't hide it. A line can be zero only with a `zero_reason`. Budget comparison itself belongs to the costing stage.
-
-### Evaluation inputs
-
-An `EvaluationInput` lists everything a result was computed from: primary and DR snapshot IDs and inventory times, coverage IDs, graph/override/group revisions, requirement and workload-profile revisions, engine and rule-pack versions, config/duration/price catalog digests, the freshness-policy version, and the assumptions, confirmations, skills and documents used. Before approval it also pins either the IaC baseline (base commit, tree digest, roots with workspace, provider Regions, backend lineage/serial and lock-file digest) or the companion design's template and input digests, never both. Lists are normalized so the same manifest always hashes the same. It holds identities and digests only: no credentials, state or secret values. The canonical approval digest is computed in P9-08.
-
-### Verification and prerequisites
-
-A `VerificationReport` keeps four answers apart (§61.1): `static_checks`, `design_verification`, the combined `deployment_prerequisites` status, and `observed_readiness`. It is bound to the approved digest, tree digest and saved-plan digest it checked.
-
-```text
-static_checks_only mode    design verification can't pass       -> "static checks only"
-design pass                needs full mode, passing static checks, no unverified changes,
-                           no failed prerequisite                -> "design verified — deployment
-                                                                     and observation pending"
-observed READY             needs every prerequisite satisfied
-```
-
-A `DeploymentPrerequisite` is something a plan can't prove (an image is present, an initial copy finished, a quota was raised). It names affected resources, owner, required evidence and re-check IDs. Satisfied or failed must cite evidence, so nothing is marked done just because its configuration exists. `combined_prerequisite_status` picks the worst: failed, then unknown, then pending.
-
-### Drills and readiness tiers
-
-`DRDrill` is the §53 schema plus the source (ARC execution report, recovery-script log, fault injection, Resilience Hub test) and optional digests of the scan and design it tested. Unmeasured RTO/RPO stay None. `ReadinessTier` (`DESIGN_VERIFIED`, `CONFIGURED`, `PROVEN`) labels the evidence behind a result; it is not a state.
-
-### Operator access
-
-`OperatorAccessProfile` mirrors the `operator_access` YAML section: identity source with home and replica Regions, a break-glass method, network paths to private endpoints and the Region each ends in, and pinned tool versions. `replica_regions: None` means unknown, `[]` means declared to have none. Typos in the YAML fail because unknown fields are rejected. The loader and OPS-ACCESS rules arrive in P4-04c.
-
-### Edges and groups
-
-A `DependencyEdge` always points **dependent → dependency**: `ECS service → RDS database` means the service needs the database. Its `bases` property is computed from its evidence, never stored.
-
-`RelationshipType` is the fixed vocabulary from §20. Four relationships are not requirements, and `is_operational_requirement` returns False for them: `contains` and `member_of` (structure), and `replicates_to` and `backed_up_by` (a primary doesn't fail because its replica or backup fails; only the DR overlay follows these).
-
-A `DependencyGroup` says how a dependent's edges combine:
-
-```text
-all      every member is needed            (the default for an ungrouped required edge)
-any      one member is enough              (e.g. two interchangeable endpoints)
-quorum   minimum_healthy members needed    (e.g. 2 of 3)
-```
-
-`required_members` gives that number.
+`required_members` gives the number needed. `scope` is `primary` (the dependency graph) or `dr` (the DR overlay). Rules that need the whole file or graph, such as "members start at the dependent" and "an edge is in at most one group per scope", are checked by the fixture validator now and by the graph builder (P0-11) for live data.
 
 ### Stacks and requirements
 
-A `Stack` is the unit of DR. `StackResource` records membership plus RTO scope: monitoring, logging and CI/CD are `out_of_scope` by default (§24.1). `StackService` exists for display only.
+A `Stack` is the unit of DR: one product, one plan, one RTO, one RPO per failure scenario.
 
-A `RecoveryRequirement` holds the targets for one stack and failure scope: RTO, RPO, budget and, for Region failure, the target Region. Durations use `DurationEstimate` (low / expected / high, each possibly unknown) and `BufferPolicy` (handoff, stack validation, contingency).
+```text
+ Stack "checkout"   roots: [route53 record]          primary_region: ap-south-1
+   │
+   ├── StackResource  route53/recordset/api      in_scope
+   ├── StackResource  ecs/service/checkout       in_scope
+   ├── StackResource  rds/db/checkout            in_scope
+   └── StackResource  logs/log-group/checkout    out_of_scope  (logging: shown, never blocking)
 
-### The DR overlay and user edits
+ StackService "api"   resource_ids: [ecs/service/checkout]   display only, no targets
 
-A `RecoveryMechanism` says how one primary resource is provided in the DR target: a live counterpart, a restore, a rebuild from IaC, and so on. The overlay is itself graph-shaped: `dr_dependency_ids` and DR-side groups list what recovery needs in the DR Region.
+ RecoveryRequirement  stack=checkout  failure_scope=region  target_region=ap-south-2
+                      RTO 30m  RPO 5m  budget $1200/month  buffer: BufferPolicy
+```
 
-A `GraphOverride` is a user edit (confirm, reject, add or edit an edge; add or edit a node). Its `payload` is a plain dict, so it round-trips through YAML, but it is validated against the schema for its `kind`; `typed_payload()` returns the parsed version.
+Durations use `DurationEstimate` (low / expected / high, each possibly unknown, never zero by default) and `BufferPolicy` (handoff, stack validation, contingency).
+
+### The DR overlay
+
+A `RecoveryMechanism` says how one primary resource is provided in the DR target. The overlay is graph-shaped too: `dr_dependency_ids` and DR-side groups list what recovery needs on the DR side.
+
+```text
+     primary Region (ap-south-1)                 DR Region (ap-south-2)
+   ┌──────────────────────────┐   mechanism    ┌──────────────────────────────┐
+   │ rds/db/checkout          │ ─────────────> │ rds/db/checkout-replica      │
+   └──────────────────────────┘ live_counter-  │   needs (dr_dependency_ids): │
+                                 part          │   kms/key/dr, rds subnet grp │
+                                               └──────────────────────────────┘
+ kind:  live_counterpart | restore_from_recovery_point | rebuild_from_iac
+        global_service | external | none | unknown
+        ("none" is a proven gap; "unknown" means not enough evidence)
+```
+
+### User edits
+
+A `GraphOverride` is a user edit. It never changes discovered data; it is applied on top of each scan:
+
+```text
+ discovered graph (scan N) ──┐
+                             ├──> effective graph used by the engine
+ GraphOverride rows ─────────┘
+   confirm_edge  reject_edge  add_edge  edit_edge  add_node  edit_node
+
+ rescan: target still exists -> override still applies
+         target gone         -> status = orphaned (shown, never dropped)
+```
+
+Its `payload` is a plain dict, so it round-trips through YAML, but it is validated against the schema for its `kind`; `typed_payload()` returns the parsed version.
 
 ### Status vocabulary
 
 ```text
-resource state, worst first:  BLOCKED > UNKNOWN > RECOVERABLE > SURVIVES
-stack state:                  BLOCKED -> UNAVAILABLE, UNKNOWN -> UNKNOWN, otherwise RECOVERABLE
+ resource state, worst first:   BLOCKED  >  UNKNOWN  >  RECOVERABLE  >  SURVIVES
+
+ stack state from its required resources (worst one wins):
+
+   worst = BLOCKED      ──> UNAVAILABLE
+   worst = UNKNOWN      ──> UNKNOWN
+   worst = RECOVERABLE  ─┐
+   worst = SURVIVES     ─┴> RECOVERABLE
+
+   no states at all     ──> error (never "SURVIVES": missing evidence is not health)
 ```
 
 ```python
@@ -166,6 +219,139 @@ from perpetual.models import ResourceState, stack_state
 
 stack_state([ResourceState.SURVIVES, ResourceState.UNKNOWN])  # StackState.UNKNOWN
 ```
+
+`Readiness` (READY, DEGRADED, NOT_READY, UNKNOWN) and `TargetComparison` (PASS, FAIL, UNCERTAIN) are the result vocabularies the later stages produce.
+
+### Facts and coverage
+
+Some things the rules need are not resource configuration: a Service Quotas limit and current usage, which instance types a Region offers, whether a feature exists in a Region, a CloudWatch series such as replica lag. They change much faster than configuration, so they live in `facts.py`, apart from resources. Every fact points at the `ScanCoverage` record of the collection that produced it:
+
+```text
+ collection run                ScanCoverage                       facts it produced
+ ─────────────                 ─────────────────────────────      ──────────────────
+ rds inventory, ap-south-2 ──> status=complete, pages done ──┬──> QuotaFact
+                               errors=[]                     ├──> MetricFact (lag)
+                                                             └──> CapabilityFact
+
+ later stages ask: "is the DR replica there?"
+
+   coverage complete + found       ──> Presence.PRESENT
+   coverage complete + not found   ──> Presence.CONFIRMED_ABSENT
+   partial / denied / unsupported
+   / not_requested                 ──> Presence.UNKNOWN   (never deletes, never proves "none")
+```
+
+The model refuses to call a run complete if pagination stopped early or errors were recorded, and a denied run must record its error codes. `FreshnessPolicy` has the shape of the maximum-age settings; the values come from [`config`](config.md) (`freshness.yaml`).
+
+The guiding rule for facts is that **missing data stays unknown**:
+
+- `QuotaFact.headroom` is None unless both the limit and current usage are known. A limit alone proves nothing.
+- `MetricFact` separates `ok`, `no_data`, `access_denied` and `error`. Only an `ok` read has samples, and it always has at least one, so "no data" can never read as zero. `latest_sample_at` is what freshness is judged on.
+- `CapabilityFact` is `available`, `unavailable` or `unknown`. An answer from a catalog names the catalog version.
+- `carried_forward=True` marks history kept for context; it can't satisfy a check by itself.
+
+### Resolved observations
+
+A `ResolvedObservation` is a CloudTrail or flow-log aggregate (window and count, never raw events) with the resources at each end:
+
+```text
+ exact:      svc-checkout ──42 calls──> dynamodb/orders
+             one resource at each end, cites the evidence that resolved it
+
+ ambiguous:  {svc-checkout, svc-admin} ──42 calls──> dynamodb/orders
+             (both use one shared role)
+             stored ONCE against the sorted candidate set:
+               - the count is not split or multiplied
+               - no high-confidence evidence is copied onto either edge
+               - a candidate edge backed only by this can't skip review
+```
+
+### Workload and cost
+
+A `WorkloadProfile` is a versioned set of quantities for one stack, each with low/expected/high bounds. A measured quantity carries its observation window; an estimate or forecast must record its assumptions. A quantity that isn't listed is unknown, never idle.
+
+A `CostEstimate` is a list of `CostLineItem`s with unique keys, so a shared foundation is counted once. Totals are computed from the lines, so they can't disagree with them:
+
+```text
+ line                kind       low    expected   high
+ rds-replica         fixed      300    320        350
+ ecr-replication     variable   2      4          6
+ cross-region-xfer   variable   None   None       None   <- usage unknown
+
+ total(high)                                      None   any unknown line -> unknown total
+ total(high, FIXED)                               350    known, but can't stand in for the total
+```
+
+A line can be zero only with a `zero_reason`. Budget comparison itself (PASS only when the high bound is within budget) belongs to the costing stage.
+
+### Evaluation inputs
+
+An `EvaluationInput` is the manifest a result was computed from. Approval later signs its digest (P9-08), so any relevant change produces a different manifest and supersedes the approval:
+
+```text
+ EvaluationInput "eval-1"   stack=checkout   scenario=region:ap-south-1   evaluated_at
+ ├── snapshots      primary_snapshot_id + inventory time, dr_snapshot_id + time, coverage_ids
+ ├── graph          graph_revision, override_revision, group_revision
+ ├── targets        requirement_id@revision, workload_profile_id@revision
+ ├── engine         engine_version, rule_pack_versions
+ ├── catalogs       config_digest, duration_catalog_digest, price_catalog_digest
+ ├── policy         freshness_policy_version
+ ├── inputs_used    assumptions, confirmations, skills, documents (kind, id, digest), sorted
+ └── before approval, ONE of:
+       iac_baseline       base commit, tree digest, roots (path, workspace, provider Regions,
+                          backend lineage/serial, lock-file digest), k8s inventory digest
+       companion_design   template digest, input digest
+```
+
+It holds identities and digests only: no credentials, state or secret values.
+
+### Verification and prerequisites
+
+A `VerificationReport` keeps four answers apart (§61.1) and is bound to the approved digest, tree digest and saved-plan digest it checked:
+
+```text
+                       mode = static_checks_only?
+                        │yes                      │no (full: a saved plan was imported)
+                        ▼                         ▼
+           design_verification can't      static_checks == pass?
+           pass  -> "static checks only"   │no -> design can't pass
+                                           │yes
+                                           ▼
+                                  unverified changes?  any prerequisite failed?
+                                           │ none of either
+                                           ▼
+                        design_verification = pass
+                        "design verified — deployment and observation pending"
+                                           │
+                          user deploys; a fresh scan checks each prerequisite
+                                           ▼
+                  every prerequisite satisfied (with evidence)?  ──no──> observed READY refused
+                                           │yes
+                                           ▼
+                             observed_readiness may be READY
+```
+
+A `DeploymentPrerequisite` is something a plan can't prove (an image is present, an initial copy finished, a quota was raised). It names affected resources, owner, required evidence and re-check IDs. Satisfied or failed must cite evidence. `combined_prerequisite_status` picks the worst: failed, then unknown, then pending; no prerequisites is satisfied.
+
+### Drills and readiness tiers
+
+```text
+ ReadinessTier (labels on the evidence, not states)
+
+   DESIGN_VERIFIED  the change meets targets on the planned graph      (VerificationReport)
+        │ deploy + fresh scan
+        ▼
+   CONFIGURED       observed READY: DR resources present and healthy   (live evaluation)
+        │ game day / ARC execution report / fault injection
+        ▼
+   PROVEN           recovery was measured                              (DRDrill)
+```
+
+`DRDrill` is the §53 schema plus the source (ARC execution report, recovery-script log, fault injection, Resilience Hub test) and optional digests of the scan and design it tested. Unmeasured RTO/RPO stay None.
+
+### Operator access
+
+`OperatorAccessProfile` mirrors the `operator_access` YAML section: identity source with home and replica Regions, a break-glass method, network paths to private endpoints and the Region each ends in, and pinned tool versions. `replica_regions: None` means unknown, `[]` means declared to have none. Typos in the YAML fail because unknown fields are rejected. The loader and OPS-ACCESS rules arrive in P4-04c.
 
 ## Rules it enforces, and why
 
@@ -195,8 +381,6 @@ stack_state([ResourceState.SURVIVES, ResourceState.UNKNOWN])  # StackState.UNKNO
 | Observed READY needs every prerequisite satisfied; settled prerequisites cite evidence | `VerificationReport`, `DeploymentPrerequisite` | No operational check passes because its configuration exists (§61.1) |
 | Identity Regions apply only to IAM Identity Center; unknown replicas are None, not [] | `OperatorIdentity` | Undeclared, undiscovered facts stay UNKNOWN (§28.1) |
 
-Rules that need the whole graph, such as "group members share one dependent" and "an edge is in at most one group", are checked when the graph is built (P0-11).
-
 ## Tests
 
 `apps/api/tests/models/`, one file per topic; shared builders in `builders.py`.
@@ -213,5 +397,5 @@ Rules that need the whole graph, such as "group members share one dependent" and
 
 ## Not here yet
 
-- Freshness and coverage values (YAML config): P0-06.
 - Canonical digests over these models: P9-08.
+- `FailureScenario` (P1-04), simulation and recovery-plan models (P1-05 to P1-15), `Finding` (P4-01): with the stages that produce them.

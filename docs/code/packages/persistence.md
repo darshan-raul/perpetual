@@ -38,6 +38,58 @@ projects
 - **Evidence** is stored once per snapshot and linked to edges by position, so an edge reloads with its evidence in the same order. The same evidence ID with different content is refused: it means a bug upstream. Groups and mechanisms keep their (rare) evidence inside their payload.
 - **Observations** are the resolved CloudTrail/flow-log aggregates from `models.observation`; raw events have nowhere to go.
 
+## A scan's lifecycle
+
+```text
+ add_scan("scan-1")                    scans.status = running
+      │
+ create_snapshot("snap-1", live)       snapshots.published_at = NULL   (open)
+      │
+      ├── save_coverage(scan-1, …)     scan_coverage rows
+      ├── save_resources(snap-1, …)    resources (identity, first time only) + resource_versions
+      ├── save_edges(snap-1, …)        edges + evidence (once) + edge_evidence links
+      ├── save_groups / save_observations / save_mechanisms / save_stacks
+      │
+ publish_snapshot("snap-1")            published_at = now   ── from here, every save_* to
+      │                                                         snap-1 raises PersistenceError
+ finish_scan("scan-1", completed|partial|failed)   can't be finished twice
+
+ next scan -> new snapshot "snap-2"; snap-1 stays as it was (history, drift)
+ overrides and evaluation inputs live beside snapshots, per project
+```
+
+## What `save_edges` writes
+
+```text
+ DependencyEdge e1 (evidence: [ev-b, ev-a])      DependencyEdge e2 (evidence: [ev-a])
+        │                                                │
+        ▼                                                ▼
+ edges row  e1  payload = edge WITHOUT evidence   edges row  e2
+        │                                                │
+        ├─ position 0 ─> _store_evidence(ev-b) ─> new evidence row
+        ├─ position 1 ─> _store_evidence(ev-a) ─> new evidence row ◄─┐
+        │                                                            │ same id, same content:
+        │                                        position 0 ─────────┘ reuse the row
+        ▼
+ edge_evidence (edge_row, position, evidence_row)
+ same id with DIFFERENT content -> PersistenceError (a bug upstream, never merged)
+```
+
+## How loading works
+
+```text
+ repo.edges("snap-1")
+   SELECT edges WHERE project_id = repo.project_id AND snapshot_id = "snap-1" ORDER BY edge_id
+   SELECT evidence payloads via edge_evidence, ORDER BY position
+        │
+        ▼
+   payload + {"evidence": [...]}  ──>  DependencyEdge.model_validate(...)
+                                       every model rule runs again; a bad row can't reach
+                                       the engine as a "valid" edge
+```
+
+Every query includes the repository's `project_id`; a scan or snapshot ID from another project is "not found".
+
 ## Using it
 
 ```python

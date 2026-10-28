@@ -14,6 +14,24 @@ A `ResourceNode` keeps whatever a source reported in `properties`, a raw dict th
 
 Each model has a `type_key` equal to the `SERVICE/TYPE` part of the canonical resource ID. `ResourceProperties` (in `properties/__init__.py`) is a union of all models, discriminated by `type_key`:
 
+```text
+ ResourceNode dict
+   id: aws://…/ecs/service/checkout          service="ecs", resource_type="service"
+   typed_properties: {type_key: "ecs/service", …}
+                          │
+                          ▼  Pydantic reads type_key, picks one model from the union
+        ┌──────────────────────────────────────────────────────────┐
+        │ ResourceProperties = ECSServiceProperties | RDSInstance… │ (57 keys)
+        └──────────────────────────────────────────────────────────┘
+                          │  validates the fields of ECSServiceProperties only
+                          ▼
+        ResourceNode._typed_properties_match_type
+          type_key == "service/resource_type" of the node?   "ecs/service" == "ecs/service" ✓
+            external/dependency -> allowed only when provider == "external"
+            generic/resource    -> allowed only when the type has no model
+          mismatch -> error (RDS fields on an ECS node would make every rule read nonsense)
+```
+
 ```python
 node = ResourceNode.model_validate({
     "id": "aws://123456789012/ap-south-1/ecs/service/checkout",
@@ -47,6 +65,21 @@ Two helpers read these cases:
 ### Planned resources: required fields
 
 A resource that a Terraform plan will create has no ARN or ID until apply, and the importer must never invent one (§15.4). So values that AWS assigns (IDs, ARNs, URIs, computed numbers such as a task definition's revision) are declared in a model's `required_fields`. They are typed `... | None`, and the base class enforces that each one is **present, or listed in `unknown_fields`**: never just absent.
+
+```text
+ for each name in required_fields:
+
+     value present? ──yes──> ok
+          │no
+          ▼
+     name in unknown_fields? ──yes──> ok, rules treat it as UNKNOWN
+          │no
+          ▼
+     error: "<name> is required; if it is only known after apply, list it in unknown_fields"
+
+ nested part (e.g. one container):  a missing required value inside it
+     -> the PARENT lists the whole field: unknown_fields=["containers"]
+```
 
 ```python
 ECSServiceProperties.model_validate({"service_name": "checkout", "desired_count": 2})

@@ -16,6 +16,20 @@ All tools are pinned in `mise.toml` and run through mise.
 | `mise run test` | pytest (no AWS, no Docker) |
 | `mise run check` | lint + typecheck + test; the same command CI runs |
 
+What `mise run check` runs, in order (CI runs the same):
+
+```text
+ mise run check
+   ├─ lint       ruff check .            style and bug patterns
+   │             ruff format --check .   formatting
+   │             lint-imports            the 9 layer rules below
+   ├─ typecheck  mypy (strict, Pydantic plugin)
+   └─ test       pytest                  no AWS, no Docker; `contract` tests skipped
+ any step fails -> the command fails
+```
+
+The CLI runs from the repository with `uv run perpetual …` (console script in `pyproject.toml`); see [packages/cli.md](packages/cli.md).
+
 One test: `uv run pytest apps/api/tests/models/test_model_edge.py::test_bases_are_derived_from_evidence -q`.
 
 Machine-only settings go in `mise.local.toml`, which is gitignored.
@@ -28,7 +42,11 @@ pyproject.toml            the one Python project: builds `perpetual` from apps/a
 uv.lock                   exact dependency versions
 mise.toml                 pinned tools and tasks
 apps/api/perpetual/       the package, one subpackage per pipeline stage
+  config/defaults/        shipped YAML defaults (in the wheel)
+  persistence/migrations/ Alembic environment and versions (in the wheel)
 apps/api/tests/           tests, mirroring the package (tests/models/ for perpetual.models)
+fixtures/graphs/          fixture files (format v1), found by name with --fixture
+fixtures/schema/          JSON Schema for fixture files; a test keeps it current
 .github/workflows/ci.yml  CI
 docs/spec/                what Perpetual must do
 docs/code/                how the code does it (these pages)
@@ -59,5 +77,11 @@ Defined in `pyproject.toml` under `[tool.importlinter]`; run by `mise run lint`.
 - Tests marked `contract` need real AWS sandbox credentials and are skipped by default.
 
 ## CI
+
+```text
+ push to main / pull request
+   └─ checkout ─> mise-action (pinned tools) ─> uv sync --all-groups --locked ─> mise run check
+                                                 (fails if uv.lock is stale)
+```
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request: it installs the pinned tools with mise, installs dependencies with `uv sync --locked` (failing if `uv.lock` is stale), then runs `mise run check`. Actions are pinned to exact commit SHAs.

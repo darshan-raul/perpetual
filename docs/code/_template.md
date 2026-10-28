@@ -18,7 +18,14 @@ What the package does and where it sits in the pipeline, for someone who has not
 
 ## How it works
 
-Walk through the main types or functions in the order a reader should meet them. Use a small diagram when relationships matter. Show a short usage example.
+Start with an ASCII diagram of the main path: what comes in, which functions it passes through, what comes out, and where it can fail. Then walk through the main types or functions in the order a reader should meet them, with a diagram wherever relationships or decisions matter. Show a short usage example.
+
+```text
+ input ──> function_a ──> function_b ──> output
+               │ fails when …
+               ▼
+           SomeError
+```
 
 ## Rules it enforces, and why
 
