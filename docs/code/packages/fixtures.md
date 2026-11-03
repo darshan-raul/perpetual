@@ -86,7 +86,7 @@ Step by step:
    - `discovered_at` and evidence `collected_at` default to `captured_at`; overrides default to project `fixture` and `captured_at`.
 3. **Validate**: the domain models (`parse_fixture`), then cross-references (`check_references`).
 
-`DERIVED_FIELDS` lists the fields step 2 fills in. `fixture_json_schema()` marks them optional, so editors accept the short form.
+`DERIVED_FIELDS` lists the fields step 2 fills in. It lives in `schema.py` with `FixtureIssue`, so imports run one way (`loader` → `validate` → `schema`) with no import cycle. `fixture_json_schema()` marks them optional, so editors accept the short form.
 
 ## Cross-reference rules
 

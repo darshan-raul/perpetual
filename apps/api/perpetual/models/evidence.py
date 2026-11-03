@@ -48,6 +48,11 @@ class Evidence(DomainModel):
     basis: Basis | None = None
     """Required for dependency evidence; DependencyEdge enforces that."""
     source: NonEmptyStr
+    kind: str | None = None
+    """The evidence kind from the weights table, e.g. security_group_path (spec §22).
+    Its weight and correlation group come from config. Only a user confirmation may
+    leave it None; it then counts by its own confidence. Combining any other
+    kind-less evidence raises."""
     resource_id: str | None = None
     attribute: str | None = None
     value_summary: str | None = None

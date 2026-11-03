@@ -98,7 +98,7 @@ A `DependencyEdge` always points **dependent → dependency**, and carries the `
    "checkout needs the database": if the database fails, checkout is impacted.
 ```
 
-`Evidence.basis` says what kind of fact it is. An edge's `bases` property is computed from its evidence, never stored:
+`Evidence.basis` says what kind of fact it is, and `Evidence.kind` (optional) names its row in the §22 weights table, e.g. `security_group_path`, which is how [`evidence`](evidence.md) finds its weight and correlation group. An edge's `bases` property is computed from its evidence, never stored:
 
 ```text
 permitted    a connection is allowed      (security group, IAM policy)

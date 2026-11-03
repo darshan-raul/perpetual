@@ -6,15 +6,15 @@ A task is done when its code, tests and code walkthrough ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-09**.
+**Current focus:** M0 PoC · next task **P0-10**.
 
 ## Milestones
 
 | Milestone | Release | Phases | Status | Exit (demo) |
 |---|---|---|---|---|
 | M0 PoC | — | P0, P1, P1c | [~] | `perpetual poc fix --fixture ecs-broken`: generated Terraform + recovery script, re-simulated stack matches `ecs-remediated` |
-| M1 Alpha | — | P1b, P2, P2b, P3, P4 (no P4-07), P5, P6, P8 | [ ] | a real sandbox ECS stack gets its graph, blockers, RTO and RPO in the UI |
-| M2 MVP | v0.1 | P7, P9 (no P9-07), P10 (v0.1 tasks), P11, P12 | [ ] | spec §100 workflow, deterministic: DR spec → companion Terraform + suggested edits + scripts/ARC plan on a branch or PR → verified with a supplied saved plan → observed READY after deploy |
+| M1 Alpha | — | P1b, P2 and P4 for the ECS + RDS slice (no P2c tasks, no P4-07), P2b, P3, P5, P6, P8 | [ ] | a real sandbox ECS stack gets its graph, blockers, RTO and RPO in the UI |
+| M2 MVP | v0.1 | P2c, P7, P9 (no P9-07), P10 (v0.1 tasks), P11, P12 | [ ] | spec §100 workflow, deterministic: DR spec → companion Terraform + suggested edits + scripts/ARC plan on a branch or PR → verified with a supplied saved plan → observed READY after deploy |
 | M3 Agents | v0.2 | P3b, P4-07, P9-07, P10 (v0.2 tasks), P13 | [ ] | LLM advisor, planner and in-place IaC transformation in an isolated runner; v0.2 gates pass |
 | M4 Proven | v0.3 | P14 | [ ] | a game day or ARC execution report takes a sandbox stack to PROVEN |
 | M5 Production | v1.0 | P15 | [ ] | installable from PyPI/Homebrew, upgradeable, audited, documented supported-service matrix |
@@ -34,6 +34,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | P5 Simulation on discovered stacks | M1 | [ ] | survives/fails and why, on sandbox |
 | P6 Recovery DAG on live data | M1 | [ ] | architecture-derived RTO |
 | P8 RPO | M1 | [ ] | stack RPO from data stores |
+| P2c Expanded services | M2 | [ ] | EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB stack scanned and assessed |
 | P7 EKS slice | M2 | [ ] | cluster ready, application not |
 | P9 Optimizer, DR spec | M2 (P9-07 M3) | [ ] | deterministic candidates compared; approved DR spec per demo |
 | P10 IaC delivery | M2 / M3 | [ ] | v0.1: companion + suggested edits verified with a supplied plan; v0.2: in-place edits verified in isolation |
@@ -131,18 +132,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-06 Typed config + defaults
 - [x] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
 - [x] P0-08 Fixture format v1, loader, validator, JSON Schema
-- [ ] P0-09 Evidence combination + fingerprints
+- [x] P0-09 Evidence combination + fingerprints
 - [ ] P0-10 Graph overrides (apply, merge, orphan, YAML)
 - [ ] P0-11 NetworkX snapshot + traversal helpers
+- [ ] P0-15 Immutable evaluation/snapshot manifests, canonical hashes, versioned fixture inputs and payload schema versions (before P0-12/13)
 - [ ] P0-12 `perpetual graph` CLI
 - [ ] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
 - [ ] P0-14 CLAUDE.md commands updated
-- [ ] P0-15 Immutable evaluation/snapshot manifests, canonical hashes and versioned fixture inputs
 
 ### P1 Simulation and recovery core
 
 - [ ] P1-01 Rule-pack protocol + registry
-- [ ] P1-02 First-slice mechanism resolution (strict "reproducible")
+- [ ] P1-02 First-slice mechanism resolution on real `DRRulePack` classes (strict "reproducible")
 - [ ] P1-03 RTO scope classification
 - [ ] P1-04 FailureScenario dispatch
 - [ ] P1-05 Impact pass
@@ -155,7 +156,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P1-12 Buffer
 - [ ] P1-13 RTO (low/expected/high, UNKNOWN, breakdown)
 - [ ] P1-14 Target comparison
-- [ ] P1-15 Persist simulation + plan
+- [ ] P1-15 Persist simulation + plan + recovery requirements
 - [ ] P1-16 `perpetual simulate` / `perpetual plan`
 - [ ] P1-17 Spec §92/§93 + simulation tests
 - [ ] P1-18 ALL/ANY/quorum selection, shared prerequisites and readiness decision-table regressions
@@ -175,6 +176,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P1b-01 Terraform importer
 - [ ] P1b-02 Identity resolution
 - [ ] P1b-03 Recorded-AWS normalizers + importer
+- [ ] P1b-15 Authoritative planned snapshots: lifecycle changes, unknowns, stale-proof invalidation and root identities (before the API and UI)
 - [ ] P1b-04 FastAPI routes
 - [ ] P1b-05 OpenAPI → TS types, drift check
 - [ ] P1b-06 `perpetual ui` (localhost, host flag warning)
@@ -186,53 +188,47 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P1b-12 Simulation view
 - [ ] P1b-13 Packaging (UI in wheel)
 - [ ] P1b-14 Playwright smoke test
-- [ ] P1b-15 Authoritative planned snapshots: lifecycle changes, unknowns, stale-proof invalidation and root identities
 
 ### P2 AWS discovery (ECS slice)
 
 - [ ] P2-01 Collector protocol, sessions (incl. global/`us-east-1` pass), partial scans
-- [ ] P2-02a EC2 instances, Auto Scaling groups, launch templates, AMIs
 - [ ] P2-02b VPC, subnets, route tables, NAT, IGW, endpoints, TGW attachments, ENIs, security groups
 - [ ] P2-02c ELB (ALB/NLB, listeners, target groups)
 - [ ] P2-02d Route 53 (zones, records, health checks, Accelerated Recovery) and ARC (routing controls, Region switch plans + evaluation, legacy readiness checks)
-- [ ] P2-02e CloudFront, ACM (incl. `us-east-1`), WAFv2 (REGIONAL + CLOUDFRONT)
+- [ ] P2-02e ACM (incl. `us-east-1`)
 - [ ] P2-03a ECS
-- [ ] P2-03b Lambda (functions, layers, event-source mappings)
 - [ ] P2-03c ECR (replication, image metadata)
-- [ ] P2-03d SQS and SNS
 - [ ] P2-03e Secrets Manager and SSM parameters (metadata, primary + DR)
 - [ ] P2-03f KMS, IAM, IAM Identity Center Regions
 - [ ] P2-03g CloudWatch Logs
 - [ ] P2-04a RDS/Aurora (instances, clusters, replicas, snapshots)
 - [ ] P2-04b S3 and AWS Backup
-- [ ] P2-04c EBS and EFS
-- [ ] P2-04d Initial DynamoDB
 - [ ] P2-05 Resource Explorer, AWS Config
-- [ ] P2-06 Edge resolvers: SG, IAM, references, ASG→LT→AMI→Snapshot→KMS, Lambda→S3/ECR/Layers, event-source/subscription/WAF associations, Config
+- [ ] P2-06 Edge resolvers: SG, IAM, references, Config (EC2/Lambda/messaging/WAF chains in P2c)
 - [ ] P2-07 `perpetual scan` + API + UI status
 - [ ] P2-08 Read-only IAM policy doc
 - [ ] P2-09 moto + Floci (+ Postgres) tests, `examples/ecs-rds`
 - [ ] P2-10 Contract suite skeleton + redaction
-- [ ] P2-11 Real-AWS checkpoint
-- [ ] P2-12 Quota/headroom, Region capability and CloudWatch Metrics collectors with typed facts/contracts
+- [ ] P2-12 Quota/headroom, Region capability and CloudWatch Metrics collectors with typed facts/contracts; facts persisted
 - [ ] P2-13 Coverage/freshness, confirmed absence, atomic snapshots and partial-scan regressions
+- [ ] P2-11 Real-AWS checkpoint (after P2-12/13)
 
 ### P2b Observed dependency evidence
 
 - [ ] P2b-01 Synthetic log generator
-- [ ] P2b-02 CloudTrail reader
-- [ ] P2b-03 Principal → compute mapping (task role, Lambda role, IRSA, Pod Identity, EC2/ASG instance profile)
-- [ ] P2b-04 Flow-log reader + ENI resolution (incl. EC2/ASG + Lambda Hyperplane ENIs)
+- [ ] P2b-02 CloudTrail reader (S3 + `LookupEvents`; Lake/Athena in backlog)
+- [ ] P2b-03 Principal → compute mapping (task role; Lambda role and EC2/ASG instance profile with P2c; IRSA/Pod Identity with P7)
+- [ ] P2b-04 Flow-log reader + ENI resolution (EC2/ASG + Lambda Hyperplane ENIs with P2c)
 - [ ] P2b-05 Aggregate-only observations + canary
 - [ ] P2b-06 Contradictions, unobserved, external proposals
 - [ ] P2b-07 Coverage report
-- [ ] P2b-08 Real-AWS checkpoint
 - [ ] P2b-09 Ambiguous observation review flow, candidate-set aggregation and review gates (model in P0-04f)
+- [ ] P2b-08 Real-AWS checkpoint (after P2b-09)
 
 ### P3 Stack and service discovery
 
-- [ ] P3-01 Grouping signals (incl. WAF→ALB→TG→ECS/EC2/ASG/Lambda & SNS→SQS→Lambda chains)
-- [ ] P3-02 Service suggestion (ECS, EC2/ASG, Lambda; Deployments in P7)
+- [ ] P3-01 Grouping signals (WAF/EC2/Lambda/SNS→SQS chains with P2c)
+- [ ] P3-02 Service suggestion (ECS; EC2/ASG and Lambda with P2c; Deployments in P7)
 - [ ] P3-03 Roots, closure, shared resources
 - [ ] P3-04 Manual stack/service editing
 - [ ] P3-05 Discovery confidence
@@ -241,25 +237,20 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [ ] P4-01 Finding model, rule registry, rule docs
 - [ ] P4-02a ECS pack
-- [ ] P4-02b EC2/ASG pack (AMI copy, snapshot KMS)
-- [ ] P4-02c Lambda pack (DR package/image/layers, event-source mappings)
 - [ ] P4-02d ECR pack
-- [ ] P4-02e SQS and SNS packs
 - [ ] P4-02f Secrets/SSM pack
 - [ ] P4-02g KMS and IAM packs
 - [ ] P4-03a RDS/Aurora pack
 - [ ] P4-03b S3 pack
 - [ ] P4-03c Network pack
-- [ ] P4-03d ALB/NLB, CloudFront origin failover, ACM
+- [ ] P4-03d ALB/NLB, ACM
 - [ ] P4-03e Route 53 pack (data vs control plane)
-- [ ] P4-03f WAF pack (primary vs DR parity)
 - [ ] P4-03g CloudWatch Logs pack (scope-aware)
 - [ ] P4-04a Cross-cutting: XREG-CONFIG-001, XREG-IAM-002, XREG-KMS-003, CTRL-PLANE-001, QUOTA-DR-001, REGION-SVC-001
 - [ ] P4-04b Cross-cutting: ARC-RS-001, SSM-PARITY-001
 - [ ] P4-04c Cross-cutting: OPS-ACCESS-001/002 + `operator_access` loader
 - [ ] P4-05 Readiness dimensions + scoring
 - [ ] P4-06 `perpetual assess` + API + UI
-- [ ] P4-08 Initial DynamoDB and EFS rules, mechanisms/options and evidence fixtures
 
 ### P5 Simulation on discovered stacks
 
@@ -282,6 +273,23 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [ ] P8-03 RPO in CLI, API, UI
 
 ## M2 MVP (v0.1)
+
+### P2c Expanded services (moved from M1; IDs unchanged)
+
+- [ ] P2-02a EC2 instances, Auto Scaling groups, launch templates, AMIs
+- [ ] P2-02f CloudFront, WAFv2 (REGIONAL + CLOUDFRONT)
+- [ ] P2-03b Lambda (functions, layers, event-source mappings)
+- [ ] P2-03d SQS and SNS
+- [ ] P2-04c EBS and EFS
+- [ ] P2-04d Initial DynamoDB
+- [ ] P4-02b EC2/ASG pack (AMI copy, snapshot KMS)
+- [ ] P4-02c Lambda pack (DR package/image/layers, event-source mappings)
+- [ ] P4-02e SQS and SNS packs
+- [ ] P4-03f WAF pack (primary vs DR parity)
+- [ ] P4-03h CloudFront origin failover
+- [ ] P4-08 Initial DynamoDB and EFS rules, mechanisms/options and evidence fixtures
+- [ ] P2c-01 Expanded-service parts of P2-06, P2b-03/04, P3-01/02, P6-01, P8-01
+- [ ] P2c-02 `examples/` expanded stack + real-AWS checkpoint
 
 ### P7 EKS slice
 
@@ -484,6 +492,8 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-11-03 | Fixes from an external review of P0-01–P0-09 and the roadmap. **Code:** (1) the evidence fingerprint adds the relationship type (spec §23 amended), so parallel typed edges between the same resources (§19.1) are rejected independently; (2) `combine` accepts a kind-less item only from `user_confirmation`; any other kind-less item raises, like an unlisted kind; (3) `save_resources`/`save_edges` look up existing identities and evidence once per batch (chunks of 500) and flush twice per call instead of per row; (4) `DERIVED_FIELDS` and `FixtureIssue` move to `fixtures/schema.py`, removing both function-local imports. **Plan:** (5) M1 covers the ECS + RDS slice; EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS and DynamoDB collectors, packs and resolvers form new phase P2c in M2 (IDs kept, marked `(M2 · P2c)`; P2-02e split into ACM and P2-02f CloudFront/WAF; P4-03d split into ALB/ACM and P4-03h CloudFront; new P2c-01/02). v0.1 scope is unchanged. (6) P2b-02 reads trails from S3 and `LookupEvents`; CloudTrail Lake and Athena go to the backlog (spec §99 amended). (7) Checklist order matches execution order: P0-15 after P0-11 and before P0-12/13; P1b-15 after P1b-03; P2-11 after P2-12/13; P2b-08 after P2b-09. (8) P1-02 implements `resolve_mechanism` on real `DRRulePack` classes that P4 extends. (9) Owners set for tables that fixtures carry but persistence lacks: `recovery_requirements` in P1-15, facts in P2-12; payload schema versions with registered upgrades in P0-15. **Not adopted:** a separate "modeled preview" mode in P10-04, because P9-04/P9-05 already evaluate each candidate and remediation as a modeled snapshot before any saved plan exists; building fact/requirement tables now, because their consumers don't exist yet. | A forgotten `kind=` or kind-less LLM evidence would otherwise silently bypass the weights table or add confidence (§2 rule 11). Per-row queries made a 5,000-resource snapshot cost tens of thousands of statements. M1's exit needs only the ECS + RDS services; the rest delayed the first real-AWS validation. S3 trail files cover the same events as Lake and Athena. |
+| 2026-10-28 | P0-09 evidence. `Evidence` gains an optional `kind` naming its row in the §22 weights table. A configured kind counts with the configured weight (so tuning applies without a rescan); a kind-less item (user confirmation, anything outside the table) counts with its own `confidence` in a group named `source:<source_type>`; an unlisted kind raises. No evidence gives 0.0. Combination functions are a name→function registry that must cover every name config allows. The fingerprint is sha256 over compact JSON of the endpoints and the sorted set of `(source_type, attribute, value_summary)` (§23); it ignores evidence IDs, times, counts, confidences, edge ID and relationship type, and keeps `None` distinct from `""`. | Config stays the single source of weights; grouping kind-less items by source is the conservative reading of §22; the fingerprint follows §23 exactly and is stable across rescans. |
 | 2026-10-28 | P0-08 fixtures. One YAML file per fixture in `fixtures/graphs/` (beside the spec's `fixtures/aws`, `terraform`, …) holding the domain models directly, header `format: perpetual-fixture` / `version: 1` / `captured_at`. The loader fills resource provider, account, Region, service, type, `planned` and planned `terraform_address` from the canonical ID and reports any authored value that contradicts it (the node-vs-ID check deferred from P0-05); global resources get region `"global"`; missing discovery/collection times default to `captured_at`, and overrides to project `fixture`. All problems are reported together with paths. Cross-reference checks also enforce the group rules (members start at the dependent; one group per edge per scope) that P0-11 will enforce on live data; overrides are not checked against resources (orphans are valid). A committed JSON Schema (`fixtures/schema/fixture-v1.schema.json`, derived fields optional) is kept current by a test. The first CLI commands (`perpetual fixtures validate|schema`) and the `perpetual` console script land here; Typer and Rich added. `minimal.yaml` is a small example; canonical fixtures stay in P0-13. | Short fixtures are easier to review, and deriving from the ID removes a whole class of inconsistency; reporting all problems at once makes hand-written fixtures practical. |
 | 2026-10-28 | P0-07 storage. Rows have typed lookup columns plus a `payload` JSON column with the full domain model, validated again on load (no column-per-field mapping). Added a `snapshots` table (live or planned, published once, then frozen) that §75 doesn't list; graph data, mechanisms and stacks are per snapshot, while overrides and evaluation inputs are per project. `resources` holds identity across snapshots and `resource_versions` each snapshot's copy. Edge evidence is stored once per snapshot with an `edge_evidence` link table that keeps order; group and mechanism evidence stays in their payloads. `observations` added (the P0-04d decision moved them here). Status/enum columns are plain strings, since values come from validated models. The initial migration is autogenerated, uses plain SQLAlchemy types, and runs from code (no `alembic.ini`). One index is named explicitly to fit PostgreSQL's 63-character limit. SQLAlchemy and Alembic added. | Keeps the schema small while the models are still growing; the payload round-trip keeps model validation authoritative; frozen snapshots implement §15.4/§76.1; per-project overrides follow §23. |
 | 2026-10-28 | P0-06 config. **Review confidence threshold defaults to 0.90**: the spec requires one (§23) but gives no number. At 0.90, Terraform references, AWS relationships and mapped CloudTrail calls pass alone; an endpoint match (0.85) or IAM permission (0.80) alone needs review; IAM plus SG path (0.95 combined) passes. Evidence kinds named after the §22 table; `name_only_heuristic` gets its own `heuristics` group (the spec's initial groups don't cover it); Kubernetes, ECS-secret and endpoint references go in `configuration_references`. Freshness, alternative-selection cap (32) and cost units (730 h, 30-day price age) are config too (D12). Out-of-scope defaults are by type key; role-based cases (log buckets, OpenSearch for logs) stay with rule packs. Buffer defaults name duration-catalog keys rather than durations, since the catalog (P1-09) owns durations. Overrides merge mappings and replace lists; changed paths are recorded. `config` keeps its own `FreshnessConfig` because it may not import `models`; a test keeps it in step with `FreshnessPolicy`. PyYAML added. | Every tuning number in YAML (D12); the threshold needs a value before readiness gates exist, and 0.90 keeps single weak signals in review. |
@@ -519,6 +529,18 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-03 — External review fixes (P0-01–P0-09, roadmap)
+
+- Reviewed an external critique against the code and plan; adopted most points (decision log). Code: fingerprint includes relationship type; only user confirmations may omit an evidence kind; batched snapshot writes with a statement-count test; fixtures import cycle removed; `minimal.yaml` evidence gains `kind: terraform_reference`. Plan: P2c phase in M2 for non-ECS-slice services, CloudTrail Lake/Athena to backlog, checklist order matches execution order, owners for requirement/fact tables and payload versioning. Spec §23 and §99 amended with a changelog line. README status and site roadmap updated.
+- `mise run check`: 9 contracts kept, mypy strict clean, 367 tests. `docs/code` evidence, fixtures and persistence pages updated.
+- **Carry-over:** P0-10 (graph overrides). Note: reject overrides target edge fingerprints, which now include the relationship type.
+
+### 2026-10-28 — P0-09 evidence combination and fingerprints
+
+- `perpetual.evidence`: `combine` (max within correlation group, `noisy_or` across, via the `COMBINATIONS` registry) returning `CombinedConfidence` with a per-group breakdown; `evidence_fingerprint`/`edge_fingerprint`. `Evidence.kind` added; fixture schema regenerated.
+- 21 new tests; `mise run check`: 9 contracts kept, mypy strict on 96 files, 362 tests. New `docs/code/packages/evidence.md` with diagrams; README, architecture (import graph, data flow), models and config pages updated.
+- **Carry-over:** P0-10 (graph overrides: apply, rescan merge, orphan detection, YAML export/apply).
 
 ### 2026-10-28 — P0-08 fixture format v1
 

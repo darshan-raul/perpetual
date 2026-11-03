@@ -25,7 +25,7 @@ It evaluates the whole **stack**: the services, databases, networking, secrets a
 - **Recovery point objective (RPO):** how much recent data the product can afford to lose.
 - **Budget:** how much the DR setup can cost.
 
-> **Pre-alpha — implementation is starting.** This repository currently contains the specification, implementation plan and design assets. The capabilities and commands below describe the planned product.
+> **Pre-alpha — milestone M0 (proof of concept) in progress.** The engine foundation is being built: domain models, canonical IDs, config, persistence, fixtures and evidence combination exist; graph, simulation and recovery planning come next. Progress is tracked in [TRACKER.md](TRACKER.md). The capabilities below describe the planned product; only `perpetual fixtures validate|schema` runs today.
 
 ## What Perpetual will do
 

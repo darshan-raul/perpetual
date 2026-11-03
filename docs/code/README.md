@@ -17,7 +17,7 @@ How the code is organised and how it works, written for a person reading it. The
                               ▼
         packages/ids.md   packages/models.md ──> models-properties.md
         packages/config.md    packages/persistence.md
-        packages/fixtures.md  packages/cli.md
+        packages/fixtures.md  packages/cli.md   packages/evidence.md
                               │
                               ▼
                      flows/fixtures-validate.md   (how they work together)
@@ -37,7 +37,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
-| `evidence` | Edge resolvers, confidence combination | stub | — |
+| `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
 | `graph` | Graph snapshots, overrides, traversal | stub | — |
 | `stacks` | Stack grouping, services, RTO scope | stub | — |
 | `rules` | DR rule packs | stub | — |

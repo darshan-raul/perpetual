@@ -10,7 +10,7 @@ const milestones = [
     delivers:
       'Normalized resource models, dependency graph, two-pass failure simulator, and critical-path recovery planning on canonical test fixtures (ecs-broken, ecs-remediated), plus a first generated Terraform fix and laptop recovery script.',
     highlights: [
-      'Repo layout, mise toolchain, ruff/mypy/pytest/import-linter CI gates (P0-01 to P0-04e done; see TRACKER.md)',
+      'Repo layout, mise toolchain, ruff/mypy/pytest/import-linter CI gates (task-level progress in TRACKER.md)',
       'NetworkX dependency graph with ALL / ANY / quorum groups and cycle termination',
       'Two-pass simulator (Impact Pass + DR Overlay Recovery Pass) and FailureReasonChain',
       'Phase-template + refinement Recovery DAG and catalog-backed RTO/RPO calculation',
@@ -27,7 +27,7 @@ const milestones = [
       'Read-only boto3 collectors with coverage, freshness, and confirmed-absence tracking (§76.1)',
       'CloudTrail & VPC Flow Log aggregation + shared-role/ENI candidate set handling (§14.1)',
       'Interactive React Flow graph workbench with persistent GraphOverride review gates (§23)',
-      'ECS, RDS, ECR, KMS, Secrets Manager, SSM, Route 53, and cross-cutting rule packs (§28–§32, §41)',
+      'ECS + RDS slice: ECS, RDS, ECR, KMS, Secrets Manager, SSM, Route 53, and cross-cutting rule packs (§28–§32, §41)',
     ],
   },
   {
@@ -38,6 +38,7 @@ const milestones = [
     delivers:
       'Full Amazon EKS deep readiness pack (§33–§40), Pareto DR design optimizer within monthly budget, companion Terraform and suggested edits delivered as a PR, explanatory runbook, prerequisite scripts, recovery scripts, and optional ARC Region switch plans. 100% deterministic.',
     highlights: [
+      'EC2/Auto Scaling, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS and DynamoDB collectors and rule packs',
       'EKS control plane, node groups, EBS/EFS CSI add-ons, IRSA/Pod Identity, and PVC validation',
       'Pareto optimizer scoring Backup & Restore, Pilot Light, Warm Standby, and Hot Standby (§54–§60)',
       'Immutable EvaluationInput SHA-256 digests binding scans, overrides, and DRSpec approvals (§56.3)',

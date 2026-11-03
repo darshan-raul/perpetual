@@ -3189,6 +3189,18 @@
           "title": "Id",
           "type": "string"
         },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
         "observation_count": {
           "anyOf": [
             {

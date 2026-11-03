@@ -248,7 +248,7 @@ Requires Kubernetes access (section 14, Level 2).
 - Each relevant event gives a principal (an assumed-role session) and a resource (from `resources` or `requestParameters`).
 - The principal is mapped back to compute through its role: ECS task role, Lambda execution role, IRSA role, Pod Identity association, EC2 instance profile (rolled up to its Auto Scaling group when applicable). The edge runs from that compute to the resource.
 - A shared role identifies a set of possible callers, not every caller. Attribute an observation to one resource only when event/session and time-bounded inventory evidence uniquely identify it; otherwise use the ambiguity contract below.
-- Perpetual reads an existing trail from its S3 bucket, from CloudTrail Lake, or from an Athena table over the trail. The `LookupEvents` API is a fallback only: it covers management events for 90 days at a low rate limit.
+- Perpetual reads an existing trail from its S3 bucket, or (later, optional) from CloudTrail Lake or an Athena table over the trail. The `LookupEvents` API is a fallback only: it covers management events for 90 days at a low rate limit.
 - Management events are always recorded. S3 object-level and DynamoDB item-level calls are data events, which are off by default and billed. Perpetual MUST NOT enable trails or data events (section 65). It reports which coverage existed, so a missing S3 edge is explained by missing data events rather than read as "no dependency".
 - The lookback window is configurable, default 30 days.
 - CloudTrail only records AWS API calls. Database, cache and service-to-service connections never appear in it. VPC Flow Logs cover those.
@@ -802,7 +802,7 @@ A rejected inferred edge must not be recreated on every scan unless the underlyi
 
 Persist rejection state.
 
-"Materially changes" is defined by an evidence fingerprint: a stable hash of the edge endpoints plus the sorted set of `(source_type, attribute, value_summary)` of its evidence.
+"Materially changes" is defined by an evidence fingerprint: a stable hash of the edge endpoints and relationship type plus the sorted set of `(source_type, attribute, value_summary)` of its evidence. The relationship type keeps parallel typed edges between the same resources (19.1) apart, so rejecting one never rejects another backed by the same evidence.
 
 A rejection is stored against a fingerprint. If a later scan produces a different fingerprint, the edge is re-proposed and linked to the earlier rejection for context.
 

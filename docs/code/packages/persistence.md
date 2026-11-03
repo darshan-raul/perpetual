@@ -66,14 +66,16 @@ projects
         ▼                                                ▼
  edges row  e1  payload = edge WITHOUT evidence   edges row  e2
         │                                                │
-        ├─ position 0 ─> _store_evidence(ev-b) ─> new evidence row
-        ├─ position 1 ─> _store_evidence(ev-a) ─> new evidence row ◄─┐
+        ├─ position 0 ─> _evidence_rows: ev-b ─> new evidence row
+        ├─ position 1 ─> _evidence_rows: ev-a ─> new evidence row ◄─┐
         │                                                            │ same id, same content:
         │                                        position 0 ─────────┘ reuse the row
         ▼
  edge_evidence (edge_row, position, evidence_row)
  same id with DIFFERENT content -> PersistenceError (a bug upstream, never merged)
 ```
+
+Writes are batched, because a large account has thousands of resources and edges per snapshot. `save_resources` looks up existing identities once per batch (in chunks of 500 IDs); `save_edges` looks up the batch's evidence IDs once, adds every edge and new evidence row, flushes once to get row IDs, then adds the links and flushes again. The number of statements doesn't grow with the batch (a test checks).
 
 ## How loading works
 
@@ -121,7 +123,7 @@ with transaction(factory) as session:
 | A published snapshot can't change | `_open_snapshot` | Snapshots are built atomically and stay immutable (§15.4, §76.1) |
 | Overrides are a separate table; only their status changes | `set_override_status` | Never mutate discovered data to reflect an edit (§23) |
 | Evaluation inputs have no update | `add_evaluation_input` | Manifests are immutable (§56.3) |
-| One evidence ID, one content | `_store_evidence` | Evidence is a traceable fact (§16) |
+| One evidence ID, one content | `_evidence_rows` | Evidence is a traceable fact (§16) |
 | A finished scan stays finished | `finish_scan` | Previous scans are kept as they were (§76) |
 | Datetimes are stored in UTC and come back timezone-aware | `UtcDateTime` | SQLite has no time zones; the models reject naive datetimes |
 | Portable types only; constraint names ≤ 63 characters | `tables.py` | PostgreSQL compatibility (§71.1) |
@@ -135,8 +137,10 @@ with transaction(factory) as session:
 `apps/api/tests/persistence/`:
 
 - `test_schema_and_migrations.py`: the planned tables exist and carry `project_id`; the migration matches the models exactly (Alembic compare); downgrade removes everything; tables and indexes compile on SQLite and PostgreSQL; identifiers fit PostgreSQL; the migration renders as PostgreSQL SQL offline; default database path.
-- `test_repository.py`: round trips for resources, edges (evidence order, shared evidence stored once), groups, observations, mechanisms, stacks, coverage, overrides and evaluation inputs; conflicting evidence refused; published snapshots frozen; history across snapshots; scan lifecycle; project isolation; override status changes leave the edit intact.
+- `test_repository.py`: round trips for resources, edges (evidence order, shared evidence stored once), groups, observations, mechanisms, stacks, coverage, overrides and evaluation inputs; conflicting evidence refused; statement count stays flat as the batch grows; published snapshots frozen; history across snapshots; scan lifecycle; project isolation; override status changes leave the edit intact.
 
 ## Not here yet
 
-Tables for later phases (findings, simulations, recovery plans, cost estimates, DR specs, verification reports, drills, LLM calls, knowledge base) arrive with their tasks, each as a new migration.
+Tables for later phases (findings, simulations, recovery plans, cost estimates, DR specs, verification reports, drills, LLM calls, knowledge base) arrive with their tasks, each as a new migration. Two models that fixtures already carry have no table yet, and their owners are set: `recovery_requirements` (revisioned, per project) lands with P1-15, and facts (`FactRecord`, per snapshot) with P2-12.
+
+Payloads have no schema version yet. Before any database outlives a model change (by v0.1 at the latest), P0-15 adds a payload schema version per row and a registered upgrade step, so an old row is upgraded or refused with a clear error instead of failing validation on load.

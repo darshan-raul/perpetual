@@ -8,7 +8,7 @@ Snapshot rows are written while the snapshot is open and frozen once it is
 published (spec §15.4, §76.1: built atomically from a declared set of runs).
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import datetime
 from typing import Any, Literal, TypeVar
 
@@ -57,6 +57,15 @@ _SCAN_STATUSES = {"pending", "running", "completed", "partial", "failed"}
 _FINAL_SCAN_STATUSES = {"completed", "partial", "failed"}
 
 M = TypeVar("M", bound=BaseModel)
+
+
+_IN_CHUNK = 500
+"""Values per `IN (...)` lookup; well under SQLite's and PostgreSQL's parameter limits."""
+
+
+def _chunks(values: list[str]) -> Iterator[list[str]]:
+    for start in range(0, len(values), _IN_CHUNK):
+        yield values[start : start + _IN_CHUNK]
 
 
 class PersistenceError(ValueError):
@@ -192,14 +201,18 @@ class ProjectRepository:
     # --- snapshot contents ---------------------------------------------------------
 
     def save_resources(self, snapshot_id: str, nodes: Iterable[ResourceNode]) -> None:
+        # One lookup for the whole batch, not one per resource: a large account has
+        # thousands of resources per snapshot.
         self._open_snapshot(snapshot_id)
+        nodes = list(nodes)
+        known = self._existing(
+            ResourceRow.resource_id,
+            ResourceRow.project_id == self.project_id,
+            [node.id for node in nodes],
+        )
         for node in nodes:
-            identity = self.session.scalar(
-                select(ResourceRow)
-                .where(ResourceRow.project_id == self.project_id)
-                .where(ResourceRow.resource_id == node.id)
-            )
-            if identity is None:
+            if node.id not in known:
+                known.add(node.id)
                 self.session.add(
                     ResourceRow(
                         project_id=self.project_id,
@@ -240,7 +253,15 @@ class ProjectRepository:
         return [(row.snapshot_id, ResourceNode.model_validate(row.payload)) for row in rows]
 
     def save_edges(self, snapshot_id: str, edges: Iterable[DependencyEdge]) -> None:
+        # Batched: evidence rows are looked up once per batch, and the session is
+        # flushed twice in total (rows, then the links that need their IDs), so
+        # saving a large snapshot doesn't cost several queries per edge.
         self._open_snapshot(snapshot_id)
+        edges = list(edges)
+        evidence_rows = self._evidence_rows(
+            snapshot_id, [item for edge in edges for item in edge.evidence]
+        )
+        edge_rows = []
         for edge in edges:
             row = EdgeRow(
                 project_id=self.project_id,
@@ -253,12 +274,15 @@ class ProjectRepository:
                 payload=_dump(edge, exclude={"evidence"}),
             )
             self.session.add(row)
-            self.session.flush()
+            edge_rows.append(row)
+        self.session.flush()
+        for edge, row in zip(edges, edge_rows, strict=True):
             for position, item in enumerate(edge.evidence):
-                evidence_row = self._store_evidence(snapshot_id, item)
                 self.session.add(
                     EdgeEvidenceRow(
-                        edge_row_id=row.row_id, position=position, evidence_row_id=evidence_row
+                        edge_row_id=row.row_id,
+                        position=position,
+                        evidence_row_id=evidence_rows[item.id].row_id,
                     )
                 )
         self.session.flush()
@@ -499,32 +523,51 @@ class ProjectRepository:
             raise PersistenceError(f"snapshot {snapshot_id!r} is published and can't change")
         return snapshot
 
-    def _store_evidence(self, snapshot_id: str, item: Evidence) -> int:
-        # Evidence is stored once per snapshot. The same ID must mean the same fact;
-        # a different payload under one ID is a bug upstream, not something to merge.
-        payload = _dump(item)
-        existing = self.session.scalar(
-            select(EvidenceRow)
-            .where(EvidenceRow.project_id == self.project_id)
-            .where(EvidenceRow.snapshot_id == snapshot_id)
-            .where(EvidenceRow.evidence_id == item.id)
-        )
-        if existing is not None:
-            if existing.payload != payload:
-                raise PersistenceError(f"evidence {item.id!r} already stored with other content")
-            return existing.row_id
-        row = EvidenceRow(
-            project_id=self.project_id,
-            snapshot_id=snapshot_id,
-            evidence_id=item.id,
-            source_type=item.source_type.value,
-            basis=item.basis.value if item.basis else None,
-            resource_id=item.resource_id,
-            payload=payload,
-        )
-        self.session.add(row)
+    def _evidence_rows(self, snapshot_id: str, items: Sequence[Evidence]) -> dict[str, EvidenceRow]:
+        """The stored row for each evidence ID, adding rows for new evidence (flushed).
+
+        Evidence is stored once per snapshot. The same ID must mean the same fact;
+        a different payload under one ID is a bug upstream, not something to merge.
+        """
+        ids = list(dict.fromkeys(item.id for item in items))
+        rows: dict[str, EvidenceRow] = {}
+        for chunk in _chunks(ids):
+            for row in self.session.scalars(
+                select(EvidenceRow)
+                .where(EvidenceRow.project_id == self.project_id)
+                .where(EvidenceRow.snapshot_id == snapshot_id)
+                .where(EvidenceRow.evidence_id.in_(chunk))
+            ):
+                rows[row.evidence_id] = row
+        for item in items:
+            payload = _dump(item)
+            existing = rows.get(item.id)
+            if existing is not None:
+                if existing.payload != payload:
+                    raise PersistenceError(
+                        f"evidence {item.id!r} already stored with other content"
+                    )
+                continue
+            row = EvidenceRow(
+                project_id=self.project_id,
+                snapshot_id=snapshot_id,
+                evidence_id=item.id,
+                source_type=item.source_type.value,
+                basis=item.basis.value if item.basis else None,
+                resource_id=item.resource_id,
+                payload=payload,
+            )
+            self.session.add(row)
+            rows[item.id] = row
         self.session.flush()
-        return row.row_id
+        return rows
+
+    def _existing(self, column: Any, scope: Any, values: Sequence[str]) -> set[str]:
+        """Which of `values` already exist in `column`, within `scope`, in a few queries."""
+        found: set[str] = set()
+        for chunk in _chunks(list(dict.fromkeys(values))):
+            found.update(self.session.scalars(select(column).where(scope).where(column.in_(chunk))))
+        return found
 
     def _load(self, table: Any, model: type[M], snapshot_id: str, order: Any) -> list[M]:
         # `table` is any snapshot-scoped row class (they all have these columns).

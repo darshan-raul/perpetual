@@ -13,8 +13,7 @@ orphaned, which is a valid state (spec §23).
 from collections import Counter
 from collections.abc import Iterable
 
-from perpetual.fixtures.loader import FixtureIssue
-from perpetual.fixtures.schema import Fixture
+from perpetual.fixtures.schema import Fixture, FixtureIssue
 from perpetual.models import DependencyGroup
 
 

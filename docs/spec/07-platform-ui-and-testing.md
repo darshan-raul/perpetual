@@ -1309,7 +1309,7 @@ Scan AWS account -> normalized graph.
 
 Deliver:
 
-- CloudTrail reader (S3, CloudTrail Lake or Athena; `LookupEvents` fallback);
+- CloudTrail reader (S3; `LookupEvents` fallback). CloudTrail Lake and Athena sources follow later and are optional;
 - VPC Flow Logs reader (S3 or CloudWatch Logs) with time-aware ENI resolution;
 - principal-to-compute mapping through task roles, IRSA and Pod Identity;
 - aggregated observations;

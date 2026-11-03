@@ -6,11 +6,12 @@ file holds domain models directly, so anything the engine accepts can be written
 down, and anything a fixture holds has passed the same validation as live data.
 
 To keep files short, the loader fills in values that follow from other values
-(see `loader.DERIVED_FIELDS`): a resource's provider, account, Region, service,
+(see `DERIVED_FIELDS`): a resource's provider, account, Region, service,
 type and planned flag come from its canonical ID, and missing timestamps default
 to the fixture's `captured_at`.
 """
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import AwareDatetime, Field
@@ -34,6 +35,23 @@ from perpetual.models import (
 
 FORMAT = "perpetual-fixture"
 VERSION = 1
+
+DERIVED_FIELDS: dict[str, tuple[str, ...]] = {
+    "ResourceNode": ("provider", "service", "resource_type", "discovered_at"),
+    "Evidence": ("collected_at",),
+    "GraphOverride": ("project_id", "created_at"),
+}
+"""Fields the loader can fill in, per model. The JSON Schema marks them optional."""
+
+
+@dataclass(frozen=True)
+class FixtureIssue:
+    path: str
+    """Where in the file, e.g. resources[2].region."""
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.path}: {self.message}" if self.path else self.message
 
 
 class Fixture(DomainModel):
@@ -62,8 +80,6 @@ class Fixture(DomainModel):
 
 def fixture_json_schema() -> dict[str, Any]:
     """JSON Schema for authored fixtures: derived fields are optional (for editors)."""
-    from perpetual.fixtures.loader import DERIVED_FIELDS  # noqa: PLC0415 (avoids a cycle)
-
     schema = Fixture.model_json_schema()
     schema["$id"] = "https://github.com/darshan-raul/perpetual/fixtures/schema/fixture-v1.json"
     schema["title"] = "Perpetual fixture v1"

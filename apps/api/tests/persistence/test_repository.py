@@ -2,11 +2,13 @@
 §71.1, §75, §76)."""
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from perpetual.models import (
@@ -109,6 +111,21 @@ def override(override_id: str = "ov-1", project_id: str = "p1") -> GraphOverride
         author="user",
         created_at=NOW,
     )
+
+
+@contextmanager
+def count_statements(session: Session) -> Iterator[list[str]]:
+    statements: list[str] = []
+
+    def record(*args: Any) -> None:
+        statements.append(args[2])
+
+    engine = session.get_bind()
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        yield statements
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
 
 
 # --- round trips -------------------------------------------------------------------
@@ -314,3 +331,22 @@ def test_evaluation_input_round_trip(repo: ProjectRepository) -> None:
     assert repo.evaluation_input("eval-1") == manifest
     with pytest.raises(PersistenceError, match="no evaluation input"):
         repo.evaluation_input("missing")
+
+
+# --- batching ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("size", [10, 200])
+def test_saving_a_snapshot_does_not_query_per_row(
+    session: Session, repo: ProjectRepository, size: int
+) -> None:
+    # A large account has thousands of resources and edges per snapshot; the
+    # number of statements must not grow with the batch (one lookup, few flushes).
+    nodes = [node(f"{DB}-{i}", "rds", "db") for i in range(size)]
+    edges = [edge(f"e{i}", f"{DB}-{i}", [f"ev-{i}", "ev-shared"]) for i in range(size)]
+    with count_statements(session) as statements:
+        repo.save_resources("snap-1", nodes)
+        repo.save_edges("snap-1", edges)
+    selects = [s for s in statements if s.lstrip().upper().startswith("SELECT")]
+    assert len(selects) <= 6
+    assert repo.edges("snap-1") == sorted(edges, key=lambda e: e.id)

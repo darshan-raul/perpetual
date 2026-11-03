@@ -12,37 +12,20 @@ with the path to the bad value, so a fixture author fixes them in one pass:
 import copy
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
-from perpetual.fixtures.schema import Fixture
+from perpetual.fixtures.schema import Fixture, FixtureIssue
+from perpetual.fixtures.validate import check_references
 from perpetual.ids import AwsResourceId, InvalidResourceIdError, parse
-
-DERIVED_FIELDS: dict[str, tuple[str, ...]] = {
-    "ResourceNode": ("provider", "service", "resource_type", "discovered_at"),
-    "Evidence": ("collected_at",),
-    "GraphOverride": ("project_id", "created_at"),
-}
-"""Fields the loader can fill in, per model. The JSON Schema marks them optional."""
 
 FIXTURE_PROJECT_ID = "fixture"
 """The project ID given to fixture overrides that don't name one."""
 
 FIXTURES_DIR_ENV = "PERPETUAL_FIXTURES_DIR"
-
-
-@dataclass(frozen=True)
-class FixtureIssue:
-    path: str
-    """Where in the file, e.g. resources[2].region."""
-    message: str
-
-    def __str__(self) -> str:
-        return f"{self.path}: {self.message}" if self.path else self.message
 
 
 class FixtureError(ValueError):
@@ -54,8 +37,6 @@ class FixtureError(ValueError):
 
 def load_fixture(path: Path) -> Fixture:
     """Load, expand and fully validate one fixture file. Raises FixtureError."""
-    from perpetual.fixtures.validate import check_references  # noqa: PLC0415 (cycle)
-
     source = str(path)
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))

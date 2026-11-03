@@ -73,9 +73,9 @@ config = load_config_file(Path("perpetual-config.yaml"))  # same, from YAML
 | Type keys are `SERVICE/TYPE` and appear in one category, once | They must match the keys in resource IDs and typed properties |
 | Durations and limits are positive | A zero freshness age would make every fact stale |
 
-## How the evidence section will be used
+## How the evidence section is used
 
-P0-09 implements the combination; this is what the config describes:
+[`evidence.combine`](evidence.md) reads it:
 
 ```text
  edge evidence             kind (weight)                     group

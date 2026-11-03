@@ -8,7 +8,7 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
  [x] built   [~] started   [ ] not yet
 
  [ ] collectors ─┐
- [ ] importers  ─┼─> [ ] normalization ─> [ ] evidence (edges) ─> [ ] graph (+ overrides)
+ [ ] importers  ─┼─> [ ] normalization ─> [~] evidence (edges) ─> [ ] graph (+ overrides)
  [x] fixtures   ─┘        (a fixture already holds normalized models, so it skips ahead ──┘)
 
  ─> [ ] stacks ─> [ ] rules (findings, DR overlay) ─> [ ] simulator ─> [ ] recovery (DAG, RTO, RPO)
@@ -25,6 +25,7 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
 | Configuration | `config` | **Built** (P0-06): versioned YAML defaults (evidence weights, review threshold, scoring, RTO scope, buffer, freshness, limits) with project overrides |
 | Storage | `persistence` | **Built** (P0-07): 17 tables, project-scoped repository, frozen published snapshots, initial Alembic migration tested on SQLite and PostgreSQL |
 | Fixtures | `fixtures` | **Built** (P0-08): format v1 in `fixtures/graphs/`, loader filling fields from canonical IDs, cross-reference checks, JSON Schema |
+| Evidence | `evidence` | **Started** (P0-09): confidence combination with correlation groups from config, evidence fingerprints; resolvers in P2b |
 | Command line | `cli` | **Started** (P0-08): `perpetual fixtures validate` and `schema` |
 | Everything else | — | Empty subpackages with a docstring; layer rules already enforced |
 
@@ -35,18 +36,19 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
                  │  cli  │  perpetual fixtures validate | schema
                  └───┬───┘
                      │
-                 ┌───▼──────┐
-                 │ fixtures │  YAML -> models, cross-references
-                 └─┬──────┬─┘
-                   │      │
-          ┌────────▼┐   ┌─▼────┐      ┌─────────────┐     ┌────────┐
-          │   ids   │   │models│ ◄────┤ persistence │     │ config │
-          └─────────┘   └──────┘      └─────────────┘     └────────┘
-           stdlib only   Pydantic      SQLAlchemy,         Pydantic,
-                         only          Alembic             PyYAML
+                 ┌───▼──────┐                          ┌──────────┐
+                 │ fixtures │  YAML -> models          │ evidence │  combine, fingerprint
+                 └─┬──────┬─┘                          └──┬────┬──┘
+                   │      │                               │    │
+          ┌────────▼┐   ┌─▼────┐ ◄────────────────────────┘    │
+          │   ids   │   │models│ ◄──────┐               ┌──────▼─┐
+          └─────────┘   └──────┘   ┌────┴────────┐      │ config │
+           stdlib only   Pydantic  │ persistence │      └────────┘
+                         only      └─────────────┘      Pydantic, PyYAML
+                                   SQLAlchemy, Alembic
 
  models, ids and config import nothing else from Perpetual (an import rule enforces it).
- Nothing imports cli. config is not wired in yet: evidence combination (P0-09) is its first user.
+ Nothing imports cli. evidence is not called by a command yet; the graph (P0-11) uses it.
 ```
 
 ## How data moves today
@@ -64,7 +66,8 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
         ▼
  the same models, ready for the graph builder (P0-11)
 
- config.load_config() -> Config  (weights, thresholds, limits)  -> evidence, rules, recovery later
+ config.load_config() -> Config ─ evidence section ─> evidence.combine(edge.evidence) -> confidence
+                                └ other sections  ─> stacks, rules, recovery (later)
 ```
 
 ## How the models connect
@@ -114,4 +117,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-09 adds `evidence` (combination with correlation groups, using `config`) and fingerprints; P0-10 graph overrides; P0-11 the NetworkX graph from a snapshot; P0-12 `perpetual graph --fixture`, the first command that runs the engine on a fixture.
+P0-10 adds graph overrides (rejections stored against `evidence` fingerprints); P0-11 the NetworkX graph from a snapshot; P0-12 `perpetual graph --fixture`, the first command that runs the engine on a fixture.

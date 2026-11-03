@@ -28,6 +28,7 @@ edges:
         source_type: terraform
         basis: referenced
         source: terraform:infra-prod/default
+        kind: terraform_reference
         attribute: container_definitions.environment.DB_HOST
         confidence: 1.0
 
