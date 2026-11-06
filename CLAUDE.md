@@ -10,6 +10,10 @@ Perpetual is a local, single-user tool that decides whether an AWS **stack** (on
 - At the start of a session, read TRACKER.md and continue from the session log's carry-over. At the end, update task states, the session log, the decision log and `docs/code/`.
 - Changes to the plan, or any deviation from the spec, go through a decision-log entry in TRACKER.md first. Changes to product behaviour go into spec.md with a changelog line under its current revision.
 
+## Readability and living wiki
+
+Follow [AGENTS.md](AGENTS.md) and [docs/code/readability.md](docs/code/readability.md). Write for readers with basic Python knowledge, explain necessary framework features, and prefer explicit control flow and focused functions. Every implementation task includes a readability review and wiki updates: concepts, affected packages, worked flows, index, and architecture as appropriate. New pages extend the wiki; changed behavior requires correcting existing pages.
+
 ## Status
 
 Milestone M0 PoC in progress: P0-01 to P0-09 are done (repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format, evidence combination); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.

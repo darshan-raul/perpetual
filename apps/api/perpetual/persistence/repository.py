@@ -258,9 +258,10 @@ class ProjectRepository:
         # saving a large snapshot doesn't cost several queries per edge.
         self._open_snapshot(snapshot_id)
         edges = list(edges)
-        evidence_rows = self._evidence_rows(
-            snapshot_id, [item for edge in edges for item in edge.evidence]
-        )
+        all_evidence = []
+        for edge in edges:
+            all_evidence.extend(edge.evidence)
+        evidence_rows = self._evidence_rows(snapshot_id, all_evidence)
         edge_rows = []
         for edge in edges:
             row = EdgeRow(
@@ -303,10 +304,14 @@ class ProjectRepository:
         evidence: dict[int, list[dict[str, Any]]] = {}
         for edge_row_id, payload in links:
             evidence.setdefault(edge_row_id, []).append(payload)
-        return [
-            DependencyEdge.model_validate(row.payload | {"evidence": evidence.get(row.row_id, [])})
-            for row in rows
-        ]
+        edges = []
+        for row in rows:
+            # Evidence is stored separately; rebuild the full model without changing
+            # the stored JSON payload.
+            payload = dict(row.payload)
+            payload["evidence"] = evidence.get(row.row_id, [])
+            edges.append(DependencyEdge.model_validate(payload))
+        return edges
 
     def evidence(self, snapshot_id: str) -> list[Evidence]:
         return self._load(EvidenceRow, Evidence, snapshot_id, EvidenceRow.evidence_id)
@@ -570,7 +575,12 @@ class ProjectRepository:
         return found
 
     def _load(self, table: Any, model: type[M], snapshot_id: str, order: Any) -> list[M]:
-        # `table` is any snapshot-scoped row class (they all have these columns).
+        """Read this project's snapshot rows and validate each payload as the requested model.
+
+        M ties the return type to the model argument: ResourceNode in means a list
+        of ResourceNode out. The table and ordering expression are SQLAlchemy objects;
+        all callers supply snapshot-scoped tables with the columns used below.
+        """
         rows = self.session.scalars(
             select(table)
             .where(table.project_id == self.project_id)

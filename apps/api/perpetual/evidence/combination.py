@@ -33,7 +33,10 @@ CombinationFunction = Callable[[Sequence[float]], float]
 
 def noisy_or(confidences: Sequence[float]) -> float:
     """1 - product(1 - c): the chance at least one independent source is right."""
-    return min(1.0, max(0.0, 1.0 - math.prod(1.0 - c for c in confidences)))
+    unsupported_probabilities = [1.0 - confidence for confidence in confidences]
+    combined = 1.0 - math.prod(unsupported_probabilities)
+    # Keep floating-point rounding inside the valid confidence range.
+    return min(1.0, max(0.0, combined))
 
 
 COMBINATIONS: dict[str, CombinationFunction] = {"noisy_or": noisy_or}
@@ -81,15 +84,22 @@ def combine(evidence: Sequence[Evidence], config: EvidenceConfig) -> CombinedCon
 
     No evidence gives 0.0: nothing supports the edge.
     """
-    best: dict[str, float] = {}
-    members: dict[str, list[str]] = {}
+    best_by_group: dict[str, float] = {}
+    evidence_ids_by_group: dict[str, list[str]] = {}
     for item in evidence:
-        group, value = group_of(item, config)
-        best[group] = max(best.get(group, 0.0), value)
-        members.setdefault(group, []).append(item.id)
-    groups = tuple(
-        GroupContribution(name, best[name], tuple(sorted(members[name]))) for name in sorted(best)
-    )
+        group_name, confidence = group_of(item, config)
+        previous_best = best_by_group.get(group_name, 0.0)
+        best_by_group[group_name] = max(previous_best, confidence)
+        evidence_ids_by_group.setdefault(group_name, []).append(item.id)
+
+    contributions = []
+    for group_name in sorted(best_by_group):
+        evidence_ids = tuple(sorted(evidence_ids_by_group[group_name]))
+        contributions.append(GroupContribution(group_name, best_by_group[group_name], evidence_ids))
+
+    # The registry selects the configured algorithm; the empty case has no support.
     function = COMBINATIONS[config.combination]
-    confidence = function([g.confidence for g in groups]) if groups else 0.0
-    return CombinedConfidence(confidence, config.combination, groups)
+    confidence = 0.0
+    if contributions:
+        confidence = function([group.confidence for group in contributions])
+    return CombinedConfidence(confidence, config.combination, tuple(contributions))

@@ -218,3 +218,16 @@ def test_parallel_typed_edges_have_different_fingerprints() -> None:
         update={"id": "edge-2", "relationship_type": RelationshipType.ENCRYPTED_BY}
     )
     assert edge_fingerprint(connects) != edge_fingerprint(encrypted)
+
+
+def test_fingerprint_preserves_persisted_hash_format() -> None:
+    # Rejections refer to these digests. Refactoring sorting or JSON encoding must
+    # preserve existing fingerprints, including nulls, empty strings and Unicode.
+    facts = [(None, None), ("", ""), ("=prefix", "café"), ("env.DB_HOST", "match")]
+    evidence = [
+        make_evidence(id=f"ev-{index}", attribute=attribute, value_summary=summary)
+        for index, (attribute, summary) in enumerate(facts)
+    ]
+    expected = "sha256:868df86b2d77245a6e329ac7a83a96a4e4924faeeedd2665ca1b53e735d3af33"
+    assert fp("service", "database", evidence) == expected
+    assert fp("service", "database", list(reversed(evidence))) == expected

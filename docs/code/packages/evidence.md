@@ -95,6 +95,12 @@ edge_fingerprint(edge)             # 'sha256:…'
 | The combination function is chosen by name from a registry | `COMBINATIONS` | Pluggable, to tune against confirmed/rejected edges (§22) |
 | Fingerprint = endpoints + sorted set of `(source_type, attribute, value_summary)` | `evidence_fingerprint` | §23 |
 
+## Reading the implementation
+
+`combine` first fills `best_by_group` and `evidence_ids_by_group`. It then builds sorted `GroupContribution` records and calls the configured function. `noisy_or` names the unsupported probability for each input before multiplying; the final clamp keeps floating-point rounding inside 0 through 1.
+
+Fingerprinting first removes duplicate facts, then sorts using `_fact_sort_key`. That helper maps `None` to `""` and a real string to `"=" + value` **for sorting only**; the original facts go into JSON unchanged. This keeps null before the empty string without changing existing digests. A regression pins the exact pre-refactor hash, including Unicode and empty values. See [the runnable evidence flow](../flows/fixture-evidence.md).
+
 ## Tests
 
 `apps/api/tests/evidence/test_combination_and_fingerprint.py`: noisy-or; every configurable function is registered; correlated evidence takes the maximum; independent groups combine; permitted + observed beats either; configured weight wins; tuned weights apply; supporting-only adds nothing; only user confirmations may omit a kind (other sources, including LLM inference, raise); no evidence; unknown kind; order independence; fingerprint format, stability, what it ignores, order and duplicates, what changes it, endpoints, `None` vs `""`, edge fingerprint ignores ID and confidence; parallel typed edges get different fingerprints.

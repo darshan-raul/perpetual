@@ -101,6 +101,12 @@ Step by step:
 
 The graph builder (P0-11) will enforce the group rules on live data too.
 
+## Reading the implementation
+
+`expand` works on a deep copy. Override defaults are applied in two named steps (`with_project`, then `with_timestamp`); `_default` only fills an absent key, so an explicit null stays available for model validation to reject. `_issue` translates Pydantic locations such as `("edges", 0, "confidence")` into `edges[0].confidence` using separate branches.
+
+The cross-reference checker builds ID lookups once. `group_by_scoped_edge` remembers which group already claimed each `(scope, edge_id)` pair. The checks remain in a fixed order so fixture authors see stable diagnostics. The tests also cover authored override fields and preservation of the caller's data.
+
 ## Tests
 
 `apps/api/tests/fixture_format/test_fixture_loader.py`: every repository fixture is valid; ID-derived fields; contradictions; planned, global and external IDs; bad IDs; override defaults; raw data unchanged; model errors collected with paths; header and unknown keys; bad files; each cross-reference rule; orphaned overrides allowed; lookup by name, path and environment variable; the committed schema is current; derived fields optional in the schema.

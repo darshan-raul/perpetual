@@ -32,11 +32,10 @@ def evidence_fingerprint(
     evidence: Iterable[Evidence],
 ) -> str:
     """`sha256:<hex>` over the endpoints, relationship type and the evidence's material facts."""
-    facts = sorted(
-        {(item.source_type.value, item.attribute, item.value_summary) for item in evidence},
-        # None sorts before any string, so ordering never depends on Python's tuple rules.
-        key=lambda fact: tuple("" if part is None else f"={part}" for part in fact),
-    )
+    unique_facts = {
+        (item.source_type.value, item.attribute, item.value_summary) for item in evidence
+    }
+    facts = sorted(unique_facts, key=_fact_sort_key)
     canonical = json.dumps(
         {
             "from": from_resource_id,
@@ -50,7 +49,20 @@ def evidence_fingerprint(
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _fact_sort_key(fact: tuple[str, str | None, str | None]) -> tuple[str, ...]:
+    """Sort missing values before strings without confusing None with an empty string."""
+    parts = []
+    for part in fact:
+        if part is None:
+            parts.append("")
+        else:
+            # Prefix every real string, including "", to preserve the existing hash format.
+            parts.append(f"={part}")
+    return tuple(parts)
+
+
 def edge_fingerprint(edge: DependencyEdge) -> str:
+    """Fingerprint a dependency claim, ignoring its edge ID and computed confidence."""
     return evidence_fingerprint(
         edge.from_resource_id, edge.to_resource_id, edge.relationship_type, edge.evidence
     )

@@ -208,7 +208,7 @@ M1 covers the ECS + RDS slice. Collectors, packs and resolvers for the other v0.
 | P14 | §108 | M4 | Proven readiness, drift, calibration and v0.3 release | checkpoint |
 | P15 | — | M5 | Production readiness and v1.0 release | checkpoint |
 
-Every task meets the spec §103 definition of done: typed model, implementation, unit tests, fixture, API and UI exposure where applicable, error handling, docs. Docs include the code walkthrough in `docs/code/`, updated in the same change as the code (decision 2026-10-28).
+Every task meets the spec §103 definition of done: typed model, implementation, unit tests, fixture, API and UI exposure where applicable, error handling, docs. Docs include the code walkthrough in `docs/code/`, updated in the same change as the code (decision 2026-10-28). Readability for a reader with basic Python knowledge is also part of completion: follow `docs/code/readability.md` and review the checklist. Extend the living wiki with new concepts and worked flows, and correct affected existing pages (decision 2026-11-07).
 
 ## 5. Phases
 

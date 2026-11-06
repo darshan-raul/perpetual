@@ -88,10 +88,12 @@ def expand(raw: dict[str, Any]) -> tuple[dict[str, Any], list[FixtureIssue]]:
 
     overrides = data.get("overrides")
     if isinstance(overrides, list):
-        data["overrides"] = [
-            _default(_default(item, "project_id", FIXTURE_PROJECT_ID), "created_at", captured_at)
-            for item in overrides
-        ]
+        expanded_overrides = []
+        for item in overrides:
+            with_project = _default(item, "project_id", FIXTURE_PROJECT_ID)
+            with_timestamp = _default(with_project, "created_at", captured_at)
+            expanded_overrides.append(with_timestamp)
+        data["overrides"] = expanded_overrides
     return data, issues
 
 
@@ -112,6 +114,7 @@ def resolve_fixture(name_or_path: str, start: Path | None = None) -> Path:
 
 
 def fixture_names(start: Path | None = None) -> list[str]:
+    """Sorted YAML fixture names from the first fixture directory, or an empty list."""
     for base in _fixture_dirs(start or Path.cwd()):
         graphs = base / "graphs"
         if graphs.is_dir():
@@ -173,7 +176,9 @@ def _evidence_holders(data: dict[str, Any]) -> Iterator[dict[str, Any]]:
             yield item
             nested = item.get("dependency_groups")
             if isinstance(nested, list):
-                yield from (group for group in nested if isinstance(group, dict))
+                for group in nested:
+                    if isinstance(group, dict):
+                        yield group
 
 
 def _default(item: object, field: str, value: object) -> object:
@@ -184,8 +189,15 @@ def _default(item: object, field: str, value: object) -> object:
 
 def _issue(error: Any) -> FixtureIssue:
     path = ""
+    # Pydantic gives a location such as ("edges", 0, "confidence").
+    # Show it to the fixture author as edges[0].confidence.
     for part in error["loc"]:
-        path += f"[{part}]" if isinstance(part, int) else (f".{part}" if path else str(part))
+        if isinstance(part, int):
+            path += f"[{part}]"
+        elif path:
+            path += f".{part}"
+        else:
+            path = str(part)
     return FixtureIssue(path, error["msg"])
 
 

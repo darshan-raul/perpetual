@@ -142,9 +142,12 @@ class CostScope(StrEnum):
 
 def _sum(values: list[Decimal | None]) -> Decimal | None:
     # Any unknown bound makes the total unknown, so it can't be hidden by known lines.
-    if any(value is None for value in values):
-        return None
-    return sum((v for v in values if v is not None), Decimal(0))
+    known_values = []
+    for value in values:
+        if value is None:
+            return None
+        known_values.append(value)
+    return sum(known_values, Decimal(0))
 
 
 class CostEstimate(DomainModel):

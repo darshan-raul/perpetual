@@ -1,18 +1,21 @@
-# Perpetual — Code Walkthrough
+# Perpetual — Living Code Wiki
 
 How the code is organised and how it works, written for a person reading it. The spec in [`docs/spec/`](../spec/) says what Perpetual must do; these documents say how the code does it today.
 
 **Kept current with the code.** Every task that changes code updates the relevant page here in the same change (see [Keeping these docs current](#keeping-these-docs-current)). If a page and the code disagree, the code is right and the page is a bug.
 
+Written for readers with basic Python knowledge. Start with the concepts, follow a worked flow, then open the linked source files. This wiki grows with implementation; existing pages are revised when behavior changes.
+
 ## Reading order
 
-1. [architecture.md](architecture.md): the pipeline, what exists so far, and how the pieces connect.
-2. [tooling.md](tooling.md): how to run things and how every change is checked (mise, uv, import rules, tests, CI).
-3. The package pages below, in pipeline order. Each one says what the package owns, walks through its files, explains the rules it enforces and why, and points at its tests.
-4. Flow pages: one end-to-end path at a time, such as "what happens during `perpetual fixtures validate`".
+1. [concepts.md](concepts.md): domain vocabulary and Python/library features used in the code.
+2. [architecture.md](architecture.md): the pipeline, what exists so far, and how the pieces connect.
+3. [tooling.md](tooling.md): how to run things and how every change is checked (mise, uv, import rules, tests, CI).
+4. The package pages below, in pipeline order. Each one says what the package owns, walks through its files, explains the rules it enforces and why, and points at its tests.
+5. Flow pages: one end-to-end path at a time, such as "what happens during `perpetual fixtures validate`".
 
 ```text
- README (this page) ──> architecture.md ──> tooling.md
+ README (this page) ──> concepts.md ──> architecture.md ──> tooling.md
                               │
                               ▼
         packages/ids.md   packages/models.md ──> models-properties.md
@@ -37,7 +40,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
-| `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
+| `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); explicit grouping and stable-hash regression after readability review; resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
 | `graph` | Graph snapshots, overrides, traversal | stub | — |
 | `stacks` | Stack grouping, services, RTO scope | stub | — |
 | `rules` | DR rule packs | stub | — |
@@ -53,17 +56,27 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 
 ## Flows
 
-End-to-end paths across packages, one per command:
+Paths across packages, with command flows and manual library examples labeled separately:
 
 | Flow | Packages |
 |---|---|
 | [`perpetual fixtures validate`](flows/fixtures-validate.md) | `cli` → `fixtures` → `ids`, `models` |
+| [Inspect fixture evidence (manual library example)](flows/fixture-evidence.md) | `fixtures` → `config` → `evidence` |
+| [Snapshot round trip (manual library example)](flows/snapshot-round-trip.md) | `fixtures` → `persistence` → `models` |
+
+## Writing and reviewing
+
+The [2026-11-07 readability audit](readability-audit.md) records the reviewed scope, refactors, and compatibility checks.
+
+Follow [readability.md](readability.md) for the code style and completion checklist. Use [_template.md](_template.md) for package pages and [_flow-template.md](_flow-template.md) for flows.
 
 ## Keeping these docs current
 
+- **Explain concepts as they arrive.** Extend [concepts.md](concepts.md), or add a linked topic page, when a feature introduces domain terms, algorithms, or unfamiliar Python/library features. Define the idea before describing the implementation.
+- **Grow and correct.** Add new concepts and flows as work progresses; revise or remove obsolete explanations. Keep historical decisions in `TRACKER.md` and Git history, so the wiki describes the current code.
 - **Same change as the code.** A task that adds or changes code updates its package page, this index's status table, and [architecture.md](architecture.md) when connections change.
 - **New package with real code:** copy [_template.md](_template.md) to `packages/<name>.md` and link it above.
-- **New end-to-end path:** add `flows/<name>.md` and list it under Flows.
+- **New end-to-end path:** use [_flow-template.md](_flow-template.md) to add `flows/<name>.md` and list it under Flows. Include concrete input/output, source links, error cases, and relevant tests. Label library compositions that are not wired into a command.
 - **Split, don't sprawl.** When a page passes roughly 400 lines, split it by topic and link the parts from the package page.
 - **Draw the flow.** Each package page has at least one ASCII diagram of its main path (what calls what, what data goes in and comes out, where it can fail), and each flow page traces one command through the packages with file and function names. Diagrams use plain `text` code blocks so they read the same in a terminal and on GitHub.
 - **Describe the code that exists.** Planned work belongs in the tracker; a page may mention what comes next in one line.

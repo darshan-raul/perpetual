@@ -282,3 +282,27 @@ def test_schema_marks_derived_fields_optional() -> None:
     assert defs["ResourceNode"]["required"] == ["id"]
     assert "collected_at" not in defs["Evidence"]["required"]
     assert "project_id" not in defs["GraphOverride"]["required"]
+
+
+def test_expansion_preserves_authored_override_fields(raw: dict[str, Any]) -> None:
+    raw["overrides"] = [
+        {
+            "id": "ov-1",
+            "kind": "confirm_edge",
+            "target": "checkout-needs-db",
+            "payload": {},
+            "author": "user",
+            "project_id": "my-project",
+            "created_at": "2026-10-27T12:00:00Z",
+        }
+    ]
+    before = copy.deepcopy(raw)
+    fixture = parse_fixture(raw)
+    override = fixture.overrides[0]
+    assert override.project_id == "my-project"
+    assert override.created_at < fixture.captured_at
+    assert raw == before
+
+    # Explicit null is invalid authored data, not permission to fill a default.
+    raw["overrides"][0]["project_id"] = None
+    assert any(issue.startswith("overrides[0].project_id:") for issue in problems(raw))

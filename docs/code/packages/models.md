@@ -381,6 +381,12 @@ A `DeploymentPrerequisite` is something a plan can't prove (an image is present,
 | Observed READY needs every prerequisite satisfied; settled prerequisites cite evidence | `VerificationReport`, `DeploymentPrerequisite` | No operational check passes because its configuration exists (§61.1) |
 | Identity Regions apply only to IAM Identity Center; unknown replicas are None, not [] | `OperatorIdentity` | Undeclared, undiscovered facts stay UNKNOWN (§28.1) |
 
+## Reading the calculation helpers
+
+In `cost.py`, `_sum` gathers known Decimal values and returns `None` immediately if any input is unknown. Only after confirming all inputs are known does it add them, starting from `Decimal(0)`. A fixed-cost subtotal can be known even when the total is unknown; it must not substitute for the total.
+
+In `status.py`, `worst_state` selects the resource state with the highest number in `_SEVERITY`. The `key` function supplies the number to compare; the result is still the original state. Empty input raises rather than claiming that an empty stack survives. See [concepts](../concepts.md) for sort keys and model validation.
+
 ## Tests
 
 `apps/api/tests/models/`, one file per topic; shared builders in `builders.py`.

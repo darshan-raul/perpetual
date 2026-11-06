@@ -199,3 +199,5 @@ Perpetual is pre-alpha: the design is complete and implementation is starting. D
 - [`spec.md`](spec.md) & [`docs/spec/`](docs/spec/): architecture overview, reader's guide, section index, and the 7 modular specification documents (`§1`–`§109`).
 - [`IMPL_PLAN.md`](IMPL_PLAN.md): how it gets built, phase by phase.
 - [`TRACKER.md`](TRACKER.md): progress and decisions.
+
+- [`docs/code/`](docs/code/README.md): living code wiki—concepts, architecture, package walkthroughs, and worked flows for readers with basic Python knowledge.

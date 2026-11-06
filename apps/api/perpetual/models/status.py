@@ -39,7 +39,7 @@ def worst_state(states: Iterable[ResourceState]) -> ResourceState:
     items = list(states)
     if not items:
         raise ValueError("cannot combine an empty set of resource states")
-    return max(items, key=_SEVERITY.__getitem__)
+    return max(items, key=lambda state: _SEVERITY[state])
 
 
 class StackState(StrEnum):
