@@ -461,6 +461,22 @@ class ProjectRepository:
         )
         self.session.flush()
 
+    def delete_override(self, override_id: str) -> None:
+        """Withdraw a user edit without changing any discovered snapshot (spec §23).
+
+        Removing an add_edge override removes its assertion on the next replay.
+        If discovery independently found that edge, the discovered edge remains.
+        """
+        row = self.session.scalar(
+            select(GraphOverrideRow)
+            .where(GraphOverrideRow.project_id == self.project_id)
+            .where(GraphOverrideRow.override_id == override_id)
+        )
+        if row is None:
+            raise PersistenceError(f"no override {override_id!r}")
+        self.session.delete(row)
+        self.session.flush()
+
     def set_override_status(self, override_id: str, status: OverrideStatus) -> GraphOverride:
         """Change only the status (e.g. orphaned after a rescan, spec §23)."""
         row = self.session.scalar(

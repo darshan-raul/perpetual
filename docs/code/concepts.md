@@ -15,7 +15,7 @@ Start here if you know basic Python but are new to this project. The examples us
 | Stack | The resources needed to serve one product, evaluated together | [Models](packages/models.md) |
 | RTO / RPO | Targets for recovery time and tolerable loss of recent data. Target models exist; the calculators are still planned | [Architecture](architecture.md) |
 | Recovery mechanism / overlay | A way to provide a resource in the recovery Region; the overlay describes these alternatives alongside the dependency graph | [Models](packages/models.md) |
-| Override | A user's correction or confirmation, stored separately from discovered data. Its model and storage exist; applying it is P0-10 | [Models](packages/models.md) |
+| Override | A user's correction or confirmation, stored separately from discovered data. Replayed on a copied graph; missing targets become orphans and changed rejected claims get review links | [Graph overrides](packages/graph.md) |
 | Fixture | A small saved input used to exercise code without calling AWS | [Fixtures](packages/fixtures.md) |
 | Snapshot | A captured set of resources and relationships; published snapshots cannot be changed through the repository | [Persistence](packages/persistence.md) |
 | UNKNOWN | There is not enough evidence to decide. It must not be treated as success or zero cost/time | [Models](packages/models.md) |

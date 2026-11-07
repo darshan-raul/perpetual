@@ -41,7 +41,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
 | `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); explicit grouping and stable-hash regression after readability review; resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
-| `graph` | Graph snapshots, overrides, traversal | stub | — |
+| `graph` | Graph snapshots, overrides, traversal | Override replay, rescan merge, orphan/reproposal diagnostics and versioned YAML (P0-10); NetworkX construction next | [packages/graph.md](packages/graph.md) |
 | `stacks` | Stack grouping, services, RTO scope | stub | — |
 | `rules` | DR rule packs | stub | — |
 | `simulator` | Failure simulation | stub | — |
@@ -63,6 +63,7 @@ Paths across packages, with command flows and manual library examples labeled se
 | [`perpetual fixtures validate`](flows/fixtures-validate.md) | `cli` → `fixtures` → `ids`, `models` |
 | [Inspect fixture evidence (manual library example)](flows/fixture-evidence.md) | `fixtures` → `config` → `evidence` |
 | [Snapshot round trip (manual library example)](flows/snapshot-round-trip.md) | `fixtures` → `persistence` → `models` |
+| [Apply graph overrides (manual library example)](flows/graph-overrides.md) | `fixtures` → `graph.overrides` → `evidence`, `ids`, `models` |
 
 ## Writing and reviewing
 

@@ -8,7 +8,7 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
  [x] built   [~] started   [ ] not yet
 
  [ ] collectors ─┐
- [ ] importers  ─┼─> [ ] normalization ─> [~] evidence (edges) ─> [ ] graph (+ overrides)
+ [ ] importers  ─┼─> [ ] normalization ─> [~] evidence (edges) ─> [~] graph (overrides built)
  [x] fixtures   ─┘        (a fixture already holds normalized models, so it skips ahead ──┘)
 
  ─> [ ] stacks ─> [ ] rules (findings, DR overlay) ─> [ ] simulator ─> [ ] recovery (DAG, RTO, RPO)
@@ -26,6 +26,7 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
 | Storage | `persistence` | **Built** (P0-07): 17 tables, project-scoped repository, frozen published snapshots, initial Alembic migration tested on SQLite and PostgreSQL |
 | Fixtures | `fixtures` | **Built** (P0-08): format v1 in `fixtures/graphs/`, loader filling fields from canonical IDs, cross-reference checks, JSON Schema |
 | Evidence | `evidence` | **Started** (P0-09): confidence combination with correlation groups from config, evidence fingerprints; resolvers in P2b |
+| Graph | `graph` | **Started** (P0-10): pure override replay, rescan merging, orphan/reproposal diagnostics, versioned YAML; NetworkX construction is P0-11 |
 | Command line | `cli` | **Started** (P0-08): `perpetual fixtures validate` and `schema` |
 | Everything else | — | Empty subpackages with a docstring; layer rules already enforced |
 
@@ -48,7 +49,8 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
                                    SQLAlchemy, Alembic
 
  models, ids and config import nothing else from Perpetual (an import rule enforces it).
- Nothing imports cli. evidence is not called by a command yet; the graph (P0-11) uses it.
+ Nothing imports cli. graph.overrides imports evidence (fingerprints), ids and models.
+ The graph library is not called by a command yet; CLI wiring is P0-12.
 ```
 
 ## How data moves today
@@ -69,6 +71,22 @@ The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists
  config.load_config() -> Config ─ evidence section ─> evidence.combine(edge.evidence) -> confidence
                                 └ other sections  ─> stacks, rules, recovery (later)
 ```
+
+## The override layer (P0-10)
+
+```text
+ source records from fixtures or repository reads  +  saved overrides
+            |                                              |
+            +-----------------> graph.overrides <-----------+
+                                  |   imports evidence (fingerprints), ids, models
+                                  v
+                    copied effective records + rejected edges
+                    + statuses + orphan reasons + reproposal links
+                                  |
+                       NetworkX construction (P0-11)
+```
+
+Callers explicitly supply historical source edges when linking changed evidence to an older rejection. YAML import/export and application are library operations. The caller persists new overrides and status updates in a transaction; withdrawing an override uses `ProjectRepository.delete_override`. Discovered snapshots remain unchanged. See [the graph package](packages/graph.md) and [worked flow](flows/graph-overrides.md).
 
 ## How the models connect
 
@@ -117,4 +135,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-10 adds graph overrides (rejections stored against `evidence` fingerprints); P0-11 the NetworkX graph from a snapshot; P0-12 `perpetual graph --fixture`, the first command that runs the engine on a fixture.
+P0-11 builds the NetworkX graph from source records plus the applied override result, preserving dependency groups and rejected-edge context. P0-15 adds immutable manifests before P0-12 wires `perpetual graph --fixture` and override YAML commands.

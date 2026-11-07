@@ -34,7 +34,7 @@ projects
 ```
 
 - **Snapshots** hold discovered data. A scan (or, later, a saved Terraform plan) fills an open snapshot, then `publish_snapshot` freezes it, and any further write raises. Older snapshots are kept; `resource_history` returns every version of one resource, oldest first (§76, drift in §77).
-- **Overrides** are per project, not per snapshot, because they apply on top of every scan. Discovered rows are never changed to reflect an edit (§23). Only an override's status changes, e.g. to `orphaned`.
+- **Overrides** are per project, not per snapshot, because they apply on top of every scan. Discovered rows are never changed to reflect an edit (§23). Only an override's status changes, e.g. to `orphaned`; `delete_override` withdraws a user instruction within the current project without touching any snapshot. Replaying without an `add_edge` instruction removes its assertion, while independently discovered edges remain.
 - **Evidence** is stored once per snapshot and linked to edges by position, so an edge reloads with its evidence in the same order. The same evidence ID with different content is refused: it means a bug upstream. Groups and mechanisms keep their (rare) evidence inside their payload.
 - **Observations** are the resolved CloudTrail/flow-log aggregates from `models.observation`; raw events have nowhere to go.
 
@@ -144,6 +144,8 @@ with transaction(factory) as session:
 
 - `test_schema_and_migrations.py`: the planned tables exist and carry `project_id`; the migration matches the models exactly (Alembic compare); downgrade removes everything; tables and indexes compile on SQLite and PostgreSQL; identifiers fit PostgreSQL; the migration renders as PostgreSQL SQL offline; default database path.
 - `test_repository.py`: round trips for resources, edges (evidence order, shared evidence stored once), groups, observations, mechanisms, stacks, coverage, overrides and evaluation inputs; conflicting evidence refused; statement count stays flat as the batch grows; published snapshots frozen; history across snapshots; scan lifecycle; project isolation; override status changes leave the edit intact.
+
+For the application boundary, see [graph overrides](graph.md) and its [persistence integration test](../../../apps/api/tests/graph/test_override_persistence.py): source records are read, overrides applied to copies, and resulting statuses saved explicitly.
 
 ## Not here yet
 

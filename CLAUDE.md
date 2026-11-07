@@ -16,7 +16,7 @@ Follow [AGENTS.md](AGENTS.md) and [docs/code/readability.md](docs/code/readabili
 
 ## Status
 
-Milestone M0 PoC in progress: P0-01 to P0-09 are done (repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format, evidence combination); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
+Milestone M0 PoC in progress: P0-01 to P0-10 are done (repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format, evidence combination, graph overrides); the current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
 
 ## Commands (from P0-01)
 

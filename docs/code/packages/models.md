@@ -185,7 +185,7 @@ A `RecoveryMechanism` says how one primary resource is provided in the DR target
 
 ### User edits
 
-A `GraphOverride` is a user edit. It never changes discovered data; it is applied on top of each scan:
+A `GraphOverride` is a user edit. Its payload is validated here; [graph.overrides](graph.md) validates its stable target and applies it. It never changes discovered data; it is applied on top of each scan:
 
 ```text
  discovered graph (scan N) ──┐

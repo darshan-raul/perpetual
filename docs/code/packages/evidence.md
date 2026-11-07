@@ -105,6 +105,10 @@ Fingerprinting first removes duplicate facts, then sorts using `_fact_sort_key`.
 
 `apps/api/tests/evidence/test_combination_and_fingerprint.py`: noisy-or; every configurable function is registered; correlated evidence takes the maximum; independent groups combine; permitted + observed beats either; configured weight wins; tuned weights apply; supporting-only adds nothing; only user confirmations may omit a kind (other sources, including LLM inference, raise); no evidence; unknown kind; order independence; fingerprint format, stability, what it ignores, order and duplicates, what changes it, endpoints, `None` vs `""`, edge fingerprint ignores ID and confidence; parallel typed edges get different fingerprints.
 
+## Used by graph overrides
+
+[graph.overrides](graph.md) matches rejections against source-edge fingerprints before adding user assertions. Historical source edges let it link changed claims to old rejection IDs. Confirmations and edits use stable endpoint-and-type targets; they do not reuse rejection hashes as edge identities.
+
 ## Not here yet
 
 - Edge resolvers that create evidence from Terraform, AWS APIs, CloudTrail and flow logs: P2b.

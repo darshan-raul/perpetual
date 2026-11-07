@@ -1,0 +1,117 @@
+# Source records remain unchanged; graph.overrides applies these edits on copies.
+format: perpetual-fixture
+version: 1
+name: review-overrides
+description: All six override kinds applied over an ECS-to-RDS source graph.
+captured_at: 2026-10-28 12:00:00+00:00
+resources:
+- id: aws://123456789012/ap-south-1/ecs/service/checkout
+  name: checkout
+- id: aws://123456789012/ap-south-1/rds/db/checkout
+  name: checkout
+edges:
+- id: checkout-needs-db
+  from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout
+  to_resource_id: aws://123456789012/ap-south-1/rds/db/checkout
+  relationship_type: connects_to
+  confidence: 1.0
+  inferred: false
+  origin: discovered
+  criticality: required
+  evidence:
+  - id: ev-tf-db-host
+    source_type: terraform
+    basis: referenced
+    source: terraform:infra-prod/default
+    kind: terraform_reference
+    attribute: container_definitions.environment.DB_HOST
+    confidence: 1.0
+- id: checkout-reads-db
+  from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout
+  to_resource_id: aws://123456789012/ap-south-1/rds/db/checkout
+  relationship_type: reads_from
+  confidence: 1.0
+  inferred: false
+  origin: discovered
+  criticality: required
+  evidence:
+  - id: ev-tf-read-db
+    source_type: terraform
+    basis: referenced
+    source: terraform:infra-prod/default
+    kind: terraform_reference
+    attribute: container_definitions.environment.DB_HOST
+    confidence: 1.0
+mechanisms:
+- id: db-dr
+  primary_resource_id: aws://123456789012/ap-south-1/rds/db/checkout
+  target_region: ap-south-2
+  target_account_id: '123456789012'
+  kind: none
+  control_plane_dependent: false
+  confidence: 0.9
+stacks:
+- id: checkout
+  name: checkout
+  criticality: critical
+  root_resource_ids:
+  - aws://123456789012/ap-south-1/ecs/service/checkout
+  resource_ids:
+  - aws://123456789012/ap-south-1/ecs/service/checkout
+  - aws://123456789012/ap-south-1/rds/db/checkout
+  primary_region: ap-south-1
+  discovery_confidence: 0.9
+requirements:
+- id: checkout-region
+  revision: 1
+  stack_id: checkout
+  failure_scope: region
+  target_rto_seconds: 1800
+  target_rpo_seconds: 300
+  target_region: ap-south-2
+overrides:
+- id: 01-confirm
+  kind: confirm_edge
+  target: edge:["aws://123456789012/ap-south-1/ecs/service/checkout","aws://123456789012/ap-south-1/rds/db/checkout","connects_to"]
+  payload: {}
+  author: operator
+- id: 02-edit-edge
+  kind: edit_edge
+  target: edge:["aws://123456789012/ap-south-1/ecs/service/checkout","aws://123456789012/ap-south-1/rds/db/checkout","connects_to"]
+  payload:
+    criticality: likely_required
+  author: operator
+- id: 03-reject
+  kind: reject_edge
+  target: sha256:dd95b805ab384480f3f54e2da1ab4d12c436d2e432a55c18d09ab6939654e217
+  payload: {}
+  author: operator
+  reason: Not a separate runtime dependency
+- id: 04-add-edge
+  kind: add_edge
+  target: edge:["aws://123456789012/ap-south-1/ecs/service/checkout","external://payments/stripe","connects_to"]
+  payload:
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout
+    to_resource_id: external://payments/stripe
+    relationship_type: connects_to
+    criticality: required
+    note: Payment provider
+  author: operator
+- id: 05-add-node
+  kind: add_node
+  target: external://payments/stripe
+  payload:
+    node_kind: external
+    resource_id: external://payments/stripe
+    provider: external
+    service: payments
+    resource_type: saas
+  author: operator
+- id: 06-edit-node
+  kind: edit_node
+  target: external://payments/stripe
+  payload:
+    stack_id: checkout
+    member: true
+    rto_scope: in_scope
+  author: operator

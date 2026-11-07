@@ -16,7 +16,7 @@ fixtures/
   schema/fixture-v1.schema.json  JSON Schema for editors (kept current by a test)
 ```
 
-`resolve_fixture` takes a path, or a name looked up in `graphs/` under `$PERPETUAL_FIXTURES_DIR` or the nearest `fixtures/` directory at or above the current directory. `fixtures/graphs/minimal.yaml` is a small, commented example; the canonical demo fixtures arrive in P0-13.
+`resolve_fixture` takes a path, or a name looked up in `graphs/` under `$PERPETUAL_FIXTURES_DIR` or the nearest `fixtures/` directory at or above the current directory. `fixtures/graphs/minimal.yaml` is a small, commented example; `review-overrides.yaml` exercises all six user-edit kinds through the [override flow](../flows/graph-overrides.md); the canonical demo fixtures arrive in P0-13.
 
 ## The format
 

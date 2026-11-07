@@ -6,7 +6,7 @@ A task is done when its code, tests and living code wiki ([`docs/code/`](docs/co
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-10**.
+**Current focus:** M0 PoC · next task **P0-11**.
 
 ## Milestones
 
@@ -133,7 +133,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-07 Persistence + initial Alembic migration + SQLite/PostgreSQL dialect compilation check
 - [x] P0-08 Fixture format v1, loader, validator, JSON Schema
 - [x] P0-09 Evidence combination + fingerprints
-- [ ] P0-10 Graph overrides (apply, merge, orphan, YAML)
+- [x] P0-10 Graph overrides (apply, merge, orphan, YAML)
 - [ ] P0-11 NetworkX snapshot + traversal helpers
 - [ ] P0-15 Immutable evaluation/snapshot manifests, canonical hashes, versioned fixture inputs and payload schema versions (before P0-12/13)
 - [ ] P0-12 `perpetual graph` CLI
@@ -492,6 +492,7 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-11-07 | P0-10 uses a pure override application layer on copied resource/edge/stack models. Confirm/edit targets encode the endpoints and relationship type; reject targets remain evidence fingerprints. Historical source edges supply rejection context on rescans; changed claims are linked to old rejection IDs. Replay is deterministic by creation time and ID, with node additions established first. YAML uses a versioned, project-bound envelope; CLI wiring stays P0-12. Missing targets produce orphan diagnostics, and invalid/ambiguous inputs fail explicitly. | Preserve discovered snapshots, typed parallel edges, reproducible user edits and review context without inventing information from a one-way hash. |
 | 2026-11-07 | Make basic-Python readability and the living code wiki part of every implementation task. Keep `docs/code/` as the single code wiki; add concepts and worked flows as features arrive, and revise existing explanations when behavior changes. Add repository-wide agent instructions and a review checklist. | User requested readable code and continuously growing documentation of concepts and flows. Framework features remain allowed when explained; correctness and existing contracts remain required. |
 | 2026-11-03 | Fixes from an external review of P0-01–P0-09 and the roadmap. **Code:** (1) the evidence fingerprint adds the relationship type (spec §23 amended), so parallel typed edges between the same resources (§19.1) are rejected independently; (2) `combine` accepts a kind-less item only from `user_confirmation`; any other kind-less item raises, like an unlisted kind; (3) `save_resources`/`save_edges` look up existing identities and evidence once per batch (chunks of 500) and flush twice per call instead of per row; (4) `DERIVED_FIELDS` and `FixtureIssue` move to `fixtures/schema.py`, removing both function-local imports. **Plan:** (5) M1 covers the ECS + RDS slice; EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS and DynamoDB collectors, packs and resolvers form new phase P2c in M2 (IDs kept, marked `(M2 · P2c)`; P2-02e split into ACM and P2-02f CloudFront/WAF; P4-03d split into ALB/ACM and P4-03h CloudFront; new P2c-01/02). v0.1 scope is unchanged. (6) P2b-02 reads trails from S3 and `LookupEvents`; CloudTrail Lake and Athena go to the backlog (spec §99 amended). (7) Checklist order matches execution order: P0-15 after P0-11 and before P0-12/13; P1b-15 after P1b-03; P2-11 after P2-12/13; P2b-08 after P2b-09. (8) P1-02 implements `resolve_mechanism` on real `DRRulePack` classes that P4 extends. (9) Owners set for tables that fixtures carry but persistence lacks: `recovery_requirements` in P1-15, facts in P2-12; payload schema versions with registered upgrades in P0-15. **Not adopted:** a separate "modeled preview" mode in P10-04, because P9-04/P9-05 already evaluate each candidate and remediation as a modeled snapshot before any saved plan exists; building fact/requirement tables now, because their consumers don't exist yet. | A forgotten `kind=` or kind-less LLM evidence would otherwise silently bypass the weights table or add confidence (§2 rule 11). Per-row queries made a 5,000-resource snapshot cost tens of thousands of statements. M1's exit needs only the ECS + RDS services; the rest delayed the first real-AWS validation. S3 trail files cover the same events as Lake and Athena. |
 | 2026-10-28 | P0-09 evidence. `Evidence` gains an optional `kind` naming its row in the §22 weights table. A configured kind counts with the configured weight (so tuning applies without a rescan); a kind-less item (user confirmation, anything outside the table) counts with its own `confidence` in a group named `source:<source_type>`; an unlisted kind raises. No evidence gives 0.0. Combination functions are a name→function registry that must cover every name config allows. The fingerprint is sha256 over compact JSON of the endpoints and the sorted set of `(source_type, attribute, value_summary)` (§23); it ignores evidence IDs, times, counts, confidences, edge ID and relationship type, and keeps `None` distinct from `""`. | Config stays the single source of weights; grouping kind-less items by source is the conservative reading of §22; the fingerprint follows §23 exactly and is stable across rescans. |
@@ -530,6 +531,15 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-07 — P0-10 graph overrides
+
+- Added `graph.overrides`: pure replay of confirm/reject/add/edit edge and add/edit node instructions over copied records; stable typed targets, deterministic ordering, user assertions, merge on discovery, orphan reactivation and historical rejection links. Conflicting/ambiguous inputs fail explicitly. Changed evidence does not inherit an earlier confirmation superseded by a rejection.
+- Versioned project-bound YAML export/load/parse and additive, idempotent import merge. Added project-scoped `ProjectRepository.delete_override` for withdrawal without changing source snapshots. Graph/override CLI wiring remains P0-12.
+- `review-overrides.yaml` exercises all six kinds. Added replay, YAML, and persistence integration tests covering source isolation, parallel types, history across rescans, membership/scope, missing targets, ordering, import conflicts and cross-project protection.
+- Wiki: graph package page, runnable override flow, architecture/import connections and current status; linked the existing evidence/models/persistence pages. Readability review: public inputs/results documented, responsibilities split into focused modules, explicit loops/validation and no new runtime dependency.
+- Validation: `mise run check` passes (430 tests, including 61 new override tests; strict mypy on 108 files; lint/formatting; nine import contracts). Both repository fixtures validate; the new wiki example runs with the documented output; local file links and code fences checked across 21 wiki pages; diff whitespace clean.
+- **Carry-over:** P0-11 (NetworkX snapshot and traversal). Preserve dependency groups and rejected-edge context; never silently lower a quorum. P0-15 still precedes P0-12/13. Callers must provide fresh source records and historical rejected claims; override status persistence is explicit.
 
 ### 2026-11-07 — Python readability audit and refactor
 

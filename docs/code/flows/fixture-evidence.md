@@ -47,6 +47,6 @@ With the current defaults, the score is `1.0`, the group is `terraform`, and the
 3. [combine](../../../apps/api/perpetual/evidence/combination.py) takes the strongest contribution within each correlation group, then combines independent groups. Unrecognized kinds raise `UnknownEvidenceKindError`. Empty evidence produces confidence 0.0.
 4. [edge_fingerprint](../../../apps/api/perpetual/evidence/fingerprint.py) hashes the endpoints, relationship type, and material evidence facts. IDs of individual evidence records, timestamps, and confidence values do not affect this fingerprint.
 
-Changing a configured weight can change the score without changing the fingerprint. Changing a dependency's endpoint or relationship changes the claim and therefore its fingerprint. The planned override layer will use fingerprints to decide whether rejected claims have materially changed.
+Changing a configured weight can change the score without changing the fingerprint. Changing a dependency's endpoint or relationship changes the claim and therefore its fingerprint. The [override layer](../packages/graph.md) uses fingerprints and historical source edges to decide whether rejected claims have materially changed.
 
 For the exact rules and regression tests, see [the evidence package](../packages/evidence.md). The loader and scoring tests cover their respective functions; this walkthrough is not a new CLI feature.
