@@ -35,13 +35,13 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `models` | Domain models, enums, status vocabulary. No I/O. | Core graph and stack models (P0-04a); typed properties for compute, data/storage, messaging, network, edge, supporting services, ARC and Identity Center (P0-04b to P0-04d); external/generic fallbacks and quota, capability and metric facts (P0-04e); coverage, resolved observations, workload/cost, evaluation inputs, verification, drills and operator access (P0-04f) | [packages/models.md](packages/models.md), [models-properties.md](packages/models-properties.md) |
 | `config` | Typed config loading + versioned defaults | Evidence weights and groups, review threshold, scoring, RTO-scope defaults, buffer, freshness, limits and cost units, with project overrides (P0-06) | [packages/config.md](packages/config.md) |
 | `ids` | Canonical resource IDs | Live, global, planned (`tf:`) and external IDs: build, parse, validate (P0-05) | [packages/ids.md](packages/ids.md) |
-| `fixtures` | Fixture format, loader, validator | Format v1, ID-derived fields, model and cross-reference checks with paths, lookup by name, JSON Schema (P0-08) | [packages/fixtures.md](packages/fixtures.md) |
+| `fixtures` | Fixture format, loader, validator | Format v1, ID-derived fields, model and cross-reference checks with paths, lookup by name, JSON Schema, versioned inputs & workload profiles, canonical fixtures (`ecs-broken`, `ecs-remediated`, `cycle`, `shared-node`, `deep-path`) (P0-08, P0-13, P0-15) | [packages/fixtures.md](packages/fixtures.md) |
 | `persistence` | SQLAlchemy models, repositories, migrations | 17 tables (projects, scans, snapshots, coverage, resources and versions, evidence, edges, groups, observations, mechanisms, stacks, overrides, evaluation inputs), `ProjectRepository`, initial migration (P0-07) | [packages/persistence.md](packages/persistence.md) |
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
 | `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); explicit grouping and stable-hash regression after readability review; resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
-| `graph` | Graph snapshots, overrides, traversal | Override replay, rescan merge, orphan/reproposal diagnostics and versioned YAML (P0-10); NetworkX construction next | [packages/graph.md](packages/graph.md) |
+| `graph` | Graph snapshots, overrides, traversal, manifests | Override replay, rescan merge, orphan/reproposal diagnostics and versioned YAML (P0-10); NetworkX `MultiDiGraph` snapshot, group validation & cycle-safe traversal (P0-11); canonical SHA-256 digests & `SnapshotManifest` (P0-15) | [packages/graph.md](packages/graph.md) |
 | `stacks` | Stack grouping, services, RTO scope | stub | — |
 | `rules` | DR rule packs | stub | — |
 | `simulator` | Failure simulation | stub | — |
@@ -51,7 +51,7 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `iac` | Companion Terraform, suggested edits, delivery | stub | — |
 | `runbooks` | Runbook, scripts (`v0.1`), ARC plan compiler (`v0.2` M3) | stub | — |
 | `llm`, `knowledge` | LLM agents and knowledge base (`v0.3` M4) | stub | — |
-| `cli` | Typer commands | `perpetual fixtures validate` and `schema` (P0-08) | [packages/cli.md](packages/cli.md) |
+| `cli` | Typer commands | `perpetual fixtures validate|schema` (P0-08) and `perpetual graph` + `perpetual graph overrides export|apply` (P0-12) | [packages/cli.md](packages/cli.md) |
 | `api` | FastAPI routes | stub | — |
 
 ## Flows

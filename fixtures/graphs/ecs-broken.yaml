@@ -1,0 +1,408 @@
+# Canonical broken ECS demo (spec §85 Fixture A, §87).
+# Primary: ap-south-1, DR: ap-south-2.
+# Intentional blockers (§87):
+#   - RDS has no cross-Region replica
+#   - ECR image is not replicated to ap-south-2
+#   - Secret exists only in primary
+#   - DR KMS key is missing
+#   - DR ECS service desired_count = 0
+#   - Route 53 failover is incomplete (points only at primary ALB)
+format: perpetual-fixture
+version: 1
+name: ecs-broken
+description: Canonical ECS + RDS checkout stack with regional DR blockers (spec §87).
+captured_at: 2026-11-24T12:00:00Z
+
+input_versions:
+  graph_revision: 1
+  override_revision: 0
+  group_revision: 0
+  requirement_revision: 1
+  engine_version: "0.0.0-fixture"
+  freshness_policy_version: "v1"
+  duration_catalog_version: "v1"
+
+resources:
+  - id: aws://123456789012/global/route53/recordset/Z123-checkout-api
+    name: api.checkout.example.com
+    typed_properties:
+      type_key: route53/recordset
+      hosted_zone_id: Z123
+      name: api.checkout.example.com
+      record_type: A
+      routing_policy: simple
+
+  - id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/checkout-alb
+    name: checkout-alb
+    typed_properties:
+      type_key: elasticloadbalancing/loadbalancer
+      name: checkout-alb
+      lb_type: application
+      scheme: internet-facing
+
+  - id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    name: checkout-api
+    typed_properties:
+      type_key: ecs/service
+      cluster_arn: arn:aws:ecs:ap-south-1:123456789012:cluster/checkout
+      task_definition_arn: arn:aws:ecs:ap-south-1:123456789012:task-definition/checkout-api:12
+      service_name: checkout-api
+      desired_count: 4
+      launch_type: FARGATE
+
+  - id: aws://123456789012/ap-south-1/ecr/repository/checkout-api
+    name: checkout-api
+    typed_properties:
+      type_key: ecr/repository
+      repository_name: checkout-api
+      repository_uri: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/checkout-api
+
+  - id: aws://123456789012/ap-south-1/secretsmanager/secret/checkout-db-creds
+    name: checkout/db-creds
+    typed_properties:
+      type_key: secretsmanager/secret
+      name: checkout/db-creds
+
+  - id: aws://123456789012/ap-south-1/kms/key/checkout-cmk
+    name: checkout-cmk
+    typed_properties:
+      type_key: kms/key
+      key_id: checkout-cmk
+      multi_region: false
+
+  - id: aws://123456789012/ap-south-1/rds/db/checkout-orders
+    name: checkout-orders
+    typed_properties:
+      type_key: rds/db
+      db_instance_identifier: checkout-orders
+      engine: postgres
+      instance_class: db.r6g.large
+      multi_az: true
+      storage_encrypted: true
+      kms_key_id: aws://123456789012/ap-south-1/kms/key/checkout-cmk
+
+  - id: aws://123456789012/ap-south-1/s3/bucket/checkout-assets
+    name: checkout-assets
+    typed_properties:
+      type_key: s3/bucket
+      bucket_name: checkout-assets
+      versioning: Enabled
+
+  - id: aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+    name: /ecs/checkout-api
+    typed_properties:
+      type_key: logs/log-group
+      log_group_name: /ecs/checkout-api
+
+  # Existing DR-side resources (incomplete)
+  - id: aws://123456789012/ap-south-2/elasticloadbalancing/loadbalancer/checkout-alb-dr
+    name: checkout-alb-dr
+    typed_properties:
+      type_key: elasticloadbalancing/loadbalancer
+      name: checkout-alb-dr
+      lb_type: application
+      scheme: internet-facing
+
+  - id: aws://123456789012/ap-south-2/ecs/service/checkout-api-dr
+    name: checkout-api-dr
+    typed_properties:
+      type_key: ecs/service
+      cluster_arn: arn:aws:ecs:ap-south-2:123456789012:cluster/checkout-dr
+      task_definition_arn: arn:aws:ecs:ap-south-2:123456789012:task-definition/checkout-api:12
+      service_name: checkout-api-dr
+      desired_count: 0
+      launch_type: FARGATE
+
+  - id: aws://123456789012/ap-south-2/s3/bucket/checkout-assets-dr
+    name: checkout-assets-dr
+    typed_properties:
+      type_key: s3/bucket
+      bucket_name: checkout-assets-dr
+      versioning: Enabled
+
+edges:
+  - id: dns-to-alb
+    from_resource_id: aws://123456789012/global/route53/recordset/Z123-checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/checkout-alb
+    relationship_type: routes_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-dns-alb
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra-prod/default
+        kind: terraform_reference
+        confidence: 1.0
+
+  - id: alb-to-ecs
+    from_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/checkout-alb
+    to_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    relationship_type: routes_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-alb-ecs
+        source_type: aws_api
+        basis: referenced
+        source: elbv2:describe_target_groups
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+  - id: ecs-uses-ecr
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/ecr/repository/checkout-api
+    relationship_type: uses_image
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ecs-ecr
+        source_type: aws_api
+        basis: referenced
+        source: ecs:describe_task_definition
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+  - id: ecs-uses-secret
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/secretsmanager/secret/checkout-db-creds
+    relationship_type: uses_secret
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ecs-secret
+        source_type: aws_api
+        basis: referenced
+        source: ecs:describe_task_definition
+        kind: ecs_secret_arn_reference
+        confidence: 1.0
+
+  - id: secret-encrypted-by-kms
+    from_resource_id: aws://123456789012/ap-south-1/secretsmanager/secret/checkout-db-creds
+    to_resource_id: aws://123456789012/ap-south-1/kms/key/checkout-cmk
+    relationship_type: encrypted_by
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-secret-kms
+        source_type: aws_api
+        basis: referenced
+        source: secretsmanager:describe_secret
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+  - id: ecs-connects-rds
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/rds/db/checkout-orders
+    relationship_type: connects_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ecs-rds
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra-prod/default
+        kind: terraform_reference
+        confidence: 1.0
+
+  - id: rds-encrypted-by-kms
+    from_resource_id: aws://123456789012/ap-south-1/rds/db/checkout-orders
+    to_resource_id: aws://123456789012/ap-south-1/kms/key/checkout-cmk
+    relationship_type: encrypted_by
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-rds-kms
+        source_type: aws_api
+        basis: referenced
+        source: rds:describe_db_instances
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+  - id: ecs-reads-s3
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/s3/bucket/checkout-assets
+    relationship_type: reads_from
+    confidence: 0.95
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ecs-s3
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra-prod/default
+        kind: terraform_reference
+        confidence: 1.0
+
+  - id: s3-replicates-to-dr
+    from_resource_id: aws://123456789012/ap-south-1/s3/bucket/checkout-assets
+    to_resource_id: aws://123456789012/ap-south-2/s3/bucket/checkout-assets-dr
+    relationship_type: replicates_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-s3-crr
+        source_type: aws_api
+        basis: referenced
+        source: s3:get_bucket_replication
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+  - id: ecs-writes-logs
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+    relationship_type: writes_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: optional
+    evidence:
+      - id: ev-ecs-logs
+        source_type: aws_api
+        basis: referenced
+        source: ecs:describe_task_definition
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+mechanisms:
+  - id: mech-dns
+    primary_resource_id: aws://123456789012/global/route53/recordset/Z123-checkout-api
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: true
+    confidence: 0.95
+
+  - id: mech-alb
+    primary_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/checkout-alb
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: live_counterpart
+    counterpart_resource_id: aws://123456789012/ap-south-2/elasticloadbalancing/loadbalancer/checkout-alb-dr
+    control_plane_dependent: false
+    confidence: 0.95
+
+  - id: mech-ecs
+    primary_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: live_counterpart
+    counterpart_resource_id: aws://123456789012/ap-south-2/ecs/service/checkout-api-dr
+    dr_dependency_ids:
+      - aws://123456789012/ap-south-2/elasticloadbalancing/loadbalancer/checkout-alb-dr
+    control_plane_dependent: true
+    confidence: 0.95
+
+  - id: mech-ecr
+    primary_resource_id: aws://123456789012/ap-south-1/ecr/repository/checkout-api
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: false
+    confidence: 0.95
+
+  - id: mech-secret
+    primary_resource_id: aws://123456789012/ap-south-1/secretsmanager/secret/checkout-db-creds
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: false
+    confidence: 0.95
+
+  - id: mech-kms
+    primary_resource_id: aws://123456789012/ap-south-1/kms/key/checkout-cmk
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: false
+    confidence: 0.95
+
+  - id: mech-rds
+    primary_resource_id: aws://123456789012/ap-south-1/rds/db/checkout-orders
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: true
+    confidence: 0.95
+
+  - id: mech-s3
+    primary_resource_id: aws://123456789012/ap-south-1/s3/bucket/checkout-assets
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: live_counterpart
+    counterpart_resource_id: aws://123456789012/ap-south-2/s3/bucket/checkout-assets-dr
+    control_plane_dependent: false
+    confidence: 0.95
+
+  - id: mech-logs
+    primary_resource_id: aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+    target_region: ap-south-2
+    target_account_id: "123456789012"
+    kind: none
+    control_plane_dependent: false
+    confidence: 0.95
+
+stacks:
+  - id: checkout
+    name: checkout
+    description: Customer checkout product stack (ECS Fargate + RDS PostgreSQL).
+    environment: prod
+    criticality: critical
+    root_resource_ids:
+      - aws://123456789012/global/route53/recordset/Z123-checkout-api
+    resource_ids:
+      - aws://123456789012/global/route53/recordset/Z123-checkout-api
+      - aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/checkout-alb
+      - aws://123456789012/ap-south-1/ecs/service/checkout-api
+      - aws://123456789012/ap-south-1/ecr/repository/checkout-api
+      - aws://123456789012/ap-south-1/secretsmanager/secret/checkout-db-creds
+      - aws://123456789012/ap-south-1/kms/key/checkout-cmk
+      - aws://123456789012/ap-south-1/rds/db/checkout-orders
+      - aws://123456789012/ap-south-1/s3/bucket/checkout-assets
+      - aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+    service_ids:
+      - svc-checkout-api
+    primary_region: ap-south-1
+    discovery_confidence: 0.95
+
+stack_services:
+  - id: svc-checkout-api
+    stack_id: checkout
+    name: checkout-api
+    resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/checkout-api
+      - aws://123456789012/ap-south-1/ecr/repository/checkout-api
+      - aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+
+stack_resources:
+  - stack_id: checkout
+    resource_id: aws://123456789012/ap-south-1/logs/log-group/checkout-api-logs
+    rto_scope: out_of_scope
+    scope_source: rule_default
+
+requirements:
+  - id: checkout-region
+    revision: 1
+    stack_id: checkout
+    failure_scope: region
+    target_rto_seconds: 1800
+    target_rpo_seconds: 300
+    max_monthly_dr_cost_usd: "800"
+    target_region: ap-south-2

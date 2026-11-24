@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-13** (canonical fixtures).
+**Current focus:** M0 PoC · **P0 complete** · next task **P1-01** (Rule-pack protocol + registry).
 
 ## Milestones
 
@@ -24,7 +24,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 | Phase | Milestone | Status | Exit criterion |
 |---|---|---|---|
-| P0 Engine foundation | M0 | [~] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
+| P0 Engine foundation | M0 | [x] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
 | P1 Simulation and recovery core | M0 | [ ] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
 | P1c PoC compile loop | M0 | [ ] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
 | P1b-02/03 Normalization & identity | M1 | [ ] | recorded-AWS normalizers + identity resolution feed P2 collectors |
@@ -62,7 +62,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | §93 RTO tests (40 / 48 / 49.5) | [ ] |
 | PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [ ] |
 | Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [x] |
-| Import contracts green | [~] |
+| Import contracts green | [x] |
 
 ### M1 Alpha (CLI)
 
@@ -163,8 +163,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-11 NetworkX snapshot + traversal helpers
 - [x] P0-15 Lightweight immutable evaluation/snapshot manifests, canonical hashes, and versioned fixture inputs (before P0-12/13; payload schema-migration upgrade registry deferred to M3 `P0-15b`)
 - [x] P0-12 `perpetual graph` CLI
-- [ ] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
-- [ ] P0-14 CLAUDE.md commands updated
+- [x] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
+- [x] P0-14 CLAUDE.md commands updated
 
 ### P1 Simulation and recovery core
 
@@ -575,6 +575,14 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P0-13 canonical fixtures & P0-14 wrap-up (P0 complete)
+
+- Authored all 5 canonical P0-13 fixtures under `fixtures/graphs/`: `ecs-broken.yaml` (spec §85/§87), `ecs-remediated.yaml` (spec §85/§88), `cycle.yaml` (spec §18), `shared-node.yaml` (multi-stack shared KMS/VPC), and `deep-path.yaml` (6-node chain > 4 hops).
+- Verified P0 exit criterion: `uv run perpetual fixtures validate` passes on all 7 fixtures, and `uv run perpetual graph --fixture ecs-broken` renders the full dependency graph, canonical manifest digest, and DR overlay.
+- Completed P0-14: updated `CLAUDE.md` status/commands to match reality and performed the end-of-P0 phase-boundary update to `docs/code/` (`README.md`, `packages/graph.md`, `packages/cli.md`).
+- Validation: `mise run check` passes cleanly across all tests, mypy strict, ruff, and 9 import contracts.
+- **Carry-over:** Start **P1 Simulation and recovery core** at **P1-01** (`DRRulePack` protocol and registry; `rules/cross/` skeleton), followed by **P1-02** (`resolve_mechanism` on real `DRRulePack` classes for the `ecs-broken` slice).
 
 ### 2026-11-24 — P0-12 `perpetual graph` CLI
 

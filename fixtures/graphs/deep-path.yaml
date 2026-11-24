@@ -1,0 +1,114 @@
+# Unit fixture: deep multi-hop dependency path (> 4 hops, spec §18).
+# Route53 -> ALB -> TargetGroup -> ECS Service -> Secret -> KMS Key (5 edges, 6 nodes).
+format: perpetual-fixture
+version: 1
+name: deep-path
+description: Six-node dependency chain verifying deep-hop traversal and reason chains (spec §18).
+captured_at: 2026-11-24T12:00:00Z
+
+resources:
+  - id: aws://123456789012/global/route53/recordset/Z123-edge
+    name: edge.example.com
+  - id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/edge-alb
+    name: edge-alb
+  - id: aws://123456789012/ap-south-1/elasticloadbalancing/targetgroup/edge-tg
+    name: edge-tg
+  - id: aws://123456789012/ap-south-1/ecs/service/deep-api
+    name: deep-api
+  - id: aws://123456789012/ap-south-1/secretsmanager/secret/deep-secret
+    name: deep-secret
+  - id: aws://123456789012/ap-south-1/kms/key/deep-cmk
+    name: deep-cmk
+
+edges:
+  - id: hop-1-dns-alb
+    from_resource_id: aws://123456789012/global/route53/recordset/Z123-edge
+    to_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/edge-alb
+    relationship_type: routes_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-1
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra/default
+        kind: terraform_reference
+        confidence: 1.0
+  - id: hop-2-alb-tg
+    from_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/edge-alb
+    to_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/targetgroup/edge-tg
+    relationship_type: targets
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-2
+        source_type: aws_api
+        basis: referenced
+        source: elbv2:describe_listeners
+        kind: aws_resource_relationship
+        confidence: 0.95
+  - id: hop-3-tg-ecs
+    from_resource_id: aws://123456789012/ap-south-1/elasticloadbalancing/targetgroup/edge-tg
+    to_resource_id: aws://123456789012/ap-south-1/ecs/service/deep-api
+    relationship_type: routes_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-3
+        source_type: aws_api
+        basis: referenced
+        source: ecs:describe_services
+        kind: aws_resource_relationship
+        confidence: 0.95
+  - id: hop-4-ecs-secret
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/deep-api
+    to_resource_id: aws://123456789012/ap-south-1/secretsmanager/secret/deep-secret
+    relationship_type: uses_secret
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-4
+        source_type: aws_api
+        basis: referenced
+        source: ecs:describe_task_definition
+        kind: ecs_secret_arn_reference
+        confidence: 1.0
+  - id: hop-5-secret-kms
+    from_resource_id: aws://123456789012/ap-south-1/secretsmanager/secret/deep-secret
+    to_resource_id: aws://123456789012/ap-south-1/kms/key/deep-cmk
+    relationship_type: encrypted_by
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-5
+        source_type: aws_api
+        basis: referenced
+        source: secretsmanager:describe_secret
+        kind: aws_resource_relationship
+        confidence: 0.95
+
+stacks:
+  - id: deep
+    name: deep
+    criticality: high
+    root_resource_ids:
+      - aws://123456789012/global/route53/recordset/Z123-edge
+    resource_ids:
+      - aws://123456789012/global/route53/recordset/Z123-edge
+      - aws://123456789012/ap-south-1/elasticloadbalancing/loadbalancer/edge-alb
+      - aws://123456789012/ap-south-1/elasticloadbalancing/targetgroup/edge-tg
+      - aws://123456789012/ap-south-1/ecs/service/deep-api
+      - aws://123456789012/ap-south-1/secretsmanager/secret/deep-secret
+      - aws://123456789012/ap-south-1/kms/key/deep-cmk
+    primary_region: ap-south-1
+    discovery_confidence: 0.95

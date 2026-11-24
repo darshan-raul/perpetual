@@ -1,8 +1,20 @@
-# `graph` package: overrides
+# `graph` package: snapshots, overrides, traversal and manifests
 
-**Owns:** user corrections applied over discovered graph records, including rescan behavior and YAML import/export.
-**Spec:** §23, §19.1, §24.1. **Tracker:** P0-10.
-**Depends on:** `models`, `ids`, `evidence`; PyYAML and Pydantic. **Used by:** library callers and tests today; graph construction (P0-11) and CLI commands (P0-12) follow.
+**Owns:** user corrections applied over discovered graph records, validated NetworkX `MultiDiGraph` snapshots, cycle-safe traversal projections, and deterministic canonical manifests.
+**Spec:** §17, §18, §19.1, §23, §24.1, §56.3, §76.1. **Tracker:** P0-10, P0-11, P0-15.
+**Depends on:** `models`, `ids`, `config`, `evidence`; NetworkX, PyYAML and Pydantic. **Used by:** `cli` (`perpetual graph`), library callers, tests, and (from P1) the simulator and recovery planner.
+
+## Snapshot, traversal and manifests (P0-11, P0-15)
+
+| File | Responsibility |
+|---|---|
+| `snapshot.py` | `DependencyGraph`, `GraphError`, `GroupMember`, `build_graph`, `from_graph_data`, `from_override_result`: builds a validated `nx.MultiDiGraph` keyed by `edge.id` (preserving parallel typed edges), checks canonical node-vs-ID consistency, validates primary and DR-overlay dependency groups, and keeps rejected edges out of active traversal while preserving rejected-member context without lowering quorums. |
+| `traversal.py` | `project_graph`, `dependency_closure`, `ancestors_of`, `shortest_dependency_path`, `has_cycles`, `detect_cycles`: builds derived `nx.DiGraph` projections carrying `edge_ids` tuples, filters structural/DR-overlay/optional/low-confidence edges, delegates to NetworkX, and terminates cleanly on cycles without raising. |
+| `manifest.py` | `canonical_json`, `canonical_digest`, `config_digest`, `evaluation_input_digest`, `SnapshotManifest`, `build_snapshot_manifest`: deterministic `sha256:<64 hex>` digests normalizing dict keys, UTC timestamps, `Decimal`, and `timedelta`, keeping explicit `null` distinct from `unknown_fields`. |
+
+Tests: `apps/api/tests/graph/test_snapshot_and_traversal.py` and `apps/api/tests/graph/test_manifest.py`.
+
+## Overrides (P0-10)
 
 ## In one paragraph
 

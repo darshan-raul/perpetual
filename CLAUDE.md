@@ -17,27 +17,32 @@ Follow [AGENTS.md](AGENTS.md) and [docs/code/readability.md](docs/code/readabili
 
 ## Status
 
-Milestone M0 PoC in progress: P0-01 to P0-10 are done (repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format, evidence combination, graph overrides); P0-11, minimal P0-15, and P0-12..14 follow before P1 and P1c, then M1 runs a CLI-first ECS + RDS slice (`perpetual scan -> simulate -> plan`) on real sandbox AWS before P1b FastAPI/UI in M2 (`v0.1`). The current task is in TRACKER.md. Commands marked as later phases below do not exist yet; P0-14 updates this file to match reality.
+Milestone M0 PoC in progress: **P0 Engine foundation is complete** (P0-01 to P0-15: repo, CI, import rules, domain models, resource IDs, config, persistence, fixture format + canonical fixtures, evidence combination, graph overrides, NetworkX snapshot & cycle-safe traversal, lightweight canonical manifests, `perpetual fixtures` and `perpetual graph` CLI). Next: **P1** (simulation and recovery core) and **P1c** (PoC compile loop), then M1 runs a CLI-first ECS + RDS slice (`perpetual scan -> simulate -> plan`) on real sandbox AWS before P1b FastAPI/UI in M2 (`v0.1`). The current task is in TRACKER.md.
 
-## Commands (from P0-01)
+## Commands (current as of P0-14)
 
 All tooling is pinned in `mise.toml` and run through mise.
 
 ```bash
 mise install                 # Python 3.13, uv, Node (build-time only), Terraform
-mise run lint                # ruff, eslint, import-linter contracts
-mise run typecheck           # mypy --strict, tsc
+mise run lint                # ruff, import-linter contracts (eslint joins in M2 P1b-07)
+mise run typecheck           # mypy --strict (tsc joins in M2 P1b-07)
 mise run test                # pytest (fixtures + Stubber/moto); no AWS, no Docker
 mise run check               # lint + typecheck + test
 
-uv run pytest apps/api/tests/simulator/test_rto.py::test_refined_dag -q   # one test
+uv run pytest apps/api/tests/graph/test_snapshot_and_traversal.py -q   # one test file
 uv run perpetual fixtures validate                  # check every fixture in fixtures/graphs
-uv run perpetual graph --fixture ecs-broken
-uv run perpetual simulate checkout --fixture ecs-broken --failure region:ap-south-1
-uv run perpetual ui          # API + UI on http://127.0.0.1:8000 (from M2 v0.1)
+uv run perpetual fixtures schema                    # print fixture v1 JSON Schema
+uv run perpetual graph --fixture ecs-broken         # print graph, manifest digest & DR overlay
+uv run perpetual graph --fixture ecs-broken --stack checkout --json
+uv run perpetual graph overrides export --fixture review-overrides
+uv run perpetual graph overrides apply FILE --fixture review-overrides --json
 
-docker compose up -d aws-emulator   # aws/aws-emulator for collector/Terraform/script integration tests (from M1 P2)
-uv run pytest -m contract           # real-AWS contract suite; needs sandbox credentials, never default
+# Later phases (not implemented yet):
+# uv run perpetual simulate checkout --fixture ecs-broken --failure region:ap-south-1   # P1-16
+# uv run perpetual ui                               # API + UI on http://127.0.0.1:8000 (M2 v0.1)
+# docker compose up -d aws-emulator                 # aws/aws-emulator integration tests (M1 P2)
+# uv run pytest -m contract                         # real-AWS contract suite; opt-in only (M1 P2)
 ```
 
 ## Architecture

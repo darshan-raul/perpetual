@@ -1,0 +1,139 @@
+# Unit fixture: shared infrastructure nodes across two stacks (spec §18, §24).
+# Both `checkout` and `billing` depend on the same shared KMS key and VPC.
+format: perpetual-fixture
+version: 1
+name: shared-node
+description: Two stacks sharing a KMS key and VPC for multi-stack shared-node tests.
+captured_at: 2026-11-24T12:00:00Z
+
+resources:
+  - id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    name: checkout-api
+  - id: aws://123456789012/ap-south-1/ecs/service/billing-api
+    name: billing-api
+  - id: aws://123456789012/ap-south-1/rds/db/checkout-db
+    name: checkout-db
+  - id: aws://123456789012/ap-south-1/rds/db/billing-db
+    name: billing-db
+  - id: aws://123456789012/ap-south-1/kms/key/shared-cmk
+    name: shared-cmk
+  - id: aws://123456789012/ap-south-1/ec2/vpc/shared-vpc
+    name: shared-vpc
+
+edges:
+  - id: checkout-to-db
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/rds/db/checkout-db
+    relationship_type: connects_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-1
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra/default
+        kind: terraform_reference
+        confidence: 1.0
+  - id: billing-to-db
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/billing-api
+    to_resource_id: aws://123456789012/ap-south-1/rds/db/billing-db
+    relationship_type: connects_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-2
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra/default
+        kind: terraform_reference
+        confidence: 1.0
+  - id: checkout-db-to-kms
+    from_resource_id: aws://123456789012/ap-south-1/rds/db/checkout-db
+    to_resource_id: aws://123456789012/ap-south-1/kms/key/shared-cmk
+    relationship_type: encrypted_by
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-3
+        source_type: aws_api
+        basis: referenced
+        source: rds:describe_db_instances
+        kind: aws_resource_relationship
+        confidence: 0.95
+  - id: billing-db-to-kms
+    from_resource_id: aws://123456789012/ap-south-1/rds/db/billing-db
+    to_resource_id: aws://123456789012/ap-south-1/kms/key/shared-cmk
+    relationship_type: encrypted_by
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-4
+        source_type: aws_api
+        basis: referenced
+        source: rds:describe_db_instances
+        kind: aws_resource_relationship
+        confidence: 0.95
+  - id: checkout-to-vpc
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/checkout-api
+    to_resource_id: aws://123456789012/ap-south-1/ec2/vpc/shared-vpc
+    relationship_type: deployed_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-5
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra/default
+        kind: terraform_reference
+        confidence: 1.0
+  - id: billing-to-vpc
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/billing-api
+    to_resource_id: aws://123456789012/ap-south-1/ec2/vpc/shared-vpc
+    relationship_type: deployed_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-6
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra/default
+        kind: terraform_reference
+        confidence: 1.0
+
+stacks:
+  - id: checkout
+    name: checkout
+    criticality: critical
+    root_resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/checkout-api
+    resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/checkout-api
+      - aws://123456789012/ap-south-1/rds/db/checkout-db
+      - aws://123456789012/ap-south-1/kms/key/shared-cmk
+      - aws://123456789012/ap-south-1/ec2/vpc/shared-vpc
+    primary_region: ap-south-1
+    discovery_confidence: 0.95
+  - id: billing
+    name: billing
+    criticality: high
+    root_resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/billing-api
+    resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/billing-api
+      - aws://123456789012/ap-south-1/rds/db/billing-db
+      - aws://123456789012/ap-south-1/kms/key/shared-cmk
+      - aws://123456789012/ap-south-1/ec2/vpc/shared-vpc
+    primary_region: ap-south-1
+    discovery_confidence: 0.95

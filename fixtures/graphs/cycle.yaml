@@ -1,0 +1,103 @@
+# Unit fixture: directed dependency cycle (spec §18).
+# svc-a -> svc-b -> svc-c -> svc-a, with svc-c also depending on orders-db.
+# Every traversal and simulator pass must terminate and report the cycle as evidence.
+format: perpetual-fixture
+version: 1
+name: cycle
+description: Service-to-service dependency cycle for cycle-safety tests (spec §18).
+captured_at: 2026-11-24T12:00:00Z
+
+resources:
+  - id: aws://123456789012/ap-south-1/ecs/service/svc-a
+    name: svc-a
+  - id: aws://123456789012/ap-south-1/ecs/service/svc-b
+    name: svc-b
+  - id: aws://123456789012/ap-south-1/ecs/service/svc-c
+    name: svc-c
+  - id: aws://123456789012/ap-south-1/rds/db/orders-db
+    name: orders-db
+
+edges:
+  - id: a-to-b
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-a
+    to_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-b
+    relationship_type: connects_to
+    confidence: 0.95
+    inferred: true
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ab
+        source_type: aws_api
+        basis: permitted
+        source: ec2:describe_security_groups
+        kind: security_group_path
+        confidence: 0.75
+  - id: b-to-c
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-b
+    to_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-c
+    relationship_type: connects_to
+    confidence: 0.95
+    inferred: true
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-bc
+        source_type: aws_api
+        basis: permitted
+        source: ec2:describe_security_groups
+        kind: security_group_path
+        confidence: 0.75
+  - id: c-to-a
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-c
+    to_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-a
+    relationship_type: connects_to
+    confidence: 0.95
+    inferred: true
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-ca
+        source_type: aws_api
+        basis: permitted
+        source: ec2:describe_security_groups
+        kind: security_group_path
+        confidence: 0.75
+  - id: c-to-db
+    from_resource_id: aws://123456789012/ap-south-1/ecs/service/svc-c
+    to_resource_id: aws://123456789012/ap-south-1/rds/db/orders-db
+    relationship_type: connects_to
+    confidence: 1.0
+    inferred: false
+    origin: discovered
+    criticality: required
+    evidence:
+      - id: ev-cdb
+        source_type: terraform
+        basis: referenced
+        source: terraform:infra-prod/default
+        kind: terraform_reference
+        confidence: 1.0
+
+stacks:
+  - id: cyclic-stack
+    name: cyclic-stack
+    criticality: high
+    root_resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/svc-a
+    resource_ids:
+      - aws://123456789012/ap-south-1/ecs/service/svc-a
+      - aws://123456789012/ap-south-1/ecs/service/svc-b
+      - aws://123456789012/ap-south-1/ecs/service/svc-c
+      - aws://123456789012/ap-south-1/rds/db/orders-db
+    primary_region: ap-south-1
+    discovery_confidence: 0.9
+
+requirements:
+  - id: cyclic-region
+    revision: 1
+    stack_id: cyclic-stack
+    failure_scope: region
+    target_rto_seconds: 1800
+    target_rpo_seconds: 300
+    target_region: ap-south-2
