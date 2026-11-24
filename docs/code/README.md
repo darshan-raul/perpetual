@@ -2,7 +2,7 @@
 
 How the code is organised and how it works, written for a person reading it. The spec in [`docs/spec/`](../spec/) says what Perpetual must do; these documents say how the code does it today.
 
-**Kept current with the code.** Every task that changes code updates the relevant page here in the same change (see [Keeping these docs current](#keeping-these-docs-current)). If a page and the code disagree, the code is right and the page is a bug.
+**Kept current with the code.** During active M0/M1 iteration, update the relevant pages here at **phase boundaries** (end of `P0`, end of `P1`, end of `P1c`, end of `P2`, etc.); from M2 onward, update them in the same change as the code (see [Keeping these docs current](#keeping-these-docs-current)). If a page and the code disagree, the code is right and the page is a bug.
 
 Written for readers with basic Python knowledge. Start with the concepts, follow a worked flow, then open the linked source files. This wiki grows with implementation; existing pages are revised when behavior changes.
 
@@ -49,8 +49,8 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `optimizer` | DR design candidates | stub | — |
 | `costing` | Cost providers | stub | — |
 | `iac` | Companion Terraform, suggested edits, delivery | stub | — |
-| `runbooks` | Runbook, scripts, ARC plan compiler | stub | — |
-| `llm`, `knowledge` | LLM agents and knowledge base (v0.2) | stub | — |
+| `runbooks` | Runbook, scripts (`v0.1`), ARC plan compiler (`v0.2` M3) | stub | — |
+| `llm`, `knowledge` | LLM agents and knowledge base (`v0.3` M4) | stub | — |
 | `cli` | Typer commands | `perpetual fixtures validate` and `schema` (P0-08) | [packages/cli.md](packages/cli.md) |
 | `api` | FastAPI routes | stub | — |
 
@@ -75,7 +75,7 @@ Follow [readability.md](readability.md) for the code style and completion checkl
 
 - **Explain concepts as they arrive.** Extend [concepts.md](concepts.md), or add a linked topic page, when a feature introduces domain terms, algorithms, or unfamiliar Python/library features. Define the idea before describing the implementation.
 - **Grow and correct.** Add new concepts and flows as work progresses; revise or remove obsolete explanations. Keep historical decisions in `TRACKER.md` and Git history, so the wiki describes the current code.
-- **Same change as the code.** A task that adds or changes code updates its package page, this index's status table, and [architecture.md](architecture.md) when connections change.
+- **Phase boundaries in M0/M1; same change from M2.** During active M0/M1 iteration, update affected package pages, this index's status table, and [architecture.md](architecture.md) at phase boundaries (end of `P0`, `P1`, `P1c`, `P2`, etc.) rather than every subtask. From M2 onward, update them in the same change as the code.
 - **New package with real code:** copy [_template.md](_template.md) to `packages/<name>.md` and link it above.
 - **New end-to-end path:** use [_flow-template.md](_flow-template.md) to add `flows/<name>.md` and list it under Flows. Include concrete input/output, source links, error cases, and relevant tests. Label library compositions that are not wired into a command.
 - **Split, don't sprawl.** When a page passes roughly 400 lines, split it by topic and link the parts from the package page.

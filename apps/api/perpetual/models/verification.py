@@ -116,7 +116,7 @@ class VerificationReport(DomainModel):
     check_results: list[CheckResult] = Field(default_factory=list)
     design_verification: DesignVerification
     unverified_change_ids: SortedIds = Field(default_factory=list)
-    """DR spec changes absent from the supplied plan or manifests (spec §61.1, v0.1)."""
+    """DR spec changes absent from supplied plan (v0.1) or manifests (v0.2; spec §61.1)."""
     prerequisites: list[DeploymentPrerequisite] = Field(default_factory=list)
     observed_readiness: Readiness = Readiness.UNKNOWN
     """From a matching live evaluation (§31); UNKNOWN when none exists."""

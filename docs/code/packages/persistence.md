@@ -151,4 +151,4 @@ For the application boundary, see [graph overrides](graph.md) and its [persisten
 
 Tables for later phases (findings, simulations, recovery plans, cost estimates, DR specs, verification reports, drills, LLM calls, knowledge base) arrive with their tasks, each as a new migration. Two models that fixtures already carry have no table yet, and their owners are set: `recovery_requirements` (revisioned, per project) lands with P1-15, and facts (`FactRecord`, per snapshot) with P2-12.
 
-Payloads have no schema version yet. Before any database outlives a model change (by v0.1 at the latest), P0-15 adds a payload schema version per row and a registered upgrade step, so an old row is upgraded or refused with a clear error instead of failing validation on load.
+Payloads have no schema version yet. In M0, P0-15 adds lightweight canonical hashes, immutable manifests, and versioned fixture inputs only; payload schema versions per row and registered upgrade steps move to post-v0.1 (`P0-15b`, `M3 Expansion`) under the strict just-in-time modeling rule, so old persisted rows are upgraded or refused with a clear error once schema upgrades are needed.

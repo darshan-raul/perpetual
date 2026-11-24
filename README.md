@@ -51,7 +51,7 @@ Multi-AZ protects against Availability Zone failures; it does not provide recove
 
 ## How it works
 
-<img alt="Perpetual planned architecture: AWS, Terraform/Kubernetes and observed evidence inputs feed a local discovery, dependency graph, rule-pack/simulator assessment and recovery planning pipeline. Digest-bound approved DR Specs compile into isolated IaC changes and recovery artifacts checked by 4-stage verification, with opt-in v0.2 LLM assistance." src="assets/architecture.svg" width="100%">
+<img alt="Perpetual planned architecture: AWS, Terraform/Kubernetes and observed evidence inputs feed a local discovery, dependency graph, rule-pack/simulator assessment and recovery planning pipeline. Digest-bound approved DR Specs compile into isolated IaC changes and recovery artifacts checked by 4-stage verification, with opt-in v0.3 LLM assistance." src="assets/architecture.svg" width="100%">
 
 ### 1. Map the stack
 
@@ -85,7 +85,7 @@ Multi-AZ protects against Availability Zone failures; it does not provide recove
 
 ## LLM proposes, engine verifies
 
-LLM features arrive in v0.2; v0.1 is fully deterministic.
+LLM features arrive in v0.3 (`M4 Agents`); v0.1 (`M2 MVP`) and v0.2 (`M3 Expansion`) are fully deterministic.
 
 LLMs are good at reading your code and AWS documentation and proposing changes. They are not a source of truth. So in Perpetual:
 
@@ -133,14 +133,17 @@ Deployment        Pending; fresh scan required for observed READY
 
 ## Scope
 
-**First release covers:**
+**First release (`v0.1`, M2 MVP) covers:**
 
-- ECS, EC2 and Serverless stacks: Route 53, WAF, ALB/NLB, CloudFront, ACM, ECS on Fargate/EC2, EC2 instances and Auto Scaling groups, Lambda, SQS, SNS, ECR, Secrets Manager, SSM Parameter Store, KMS, IAM, RDS/Aurora, basic DynamoDB recovery, S3, EBS/EFS, CloudWatch Logs, VPC networking;
-- EKS stacks: clusters, node groups, add-ons, IRSA and Pod Identity, persistent volumes on EBS/EFS;
-- companion Terraform for new DR resources, and suggested edits for resources your Terraform and Kubernetes manifests already manage, delivered as a pull request;
-- a runbook, prerequisite scripts, recovery scripts and optional ARC Region switch plans.
+- ECS + RDS stacks end-to-end: `ECS on Fargate/EC2`, `RDS/Aurora`, `S3`, `ECR`, `Secrets Manager`, `SSM Parameter Store`, `KMS`, `IAM`, `ALB/NLB`, `Route 53`, `ACM`, `CloudWatch Logs` (scope-aware), and `VPC` networking;
+- CloudTrail-only observed dependency evidence (`P2b`), a read-only React Flow graph viewer with review/confirm/reject (structural graph edits live in YAML overrides `P0-10`), and preset-based DR comparison (`StaticCostProvider` + Backup/Restore, Pilot Light, Warm Standby);
+- companion Terraform for new DR resources and suggested edits by Terraform address for resources your Terraform already manages, verified with a supplied saved plan and delivered on a branch or PR;
+- failover and failback runbooks, prerequisite scripts, and laptop-run Python recovery scripts.
 
-In-place edits to Terraform, plain Kubernetes manifests, Kustomize overlays and Helm values arrive in v0.2.
+**Post-v0.1 expansion (`v0.2`, M3) and agents (`v0.3`, M4):**
+
+- `v0.2` adds expanded AWS services (`EC2/ASG`, `Lambda`, `SQS/SNS`, `CloudFront`, `WAF`, `EBS/EFS`, `DynamoDB`), `EKS` stacks (clusters, node groups, add-ons, IRSA, Pod Identity, EBS/EFS PVs), VPC Flow Logs + time-aware ENI resolution + ambiguous candidate-set review UI, interactive structural graph editing in the UI, full combinatorial Optimizer search + `AWSPricingProvider`, and the ARC Region switch plan compiler;
+- `v0.3` adds LLM advisory review, candidate planning, and in-place edits to Terraform, plain Kubernetes manifests, Kustomize overlays, and Helm values inside an isolated runner.
 
 **Checked but not counted in the RTO:** monitoring, logging and CI/CD.
 
@@ -174,16 +177,17 @@ perpetual transform checkout --terraform ./infra/prod --k8s ./deploy/prod --open
 
 ## Status
 
-Perpetual is pre-alpha: the design is complete and implementation is starting. Development is engine-first, ECS before EKS:
+Perpetual is pre-alpha: the design is complete and M0 PoC implementation is in progress. Development is engine-first and CLI-first, ECS + RDS before EKS and expanded services:
 
 | Milestone | Delivers |
 |---|---|
 | M0 PoC | Graph, simulator and recovery planning on test fixtures, plus a first generated fix and recovery script |
-| M1 Alpha | Terraform import, local web UI and graph editor, live AWS scanning with CloudTrail and flow-log evidence, stacks, DR rules, RTO and RPO on real accounts |
-| v0.1 | EKS, DR design within budget, companion Terraform and suggested edits as a PR, runbook, recovery scripts and ARC Region switch plans. No LLM. |
-| v0.2 | LLM advisor and planner, in-place edits to your Terraform and manifests in an isolated runner |
-| v0.3 | Proven readiness from game days and ARC execution reports; drift |
-| v1.0 | Packaged, upgradeable, audited release with a published service matrix |
+| M1 Alpha | CLI-only ECS + RDS slice (`perpetual scan -> simulate -> plan`) on real AWS accounts with CloudTrail evidence, stacks, DR rules, RTO and RPO |
+| v0.1 (M2 MVP) | Terraform saved-plan import, local web UI (read-only React Flow viewer + review/confirm/reject), preset DR design (`StaticCostProvider`), companion Terraform + suggested edits as a PR, runbooks, prerequisite scripts and Python recovery scripts. Fully deterministic. |
+| v0.2 (M3 Expansion) | Expanded AWS services (`EC2/ASG`, `Lambda`, `SQS/SNS`, `CloudFront`, `WAF`, `EBS/EFS`, `DynamoDB`), `EKS` stacks, VPC Flow Logs + ambiguous review UI, interactive structural graph editor in UI, combinatorial Optimizer + `AWSPricingProvider`, and ARC Region switch plan compiler. Still deterministic. |
+| v0.3 (M4 Agents) | LLM advisor, planner and in-place edits to your Terraform and manifests in an isolated runner |
+| v0.4 (M5 Proven) | Proven readiness from game days and ARC execution reports; drift |
+| v1.0 (M6 Production) | Packaged, upgradeable, audited release with a published service matrix |
 
 ## Tech stack
 

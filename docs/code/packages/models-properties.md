@@ -206,7 +206,7 @@ Volumetric fields (storage size, IOPS, item counts, bucket size) are here becaus
 | `type_key` | Model | What rules use it for |
 |---|---|---|
 | `external/dependency` | `ExternalResourceProperties` | declared DR posture (`unknown` until the user says otherwise), description, matching hostnames |
-| `generic/resource` | `GenericResourceProperties` | nothing: it keeps unmodelled AWS types (e.g. ElastiCache in v0.1) visible in the graph; Terraform or CloudFormation type for reference |
+| `generic/resource` | `GenericResourceProperties` | nothing: it keeps unmodelled AWS types (e.g. ElastiCache in v0.1; runtime collector/rule support for `P2c` and `EKS` types also ships post-v0.1 in `M3`) visible in the graph; Terraform or CloudFormation type for reference |
 | `codepipeline/pipeline` | `CodePipelineProperties` | what it deploys and to which Regions: a pipeline the recovery plan uses comes back into RTO scope (§24.1) |
 
 ### External, generic and out of scope

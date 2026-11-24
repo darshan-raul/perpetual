@@ -73,6 +73,8 @@ The resulting graph MUST be acyclic. A cycle is a rule-pack bug and fails plan g
 
 # 47.2 Execution Method
 
+> **Scope note:** `scripts` (`P11-06`) is the execution method in **`v0.1` (`M2 MVP`)**. The `arc_region_switch` plan compiler (`§63.3`, `P11-07`) ships in **post-v0.1 (`M3 Expansion / v0.2`)**; the `DRSpec.execution_method` field and compiler semantics below are preserved intact.
+
 The DR spec (56.2) selects one execution method per stack:
 
 ```text
@@ -91,7 +93,7 @@ RTO is computed for the selected method, so a stack still has one RTO per scenar
 - scripts: every human check is a gate that takes handoff time from the plan buffer (49.2);
 - arc_region_switch: the DAG is grouped into sequential steps of parallel blocks (63.3). When grouping lengthens the critical path, the plan-as-compiled RTO is the result, and the ideal DAG RTO is shown only as context.
 
-When ARC is selected, its per-plan monthly price counts toward total steady-state DR cost (59.1), taken from the versioned price table. Generated plans have no alarm triggers in v0.1; an operator starts them (101).
+When ARC is selected *(available post-v0.1 in `M3 Expansion / v0.2`)*, its per-plan monthly price counts toward total steady-state DR cost (59.1), taken from the versioned price table. Generated plans have no alarm triggers; an operator starts them (101).
 
 ---
 
@@ -449,6 +451,8 @@ Recovery options are per-resource inputs to the optimizer. Their RTO, RPO and co
 
 # 56. MVP Optimizer
 
+> **v0.1 vs post-v0.1 scope:** In **`v0.1` (`M2 MVP`, `P9`)**, the Optimizer uses `StaticCostProvider` plus **3–4 discrete stack presets** (`Backup/Restore`, `Pilot Light`, `Warm Standby`) evaluated through the simulator and recovery DAG. The full strategy/variant combinatorial search below and `AWSPricingProvider` (`§58`) ship in **post-v0.1 (`M3 Expansion / v0.2`)**.
+
 Do NOT start with Z3.
 
 Do NOT start with a complex mathematical solver.
@@ -474,7 +478,7 @@ Every candidate is a complete stack plan: a mechanism for every in-scope resourc
 
 # 56.1 LLM Candidate Planner
 
-Ships in v0.2 (decision 2026-10-27). v0.1 uses only deterministic candidates (56).
+Ships in v0.3 (`M4 Agents`; shifted from `v0.2` when deterministic `M3 Expansion` was inserted on 2026-11-24; original LLM decision 2026-10-27). `v0.1` (presets) and `v0.2` (combinatorial search) use only deterministic candidates (56).
 
 Strategy templates give good starting points, but the best design often mixes them: for example Aurora Global Database for the orders database, backup and restore for a reporting database, and warm standby for the API tier. An LLM planner agent proposes such candidates.
 
@@ -528,7 +532,7 @@ class DRSpec(BaseModel):
     # Change IDs in apply order (e.g. DR network and KMS before replicas).
 
     execution_method: Literal["scripts", "arc_region_switch"] = "scripts"
-    # How recovery runs (47.2). Part of the approved design and its digest.
+    # How recovery runs (47.2). v0.1 uses "scripts"; "arc_region_switch" compiler ships in v0.2 (M3).
 
     manual_steps: list[str]
     # Work outside Terraform, delivered as prerequisite scripts and SOPs (63.1):
@@ -541,7 +545,7 @@ class DRSpec(BaseModel):
     findings_remaining: list[str]
 
     rationale: str
-    # v0.1: deterministic summary of engine results. From v0.2: LLM-written,
+    # v0.1/v0.2: deterministic summary of engine results. From v0.3 (M4 Agents): LLM-written,
     # citing knowledge-base documents and skills.
 
     assumptions: list[str]
@@ -610,9 +614,9 @@ class CostProvider(Protocol):
 Implementations:
 
 ```text
-StaticCostProvider
-AWSPricingProvider
-InfracostProvider
+StaticCostProvider      # v0.1 (M2 MVP)
+AWSPricingProvider      # post-v0.1 (M3 Expansion / v0.2)
+InfracostProvider       # post-MVP
 ```
 
 Future:

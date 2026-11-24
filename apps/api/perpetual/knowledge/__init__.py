@@ -1,1 +1,1 @@
-"""Knowledge-base ingestion and retrieval (spec §69.3). Ships in v0.2."""
+"""Knowledge-base ingestion and retrieval (spec §69.3). Ships in v0.3."""

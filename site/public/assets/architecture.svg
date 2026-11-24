@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1440 820" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arch-title arch-desc" id="perpetual-architecture">
   <title id="arch-title">Perpetual — Architecture</title>
-  <desc id="arch-desc">Perpetual planned architecture (Specification Revision 4): AWS APIs, Terraform/Kubernetes infrastructure code, and observed evidence feed a local deterministic pipeline (Discover and normalize, Dependency graph with user overrides, Assess and simulate with DR rule packs and two-pass simulator, Recovery plan and DR design producing a digest-bound DR Spec, Compile IaC and recovery artifacts in an isolated worktree, and 4-stage verification on planned snapshots). Opt-in v0.2 LangGraph LLM agents assist with advisory review, candidate planning, and IaC transformation using a local knowledge base, versioned skills, and sanitized web search.</desc>
+  <desc id="arch-desc">Perpetual planned architecture (Specification Revision 4): AWS APIs, Terraform/Kubernetes infrastructure code, and observed evidence feed a local deterministic pipeline (Discover and normalize, Dependency graph with user overrides, Assess and simulate with DR rule packs and two-pass simulator, Recovery plan and DR design producing a digest-bound DR Spec, Compile IaC and recovery artifacts in an isolated worktree, and 4-stage verification on planned snapshots). Opt-in v0.3 LangGraph LLM agents assist with advisory review, candidate planning, and IaC transformation using a local knowledge base, versioned skills, and sanitized web search.</desc>
 
   <defs>
     <style>
@@ -131,7 +131,7 @@
   <text x="72" y="508" class="card-sub">CloudTrail &amp; Flow Logs</text>
   <text x="72" y="524" class="card-sub">SG, NetPol &amp; IAM rules</text>
   <text x="72" y="540" class="card-sub">Game days &amp; ARC reports</text>
-  <text x="72" y="556" class="edge-sub">(proven readiness · v0.3)</text>
+  <text x="72" y="556" class="edge-sub">(proven readiness · v0.4)</text>
 
   <!-- Arrow: Observed evidence -> Runs locally -->
   <path d="M 204,526 H 236 V 414 H 264" stroke="#1a2b49" stroke-width="1.8" fill="none" marker-end="url(#arrow-solid)"/>
@@ -384,9 +384,9 @@
   <g filter="url(#card-shadow)">
     <rect x="556" y="546" width="354" height="86" rx="8" fill="#ffffff" stroke="#2a72b5" stroke-width="1.5"/>
   </g>
-  <!-- Opt-in v0.2 badge on LLM card -->
+  <!-- Opt-in v0.3 badge on LLM card -->
   <rect x="816" y="554" width="82" height="18" rx="4" fill="#e3f2fd" stroke="#1971c2" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="857" y="567" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1565c0">v0.2 OPT-IN</text>
+  <text x="857" y="567" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1565c0">v0.3 OPT-IN</text>
   <!-- Brain Icon -->
   <g transform="translate(572, 570)">
     <path d="M 14,4 C 8,4 4,8 4,13 C 1,14 0,18 2,22 C 0,26 3,31 8,32 C 10,36 15,36 16,33 V 5 C 16,4.5 15,4 14,4 Z" fill="none" stroke="#1971c2" stroke-width="2"/>
@@ -511,7 +511,7 @@
   <line x1="36" y1="720" x2="94" y2="720" stroke="#1a2b49" stroke-width="1.8" marker-end="url(#arrow-solid)"/>
   <text x="106" y="724" class="card-sub">= deterministic engine workflow (v0.1+)</text>
   <line x1="36" y1="744" x2="94" y2="744" stroke="#1971c2" stroke-width="1.8" stroke-dasharray="6,4" marker-end="url(#arrow-dashed)"/>
-  <text x="106" y="748" class="card-sub">= opt-in agent interactions (v0.2)</text>
+  <text x="106" y="748" class="card-sub">= opt-in agent interactions (v0.3)</text>
 
   <!-- Footer safety invariant -->
   <text x="734" y="798" text-anchor="middle" class="footer-note">

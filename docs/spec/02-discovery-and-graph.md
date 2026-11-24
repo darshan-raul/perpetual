@@ -164,6 +164,8 @@ must be inferred separately.
 
 # 14. Optional Kubernetes Discovery
 
+> **Scope note:** EKS and Kubernetes discovery (`P7`) are **post-v0.1 (`M3 Expansion / v0.2`, Second Vertical Slice `§106`)**. The full target specification below is preserved intact.
+
 EKS assessment should work at two levels.
 
 ### Level 1: AWS-only
@@ -202,6 +204,8 @@ class KubernetesCollector:
 ---
 
 # 14.1 Dependency Discovery Sources
+
+> **v0.1 vs post-v0.1 scope:** In **`v0.1`** (`M1` / `M2`, `P2b`), observed dependency discovery delivers **CloudTrail-only observation** (S3 trail + `LookupEvents` fallback, role-to-compute attribution, and contradiction / unobserved-in-window flags). **VPC Flow Logs, time-aware ENI resolution, and the ambiguous candidate-set review UI (`P2b-04`, `P2b-09`) are deferred to post-v0.1 (`M3 Expansion / v0.2`)**; Kubernetes `NetworkPolicies` arrive with `P7` (`M3 Expansion / v0.2`). The full specification below—including the resolved-observation schema (`P0-04f`/`P0-07`)—remains the target design.
 
 Perpetual computes the graph's edges itself. It does not rely on the user to draw them. The user reviews and corrects the result (section 23).
 
@@ -732,6 +736,8 @@ Weights should be configuration, not hard-coded throughout the application.
 ---
 
 # 23. User Review and Editing of the Graph
+
+> **v0.1 UI vs YAML scope:** In **`v0.1` (`M2`, `P1b`)**, the web UI provides a **read-only React Flow viewer plus the review/confirm/reject panel** (`confirm_edge`, `reject_edge`). Structural graph edits (`add_edge`, `edit_edge`, `add_node`, `edit_node`, deleting user-added edges) live in **YAML overrides (`P0-10`) and the CLI**; the interactive structural graph-editor UI (`P1b-10`) ships in **post-v0.1 (`M3 Expansion / v0.2`)**.
 
 Perpetual computes the graph (section 14.1). The user reviews it and corrects it. Discovered data is never edited in place. User changes are stored as overrides and applied on top of every scan.
 

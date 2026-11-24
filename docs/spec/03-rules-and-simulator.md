@@ -221,7 +221,7 @@ Discovered facts take precedence over declared ones when both exist. Facts that 
 
 Quota and service-availability checks use read-only APIs only (`service-quotas:List*`, `ec2:DescribeInstanceTypeOfferings`).
 
-The discovery layer must supply these facts before rules run: quota values and available usage/headroom, instance-type offerings, Region/feature capability metadata, CloudWatch metric samples for replication/usage, EFS filesystem/replication/backup metadata, and DynamoDB tables/PITR/backups/replica/index/KMS metadata. Feature availability that an API or versioned capability source cannot establish remains UNKNOWN. Quota limits without current usage cannot prove sufficient headroom. CloudWatch Logs discovery is not a substitute for CloudWatch Metrics collection. Each rule declares its required coverage and freshness (76); the plan's coverage matrix owns collection, normalization, actions, estimates and tests. Initial DynamoDB assessment and basic existing-replica/backup recovery are in v0.1; advanced topology optimization may be deferred.
+The discovery layer must supply these facts before rules run: quota values and available usage/headroom, instance-type offerings, Region/feature capability metadata, CloudWatch metric samples for replication/usage, and—for post-v0.1 `P2c` services (`M3 Expansion / v0.2`)—EFS filesystem/replication/backup metadata and DynamoDB tables/PITR/backups/replica/index/KMS metadata. Feature availability that an API or versioned capability source cannot establish remains UNKNOWN. Quota limits without current usage cannot prove sufficient headroom. CloudWatch Logs discovery is not a substitute for CloudWatch Metrics collection. Each rule declares its required coverage and freshness (76); the plan's coverage matrix owns collection, normalization, actions, estimates and tests. DynamoDB (`P2c`)—including initial assessment and basic existing-replica/backup recovery—is deferred to **post-v0.1 (`M3 Expansion / v0.2`)** alongside EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, and EBS/EFS; `v0.1` ships the ECS + RDS slice (`ECS, RDS/Aurora, S3, ECR, Secrets/SSM, KMS, IAM, ALB, Route 53, VPC`).
 
 When reading environment variables or ConfigMaps, persist only the matched fact (e.g. "env var DB_HOST matches primary RDS endpoint"). Never persist the value (section 67).
 
@@ -229,7 +229,7 @@ When reading environment variables or ConfigMaps, persist only the matched fact 
 
 # 28.2 LLM Advisory Review
 
-Ships in v0.2 (decision 2026-10-27).
+Ships in v0.3 (`M4 Agents`; shifted from `v0.2` when deterministic `M3 Expansion` was inserted on 2026-11-24; original LLM decision 2026-10-27).
 
 Rule packs are deterministic and cover known patterns. An advisory review, run by an LLM agent after the rule packs, looks for what they miss: unusual dependencies, application configuration that ties a service to the primary Region, services without a rule pack, and organization-specific standards from the knowledge base.
 
@@ -545,6 +545,8 @@ Propagate readiness from:
 ---
 
 # 33. EKS Rule Pack
+
+> **Scope note:** The EKS rule pack (`§33–§40`) ships in **post-v0.1 (`P7`, `M3 Expansion / v0.2`, Second Vertical Slice `§106`)**. The full specification below is preserved intact as target post-v0.1 behavior.
 
 EKS requires nested readiness.
 

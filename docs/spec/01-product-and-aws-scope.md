@@ -202,7 +202,7 @@ These are labels on the evidence behind a result, not extra states in 30.1. Obse
 | Tool | What it does | Relationship to Perpetual |
 |---|---|---|
 | AWS Resilience Hub (next generation) | Services and user journeys, dependency discovery from DNS query logs, AI failure-mode analysis, resilience policies, FIS-based tests | Overlaps with assessment. Optional future evidence source: discovered dependencies as candidate edges, test results as drill evidence. Never required. |
-| ARC Region switch | Runs multi-Region recovery plans made of execution blocks; evaluates plans every 30 minutes; writes execution reports with measured RTO | Optional runtime. Perpetual compiles plans for it (63.3) and reads existing plans as evidence (28.1). |
+| ARC Region switch | Runs multi-Region recovery plans made of execution blocks; evaluates plans every 30 minutes; writes execution reports with measured RTO | Optional runtime. Perpetual reads existing plans as evidence (`28.1`); compiling plans for it (`63.3`, `P11-07`) is post-v0.1 (`M3 Expansion / v0.2`). |
 | ARC readiness checks | Closed to new customers | Legacy: collected when present, never recommended. |
 | AWS Fault Injection Service | Fault injection experiments | A source of proof; Perpetual never injects faults. |
 
@@ -225,6 +225,8 @@ The initial architecture must nevertheless avoid hard-coding business logic dire
 # 5. AWS Services In Scope
 
 Perpetual should recognize and reason about the following service families.
+
+> **Release boundary (`v0.1` vs post-v0.1):** **`v0.1` (`M2 MVP`)** ships end-to-end deterministic discovery, rules, simulation, recovery planning, preset optimization, companion Terraform, and runbooks/scripts for the **ECS + RDS slice** (`ECS`, `RDS/Aurora`, `S3`, `ECR`, `Secrets Manager`, `SSM Parameter Store`, `KMS`, `IAM`, `ALB`, `Route 53`, `VPC`, plus `CloudWatch Logs` scope-aware awareness, `AWS Backup`, `Service Quotas`, and `IAM Identity Center`). **`EC2/Auto Scaling`, `Lambda`, `DynamoDB`, `EBS`, `EFS`, `SQS`, `SNS`, `CloudFront`, and `WAF`** (`P2c`) as well as **`EKS`** (`P7`, `§106`) and **`ARC Region switch` plan compilation** (`§63.3`, `P11-07`) are **post-v0.1 (`M3 Expansion / v0.2`)**; their full target specifications below are preserved intact.
 
 ## 5.1 Containers
 
@@ -261,7 +263,9 @@ The engine should be able to determine whether an ECS service could start in the
 
 ## 5.2 Kubernetes / Amazon EKS
 
-EKS must remain in scope from the beginning.
+> **Scope note:** EKS (`P7`, Second Vertical Slice `§106`) is **post-v0.1 (`M3 Expansion / v0.2`)**, delivered after the `v0.1` ECS + RDS end-to-end release (`§105`). The full EKS specification below defines the target `M3` capability.
+
+EKS remains a core post-v0.1 target from the architectural model upward.
 
 Support an EKS-specific readiness model.
 
@@ -310,7 +314,7 @@ Detect important platform dependencies including:
 - cert-manager;
 - service mesh if detectable.
 
-Not all add-ons need detailed rules in v0.1.
+Not all add-ons need detailed rules in the initial EKS release (`M3 Expansion / v0.2`).
 
 The framework must make adding add-on rules straightforward.
 
@@ -379,6 +383,8 @@ Can every external dependency resolve?
 
 ## 5.3 Amazon EC2 and Auto Scaling
 
+> **Scope note:** **Post-v0.1 (`P2c`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
+
 Support:
 
 - standalone EC2 instances;
@@ -393,6 +399,8 @@ Support:
 ---
 
 ## 5.4 AWS Lambda
+
+> **Scope note:** **Post-v0.1 (`P2c`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
 
 Support:
 
@@ -472,6 +480,8 @@ Support:
 
 ## 6.3 DynamoDB
 
+> **Scope note:** **Post-v0.1 (`P2c`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
+
 Initial support:
 
 - table;
@@ -505,6 +515,8 @@ Inspect:
 
 ## EBS
 
+> **Scope note:** **Post-v0.1 (`P2c` / `P7`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
+
 Inspect:
 
 - attached volumes;
@@ -522,6 +534,8 @@ EBS is especially important for EKS PV recovery.
 
 ## EFS
 
+> **Scope note:** **Post-v0.1 (`P2c` / `P7`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
+
 Inspect:
 
 - file systems;
@@ -536,6 +550,8 @@ Inspect:
 ---
 
 ## 7.1 Messaging: Amazon SQS and Amazon SNS
+
+> **Scope note:** **Post-v0.1 (`P2c`, `M3 Expansion / v0.2`).** Target specification preserved intact below.
 
 ### Amazon SQS
 
@@ -573,8 +589,8 @@ Initially include awareness of:
 - Route 53;
 - ALB;
 - NLB;
-- CloudFront;
-- AWS WAF (WAFv2 Web ACLs, rule groups, IP sets, regional ALB associations and `us-east-1` `Scope=CLOUDFRONT` associations, plus primary-vs-DR Web ACL and rule parity checks);
+- CloudFront *(post-v0.1 `P2c`, `M3 Expansion / v0.2`)*;
+- AWS WAF (`P2c`, `M3 Expansion / v0.2`: WAFv2 Web ACLs, rule groups, IP sets, regional ALB associations and `us-east-1` `Scope=CLOUDFRONT` associations, plus primary-vs-DR Web ACL and rule parity checks);
 - Amazon CloudWatch Logs (log groups, KMS encryption, retention, subscription filters; out of RTO scope by default per section 24.1 unless marked required, assessed under Observability);
 - VPC;
 - subnets;
@@ -586,7 +602,7 @@ Initially include awareness of:
 - security groups;
 - AWS Backup;
 - Service Quotas (DR Region quotas for the services a stack uses);
-- Amazon Application Recovery Controller (ARC): routing controls; Region switch plans, their evaluation status and execution-report locations; readiness checks as legacy configuration only (closed to new customers), never recommended;
+- Amazon Application Recovery Controller (ARC): routing controls; Region switch plans, their evaluation status and execution-report locations *(reading existing plans as evidence is in v0.1; compiling new ARC Region switch plans in §63.3 is post-v0.1 `M3 Expansion / v0.2`)*; readiness checks as legacy configuration only (closed to new customers), never recommended;
 - Route 53 Accelerated Recovery status on public hosted zones (8.1);
 - IAM Identity Center instance home Region and replica Regions (operator access, 28.1);
 - ACM certificates (including `us-east-1` certificates used by CloudFront, discovered via a global/`us-east-1` collector pass alongside `Route 53`, `IAM`, `CloudFront`, and `CLOUDFRONT`-scoped WAFv2 Web ACLs).

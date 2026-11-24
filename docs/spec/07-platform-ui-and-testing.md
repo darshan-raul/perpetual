@@ -144,7 +144,7 @@ perpetual/
 |
 +-- docs/
 |
-+-- docker-compose.yml   # Floci and Postgres for tests; not needed to run locally
++-- docker-compose.yml   # aws/aws-emulator (aws-emulator) and Postgres for tests; not needed to run locally
 +-- Makefile
 +-- README.md
 ```
@@ -374,12 +374,12 @@ GET /projects/{id}/graph
     # Whole project graph. Filters: stack, service, VPC, basis, confidence,
     # review_state, rto_scope.
 
-POST /projects/{id}/edges
-PATCH /edges/{id}
+POST /projects/{id}/edges          # structural graph edit API/UI: post-v0.1 (P1b-10, M3 / v0.2)
+PATCH /edges/{id}                   # v0.1 uses YAML overrides (P0-10) + confirm/reject below
 DELETE /edges/{id}
     # Rejects a discovered edge; deletes a user-added edge.
 
-POST /projects/{id}/nodes
+POST /projects/{id}/nodes           # structural graph edit API/UI: post-v0.1 (P1b-10, M3 / v0.2)
 PATCH /resources/{id}
     # Stack and service membership, RTO scope.
 
@@ -413,24 +413,24 @@ POST /edges/{id}/confirm
 POST /edges/{id}/reject
 ```
 
-DR design and delivery (v0.1):
+DR design and delivery (`v0.1` ECS + RDS; expanded in `v0.2` M3; agentic in `v0.3` M4):
 
 ```text
 POST /stacks/{id}/dr-spec              # from the selected candidate
 GET  /dr-specs/{id}
 POST /dr-specs/{id}/approve
 
-POST /dr-specs/{id}/transform          # v0.1: companion Terraform + suggested edits;
-                                       # v0.2: in-place edits. Body: IaC paths, open_pr
+POST /dr-specs/{id}/transform          # v0.1: ECS+RDS companion TF + suggested edits;
+                                       # v0.2 (M3): +EKS/P2c; v0.3 (M4): in-place edits.
 GET  /transformations/{id}             # progress, diff, verification report
-POST /transformations/{id}/verify      # body: saved plan JSON (+ rendered manifests)
+POST /transformations/{id}/verify      # body: saved plan JSON (+ rendered K8s manifests in M3 / v0.2)
 
-POST /stacks/{id}/recovery-artifacts   # runbook, prerequisite scripts, recovery
-                                       # scripts, ARC plan for the DR spec's method
+POST /stacks/{id}/recovery-artifacts   # v0.1: runbook, prerequisite + Python recovery scripts;
+                                       # v0.2 (M3): +ARC plan for the DR spec's method
 GET  /stacks/{id}/recovery-artifacts
 ```
 
-LLM-assisted (v0.2):
+LLM-assisted (`v0.3`, `M4 Agents`):
 
 ```text
 POST /stacks/{id}/advise
@@ -479,9 +479,9 @@ perpetual simulate checkout \
 perpetual optimize checkout \
   --rto 30m \
   --rpo 5m \
-  --budget 1200            # v0.2+: includes LLM candidates unless --no-llm
+  --budget 1200            # v0.1: presets; v0.2 (M3): combinatorial; v0.3+: LLM candidates unless --no-llm
 
-# from v0.2
+# from v0.3 (M4 Agents)
 perpetual llm configure
 perpetual llm test
 perpetual llm log
@@ -494,14 +494,14 @@ perpetual kb remove <doc-id>
 
 perpetual skills list
 
-perpetual advise checkout                 # v0.2
+perpetual advise checkout                 # v0.3 (M4 Agents)
 perpetual dr-spec checkout [--approve]
 perpetual transform checkout \
   --terraform ./infra/live/prod \
-  --k8s ./deploy/overlays/prod \
-  [--open-pr]                # v0.1: companion + suggested edits; v0.2: in-place
-perpetual verify checkout --plan-json plan.json [--manifests ./rendered]
-perpetual recovery checkout  # runbook, prerequisite + recovery scripts, ARC plan
+  [--k8s ./deploy/overlays/prod] \        # --k8s from v0.2 (M3, EKS)
+  [--open-pr]                # v0.1: ECS+RDS companion + suggested edits; v0.2: +EKS/P2c; v0.3: in-place
+perpetual verify checkout --plan-json plan.json [--manifests ./rendered]  # --manifests from v0.2 (M3)
+perpetual recovery checkout  # v0.1: runbook, prereq + Python scripts; v0.2 (M3): +ARC plan
 ```
 
 CLI can initially call local Python services directly rather than requiring the API.
@@ -561,6 +561,8 @@ Below:
 ---
 
 # 82. Graph Editor
+
+> **v0.1 UI vs post-v0.1 scope:** Per the 2026-11-24 CLI-first ordering (`§99`), `P1b` ships in **`M2 MVP (v0.1)`** after the CLI-first `M1` (`P2 + P4` ECS + RDS) real-AWS slice. In **`v0.1`**, the React Flow UI is a **read-only graph viewer plus edge review/confirm/reject panel** (`[ Confirm ]` / `[ Reject ]`), while structural graph edits (`add_edge`, `edit_edge`, `add_node`, `edit_node`, deleting user edges) live in **YAML overrides (`P0-10`) and the CLI**. The full interactive structural graph-editor UI (`### Edit`, `P1b-10`) and the ambiguous Flow-Log / shared-role candidate-set review UI (`P2b-09`) ship in **post-v0.1 (`M3 Expansion / v0.2`)**; their full design is preserved intact below.
 
 The graph editor is the first web UI (section 99). It is deliberately small: view the computed graph, review it, and correct it.
 
@@ -720,6 +722,8 @@ ECS Fargate
 
 # 86. Fixture B — EKS
 
+> **Scope note:** **Post-v0.1 (`P7`, `M3 Expansion / v0.2`, Second Vertical Slice `§106`).** Preserved intact below.
+
 ```text
 Route53
    |
@@ -815,6 +819,8 @@ Simulation should show stack recoverability.
 
 # 89. EKS Demo Failure
 
+> **Scope note:** **Post-v0.1 (`P7`, `M3 Expansion / v0.2`, Second Vertical Slice `§106`).** Preserved intact below.
+
 Intentionally create:
 
 ```text
@@ -874,42 +880,43 @@ independently.
 
 # 90.1 Test Environments
 
-Development does not need a real AWS account until Phase 2, and after that only for a small contract suite.
+Development does not need a real AWS account until M1 (Phase 2), and after that only for a small contract suite.
 
 Four environments, from fastest to most real:
 
 ```text
-fixtures     YAML normalized graph + DR overlay + overrides (section 104),
-             saved `terraform show -json` files, saved API responses (fixtures/aws/).
-             No network, no credentials.
+fixtures           YAML normalized graph + DR overlay + overrides (section 104),
+                   saved `terraform show -json` files, saved API responses (fixtures/aws/).
+                   No network, no credentials.
 
-moto         in-process boto3 mocks for collector unit tests.
+Stubber / moto     in-process `botocore.stub.Stubber` and `moto` mocks for pure unit
+                   error-injection and client-call tests.
 
-Floci        local AWS emulator in Docker, for collector integration tests in CI.
-             The demo Terraform (sections 85-89) is applied to it, then scanned.
+aws/aws-emulator   (`aws-emulator`) local AWS emulator in Docker, for stateful collector,
+                   Terraform, and recovery-script integration tests in CI.
+                   The demo Terraform (sections 85-89) is applied to it, then scanned.
 
-real AWS     a sandbox account (plus a DR account for section 66 tests), used for
-             a small contract suite. Never a customer or production account.
+real AWS           a sandbox account (plus a DR account for section 66 tests), used for
+                   the opt-in contract suite (`tests/contract/`). Never a customer or
+                   production account.
 ```
 
 Which environment each part uses:
 
 ```text
-Phases 0-1    engine, simulator, recovery DAG, RTO        fixtures
-Phase 1b      API, UI, Terraform importer                 fixtures
-Phase 2       collectors                                  moto (unit), Floci (integration),
-                                                          real AWS (contract)
-Phase 2b      CloudTrail and flow-log readers             synthetic log files in Floci S3,
-                                                          real AWS (contract)
-Phases 3-8    stack discovery, rules, RPO, optimizer      fixtures
-Phase 3b      LLM foundation                              fake chat model (recorded responses)
-Phase 9       IaC transformation                          examples/ repos + Floci for terraform
-                                                          plan; fake model in CI, evals on demand
+M0 (Phases 0, 1, 1c)   engine, simulator, recovery DAG, RTO, PoC loop   fixtures (+ moto/aws-emulator dry run for P1c script)
+M1 (Phases 2, 2b)      ECS + RDS collectors & CloudTrail reader         Stubber / moto (unit), aws-emulator (integration),
+                                                                        synthetic CloudTrail in aws-emulator S3, real AWS (contract)
+M1 (Phases 3–8)        stack discovery, ECS+RDS rules, RPO (CLI)        fixtures + real sandbox AWS checkpoints
+M2 (Phase 1b, v0.1)    API, read-only UI, Terraform importer            fixtures + aws-emulator
+M2 (Phases 9–10, v0.1) companion Terraform + recovery scripts (ECS+RDS) examples/ecs-rds/ + aws-emulator (terraform plan & script dry run)
+M3 (v0.2 Expansion)    P2c services, EKS (P7), Flow Logs (P2b-04), ARC  fixtures + Stubber/moto + aws-emulator + real AWS (contract)
+M4 (v0.3 Agents)       Phase 3b LLM foundation & agentic P10            fake chat model in CI; evals/ on demand
 ```
 
 ### Synthetic logs
 
-Emulators do not produce real CloudTrail or VPC Flow Logs, because there is no real traffic. A generator in `fixtures/logs/` writes files in the real delivery formats (CloudTrail JSON in the trail's S3 key layout; flow-log records, versions 2 and 5) from a scenario description:
+Emulators do not produce real CloudTrail or VPC Flow Logs, because there is no real traffic. A generator in `fixtures/logs/` writes files in the real delivery formats (CloudTrail JSON in the trail's S3 key layout; flow-log records, versions 2 and 5, used once `P2b-04` ships in `M3 Expansion / v0.2`) from a scenario description:
 
 ```yaml
 scenario: checkout-observed
@@ -930,7 +937,7 @@ flows:
     count: 50
 ```
 
-Generated files are uploaded to a Floci S3 bucket, so readers are tested through the same S3 path they use in production. The generator also produces the edge cases from section 14.1: reused Fargate ENIs, unresolvable addresses, observed-but-not-permitted flows.
+Generated files are uploaded to an `aws-emulator` (`aws/aws-emulator`) S3 bucket, so readers are tested through the same S3 path they use in production. The generator also produces the edge cases from section 14.1 (`CloudTrail` shared-role cases in `v0.1`; reused Fargate ENIs, unresolvable addresses, and observed-but-not-permitted flows in `M3` / `P2b-04`).
 
 ### What emulators cannot prove
 
@@ -942,7 +949,7 @@ These need the real AWS contract suite:
 - real CloudTrail and flow-log delivery, including data-event coverage detection;
 - cross-account access to a separate DR account (section 66).
 
-Emulator support is checked per service and operation before it is relied on. A passing Floci test proves the SDK calls work, not that behaviour matches AWS.
+Emulator support is checked per service and operation before it is relied on. A passing `aws-emulator` test proves the SDK calls work, not that behaviour matches AWS.
 
 ### Real-AWS contract suite
 
@@ -955,9 +962,9 @@ Emulator support is checked per service and operation before it is relied on. A 
 Real-AWS checkpoints:
 
 ```text
-Phase 2 exit      scan the sandbox account -> normalized graph
-Phase 2b exit     real CloudTrail and flow logs -> observed edges
-Sections 87-89    demo scenarios reproduced on real infrastructure
+M1 Phase 2 exit   scan the sandbox account (ECS + RDS slice) -> normalized graph
+M1 Phase 2b exit  real CloudTrail -> observed edges (Flow Logs follow in M3 / v0.2)
+M1/M2 §§87–88     ECS demo scenarios reproduced on real infrastructure (§89 EKS follows in M3 / v0.2)
 ```
 
 ---
@@ -969,15 +976,15 @@ These are required release regressions in addition to the canonical ECS/EKS demo
 | Contract | Minimum regression | Plan owner |
 |---|---|---|
 | Planned snapshot (15.4) | A changed property overrides live configuration; deletion/replacement removes obsolete proof; unknown fields stay unknown; root identities do not collide | P1b-15, P10-04 |
-| Verification stages (61.1) | New replica with no estimator stays unknown; modeled design PASS retains pending seeding/image/secret prerequisites; static-only is never design verified; rescan is required for observed READY | P8-01, P10-04/08, P12-01 |
-| Execution isolation (61) | External data source, unapproved provider/plugin, symlink escape, credential read, forbidden egress and cloud mutation are denied; lack of isolation fails closed | P10-09 |
+| Verification stages (61.1) | New replica with no estimator stays unknown; modeled design PASS retains pending seeding/image/secret prerequisites; static-only is never design verified; rescan is required for observed READY | P8-01, P10-04 (`v0.1`), P10-08 (`M4`), P12-01 |
+| Execution isolation (61) | External data source, unapproved provider/plugin, symlink escape, credential read, forbidden egress and cloud mutation are denied; lack of isolation fails closed | P10-09 (`M4 / v0.3`) |
 | Coverage and freshness (76.1) | Failed DR collector retains historical replica but cannot prove readiness; complete deletion differs from AccessDenied/partial pagination; stale metrics and scan skew gate results | P2-13 |
 | Readiness (31) | Ordered table, proven failure plus unknown, target equality, RPO FAIL with usable recovery, missing evaluator, optional budget and out-of-scope findings | P1-07/18, P4-05, P8-03, P9-04 |
-| Evidence producers (28.1) | Each enabled service/rule/estimator maps to typed collected facts, actions and tests; include quotas, metrics, EFS and basic DynamoDB | P0-04, P2-12, P4-08; plan §3.5 |
-| Approval validity (56.3) | Requirement/scan/override/base-tree/backend change and expiry invalidate approval; resume checks digest; post-verification edit invalidates report | P0-15, P9-08, P10-01/04/05 |
+| Evidence producers (28.1) | Each enabled service/rule/estimator maps to typed collected facts, actions and tests; `v0.1` covers ECS+RDS quotas/metrics, while EFS and DynamoDB (`P4-08`) ship in `M3 (v0.2)` | P0-04, P2-12, P4-08 (`M3`); plan §3.5 |
+| Approval validity (56.3) | Requirement/scan/override/base-tree/backend change and expiry invalidate approval; resume checks digest; post-verification edit invalidates report (`P0-15` covers lightweight canonical hashes/manifests in M0; schema-migration upgrade registry `P0-15b` ships in `M3`) | P0-15 (`M0`), P0-15b (`M3`), P9-08, P10-01/04/05 |
 | Redundancy (19.1) | ANY one-of-two, both failed, quorum two-of-three, unknown member, shared failed prerequisite, bounded selection and selected-path review | P1-18 |
-| Attribution (14.1) | Shared role/ENI keeps one ambiguous aggregate without confidence inflation; exact evidence and user confirmation resolve it | P2b-09 |
-| Cost/budget (59.1) | Missing/stale price or usage, shared-resource deduplication, total/incremental separation, range straddling budget, exact equality and unknown Pareto exclusion | P9-03/04/09 |
+| Attribution (14.1) | Shared role/ENI keeps one ambiguous aggregate without confidence inflation; exact evidence and user confirmation resolve it (`CloudTrail`-only in `v0.1`; Flow Logs + candidate-set review UI `P2b-09` in `M3 / v0.2`) | P2b (`M1`), P2b-09 (`M3`) |
+| Cost/budget (59.1) | Missing/stale price or usage, shared-resource deduplication, total/incremental separation, range straddling budget, exact equality and unknown Pareto exclusion (`StaticCostProvider` + presets in `v0.1`; `AWSPricingProvider` / full search in `M3 / v0.2`) | P9-03/04/09 |
 | Terraform format (15.4) | Saved-plan show JSON accepted; plan UI JSON rejected with an actionable error | P1b-01, P10-04 |
 
 # 91. Rule Test Example
@@ -1189,18 +1196,29 @@ Do not mark it green.
 
 # 99. Initial Implementation Phases
 
-The order is engine-first. The DR model is what has to be correct, so it is proven from the CLI against fixtures before any web UI or server infrastructure is built.
+The order is engine-first and CLI-first (`M0` on fixtures → `M1` CLI-only ECS + RDS vertical slice on real sandbox AWS → `M2` API/UI, preset optimizer, companion Terraform, and scripts for `v0.1`). The DR model is proven from the CLI before any web UI or server infrastructure is built.
 
-Release milestones (decision 2026-10-27):
+Release milestones (updated 2026-11-24; original LLM boundary decision 2026-10-27):
 
 ```text
-M0 PoC         phases 0-1 plus a fixture-only compile loop: fix -> Terraform -> re-simulate
-M1 Alpha       phases 1b, 2, 2b, 3, 4 (without advisory review), 5, 6, 7 (RPO)
-M2 v0.1        EKS slice, optimizer, IaC delivery, recovery artifacts; fully deterministic
-M3 v0.2        LLM features: phase 3b, advisory review, LLM candidate planner,
-               transformation agent with enforced isolation, explainer
-M4 v0.3        proven readiness from drills, drift
-M5 v1.0        production release
+M0 PoC         P0 (P0-11 -> minimal P0-15 hashes/manifests -> P0-12..14), P1, and P1c
+               fixture-only compile loop (fix -> Terraform -> script -> re-simulate)
+M1 Alpha       CLI-first ECS + RDS real-AWS vertical slice: P1b-02/03 (identity & normalizers),
+               CLI-only Phase 2 (ECS + RDS slice), Phase 2b (CloudTrail-only), Phase 3,
+               Phase 4 (ECS + RDS + cross-cutting packs), Phase 5, Phase 6 (CLI), Phase 7/P8 (CLI)
+M2 MVP (v0.1)  Phase 1b (Terraform importer, planned snapshots, FastAPI, read-only React Flow
+               viewer + review/confirm/reject panel), Phase 8/P9 (StaticCostProvider + 3–4 presets),
+               Phase 9/P10 (ECS + RDS companion Terraform + suggested edits + supplied-plan
+               verification), Phase 10/P11 (runbooks, prerequisite scripts, laptop Python scripts)
+M3 Expansion   (v0.2) Post-v0.1 deterministic expansion: P0-15b (schema-migration upgrade registry),
+               P1b-10 (interactive UI graph editor), P2b-04/09 (Flow Logs + ENI resolution &
+               ambiguous review UI), P2c (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS,
+               DynamoDB), P7 (EKS slice + §89), full P9 combinatorial search + AWSPricingProvider,
+               and P11-07 (ARC Region switch plan compiler)
+M4 Agents      (v0.3) LLM features: Phase 3b, advisory review (§28.2), LLM candidate planner (§56.1),
+               transformation agent with enforced isolation (§61), explainer (§70)
+M5 Proven      (v0.4) proven readiness from drills, drift
+M6 Production  (v1.0) production release
 ```
 
 ## Phase 0 — Engine Foundation (CLI only)
@@ -1211,7 +1229,7 @@ Deliver:
 - Pydantic domain models (section 104);
 - fixture format: a normalized graph, DR overlay and graph overrides in YAML, loadable without collectors;
 - SQLAlchemy persistence on SQLite (Postgres-compatible schema, no Postgres-only features yet);
-- NetworkX graph builder;
+- NetworkX graph builder (`P0-11`) followed by minimal `P0-15` (lightweight canonical hashes, immutable manifests, versioned fixture inputs; schema-migration upgrade registry `P0-15b` moves to `M3`);
 - graph overrides (section 23) applied from YAML;
 - `perpetual` CLI that runs on fixtures.
 
@@ -1243,88 +1261,99 @@ reproduces section 87 (NOT DR READY + blockers + RTO range), and the
 remediated fixture (section 88) shows RECOVERABLE.
 ```
 
+In `M0`, Phase 1 is followed by the fixture-only PoC compile loop (`P1c` in `IMPL_PLAN.md`: modeled fix → companion Terraform + recovery script → re-simulated `RECOVERABLE`).
+
 ---
 
-## Phase 1b — Importers, API and UI
+## Phase 1b — Importers, API and UI (`M1` data → `M2 v0.1` API/UI → `M3 v0.2` editor)
+
+Ordering (updated 2026-11-24): identity resolution and recorded-AWS normalizers (`P1b-02/03`) run **first in `M1`** so they feed live `Phase 2` collectors. FastAPI, the Terraform importer, and the read-only UI ship in **`M2 MVP (v0.1)`** after the CLI-first `P2 + P4` ECS + RDS real-AWS vertical slice has validated real data.
 
 Deliver:
 
-- Terraform JSON importer;
-- identity resolution (section 15.1);
-- mock AWS importer;
-- FastAPI;
-- Alembic migrations (SQLite, tested against PostgreSQL);
-- `perpetual ui`: API and static UI served by one local process (section 71.1);
-- graph API, including override endpoints;
-- Vite + React + shadcn + React Flow graph editor (section 82): whole graph, review queue, add, edit and delete edges and nodes;
-- simulation view on the reviewed graph.
+- `M1` (ahead of `Phase 2`): identity resolution (section 15.1) and recorded-AWS normalizers;
+- `M2` (`v0.1`): Terraform JSON importer (`P1b-01`) and planned snapshot semantics (`P1b-15`);
+- `M2` (`v0.1`): FastAPI, Alembic migrations (SQLite, tested against PostgreSQL), and `perpetual ui` (section 71.1);
+- `M2` (`v0.1`): Vite + React + shadcn + React Flow **read-only graph viewer + edge review/confirm/reject panel** (section 82), plus simulation, findings, recovery, and RPO views (structural edits stay in YAML overrides `P0-10`);
+- `M3` (`v0.2`): interactive structural graph-editor UI (`P1b-10`: add, edit, and delete edges/nodes and edit stack/service/RTO scope in UI).
 
-Exit criterion:
+Exit criterion (`M2 v0.1`):
 
 ```text
-Import fixture -> review and correct the computed graph in the UI -> simulate on it.
+Import saved Terraform plan or live scan -> review and confirm/reject edges in the
+read-only React Flow UI -> view simulation, findings, recovery plan, and RPO.
 ```
 
 ---
 
-## Phase 2 — AWS Discovery
+## Phase 2 — AWS Discovery (`M1` ECS + RDS slice; `M3` `P2c` + `P7`)
 
-Implement:
+Implement in **`M1` (`v0.1` ECS + RDS slice, CLI-only)**:
 
 ```text
 ECS
-EKS
-EC2/Auto Scaling/VPC
-Lambda
 RDS/Aurora
 S3
-SQS
-SNS
 ECR
-ELB
+ELB (ALB/NLB)
 Route53
-WAF
 Secrets Manager
 SSM Parameter Store
 KMS
 IAM
-CloudWatch Logs
+VPC / Subnets / Security Groups
+CloudWatch Logs (scope-aware)
+Backup / Service Quotas / IAM Identity Center
+```
+
+Implement post-v0.1 in **`M3 Expansion (v0.2)`** (`P2c` and `P7`):
+
+```text
+EKS (P7)
+EC2 / Auto Scaling / EBS / EFS (P2c)
+Lambda (P2c)
+DynamoDB (P2c)
+SQS / SNS (P2c)
+CloudFront / WAF (P2c)
 ```
 
 Add Resource Explorer and Config as supplementary sources.
 
 Dependency evidence in this phase: security groups, IAM policies and configuration references.
 
-Collectors are tested with moto and Floci, then checked against a real sandbox account (section 90.1).
+Collectors are tested with `botocore.stub.Stubber` / `moto` (unit) and `aws/aws-emulator` (`aws-emulator`, integration), then checked against a real sandbox account (section 90.1).
 
-Exit criterion:
+Exit criterion (`M1` CLI):
 
 ```text
-Scan AWS account -> normalized graph.
+Scan AWS account (ECS + RDS slice) -> normalized graph via CLI.
 ```
 
 ---
 
-## Phase 2b — Observed Dependency Evidence
+## Phase 2b — Observed Dependency Evidence (`M1` CloudTrail-only; `M3` Flow Logs)
 
-Deliver:
+Deliver in **`M1` (`v0.1` ECS + RDS slice, CLI-only)**:
 
 - CloudTrail reader (S3; `LookupEvents` fallback). CloudTrail Lake and Athena sources follow later and are optional;
-- VPC Flow Logs reader (S3 or CloudWatch Logs) with time-aware ENI resolution;
-- principal-to-compute mapping through task roles, IRSA and Pod Identity;
+- principal-to-compute mapping through task roles (plus IRSA/Pod Identity once EKS ships in `M3`);
 - aggregated observations;
 - contradiction and "unobserved in window" flags;
-- coverage report (which trails, data events and flow logs existed).
+- coverage report (which trails and data events existed).
 
-Kubernetes NetworkPolicy evidence arrives with the EKS slice (section 106).
+Deliver post-v0.1 in **`M3 Expansion (v0.2)`** (`P2b-04`, `P2b-09`):
 
-Readers are developed against synthetic log files (section 90.1), then checked against real logs in the sandbox account.
+- VPC Flow Logs reader (S3 or CloudWatch Logs) with time-aware ENI resolution;
+- ambiguous candidate-set review UI (`P2b-09`);
+- Kubernetes NetworkPolicy evidence with the EKS slice (`P7`, section 106).
 
-Exit criterion:
+Readers are developed against synthetic log files in `aws-emulator` S3 (section 90.1), then checked against real logs in the sandbox account.
+
+Exit criterion (`M1` CloudTrail-only):
 
 ```text
-Every edge shows its basis. Edges that are permitted but unobserved, and flows that
-are observed but not permitted, are listed for review.
+Every edge shows its basis. Edges that are permitted but unobserved, and CloudTrail
+calls that are observed but not permitted, are listed for review.
 ```
 
 ---
@@ -1346,7 +1375,7 @@ Perpetual understands "checkout" as a stack rather than unrelated AWS resources.
 
 ---
 
-## Phase 3b — LLM Foundation (v0.2)
+## Phase 3b — LLM Foundation (`M4 Agents`, `v0.3`)
 
 Deliver:
 
@@ -1369,35 +1398,42 @@ perpetual llm test passes against a configured provider; the explainer answers
 
 ## Phase 4 — DR Rule Engine
 
-First rule packs:
+First rule packs in **`M1` (`v0.1` ECS + RDS slice, CLI-only)**:
 
 ```text
 ECS
-EKS
-EC2/ASG
-Lambda
-RDS
+RDS/Aurora
 S3
-SQS
-SNS
 ECR
 Secrets/SSM
 KMS
 IAM
-network
+network / VPC
 ALB
 Route53
-WAF
-CloudWatch Logs
+CloudWatch Logs (scope-aware)
+cross-cutting (section 28.1)
 ```
 
-Then the advisory review (section 28.2), in v0.2.
+Post-v0.1 rule packs in **`M3 Expansion (v0.2)`** (`P2c` and `P7`):
+
+```text
+EKS (§33–§40)
+EC2/ASG
+Lambda
+DynamoDB
+EBS/EFS
+SQS/SNS
+CloudFront/WAF
+```
+
+Then the advisory review (section 28.2), in **`v0.3` (`M4 Agents`)**.
 
 Exit criterion:
 
 ```text
-Stack assessment produces evidence-backed findings. From v0.2, advisory items
-appear with citations and can be accepted or dismissed.
+Stack assessment produces evidence-backed findings in CLI (`M1`) and UI (`M2`).
+From v0.3 (`M4`), advisory items appear with citations and can be accepted or dismissed.
 ```
 
 ---
@@ -1440,7 +1476,7 @@ Predicted RTO becomes architecture-derived.
 
 ## Phase 7 — RPO
 
-Implement resource-specific RPO estimates.
+Implement resource-specific RPO estimates (`RDS`, `S3` in `v0.1`; `DynamoDB`, `EFS`, stateful `SQS` in `M3 / v0.2`).
 
 Exit criterion:
 
@@ -1464,13 +1500,14 @@ and:
 "What is the best DR posture for this budget?"
 ```
 
-Includes the DR spec (section 56.2). The LLM candidate planner (section 56.1) arrives in v0.2.
+In **`v0.1` (`M2 MVP`)**, the Optimizer uses `StaticCostProvider` and compares **3–4 discrete stack presets** (`Backup/Restore`, `Pilot Light`, `Warm Standby`) evaluated through the simulator and recovery DAG, producing an approved DR spec (section 56.2). Full combinatorial candidate search + `AWSPricingProvider` arrive in **`v0.2` (`M3 Expansion`)**, and the LLM candidate planner (section 56.1) arrives in **`v0.3` (`M4 Agents`)**.
 
 Exit criterion:
 
 ```text
-Several deterministic architecture candidates can be compared, and an approved
-DR spec exists for each demo stack. LLM-proposed candidates join in v0.2.
+v0.1: 3–4 deterministic preset candidates are compared via StaticCostProvider, and an
+approved DR spec exists for the ECS + RDS stack. v0.2: full combinatorial search +
+AWSPricingProvider. v0.3: LLM-proposed candidates join.
 ```
 
 ---
@@ -1479,13 +1516,17 @@ DR spec exists for each demo stack. LLM-proposed candidates join in v0.2.
 
 Deliver:
 
-v0.1:
+`v0.1` (`M2 MVP` — ECS + RDS):
 
-- companion Terraform for new DR resources, and suggested edits by Terraform address for resources the user's IaC already manages (section 62.1);
+- companion Terraform for new ECS + RDS DR resources, and suggested edits by Terraform address for resources the user's IaC already manages (section 62.1);
 - verification from static checks of the generated code and a saved plan the user supplies (section 61.1);
 - change delivery: branch, commits, patch, optional PR (section 62).
 
-v0.2:
+`v0.2` (`M3 Expansion`):
+
+- companion Terraform templates and suggested edits extended to `P2c` services and EKS (`P7`, incl. Kubernetes suggested edits and supplied rendered manifests).
+
+`v0.3` (`M4 Agents`):
 
 - resource-to-code mapping for Terraform and Kubernetes (section 61);
 - transformation agent in a git worktree with the tool allowlist and enforced isolation;
@@ -1495,42 +1536,48 @@ v0.2:
 Exit criterion:
 
 ```text
-v0.1: for the broken ECS and EKS demos, `perpetual transform` produces companion
-Terraform and suggested edits, design verification passes from a supplied saved
-plan, and the re-simulated stack meets its targets. v0.2: the same with in-place
-edits to the example Terraform and manifests.
+v0.1: for the broken ECS + RDS demo, `perpetual transform` produces companion Terraform
+and suggested edits, design verification passes from a supplied saved plan, and the
+re-simulated stack meets its targets. v0.2: EKS + P2c demos verified the same way.
+v0.3: in-place agentic edits to the example Terraform and manifests.
 ```
 
 ---
 
 ## Phase 10 — Recovery Artifacts
 
-Generate the runbook, prerequisite scripts, recovery scripts and ARC Region switch plans from recovery plans (section 63).
+`v0.1` (`M2 MVP`): generate failover/failback runbooks, prerequisite scripts/SOPs, and laptop-run Python recovery scripts from recovery plans (section 63, 63.1, 63.2).
+
+`v0.2` (`M3 Expansion`): add optional ARC Region switch plan compilation (`P11-07`, section 63.3) from the same DAG.
 
 ---
 
-# 100. MVP Definition
+# 100. MVP Definition (`v0.1` — ECS + RDS End-to-End)
 
-The first genuinely usable release is achieved when this workflow works:
+The first genuinely usable release (`v0.1` / `M2 MVP`) is achieved when this workflow works deterministically for an **ECS + RDS stack** (`EKS`, `P2c` services, VPC Flow Logs, interactive UI graph editing, full combinatorial optimizer + `AWSPricingProvider`, and ARC Region switch plan compilation follow in `v0.2` / `M3 Expansion`; LLM agents follow in `v0.3` / `M4`):
 
 ```text
-1. Import Terraform and/or scan AWS.
+1. Import Terraform saved plan and/or scan AWS (with CloudTrail-only P2b).
 
-2. Perpetual discovers:
-   ECS or EKS
-   database
-   storage
-   networking
-   secrets
+2. Perpetual discovers the v0.1 ECS + RDS slice:
+   ECS
+   RDS / Aurora
+   S3
+   ECR
+   Secrets Manager / SSM Parameter Store
    KMS
-   images
-   DNS
+   IAM
+   ALB / Route 53
+   VPC / Subnets / Security Groups
+   (EKS and P2c services follow in v0.2 / M3.)
 
-3. Perpetual shows the whole computed graph with its evidence.
-   User reviews it and adds, edits or rejects mappings.
+3. Perpetual shows the whole computed graph with its evidence in a
+   read-only React Flow viewer. User reviews and confirms or rejects
+   edges in the UI; structural edits (add/edit/delete) use YAML overrides (P0-10)
+   until the interactive UI editor ships in v0.2 (M3).
 
 4. Perpetual groups resources into a stack and its services.
-   User adjusts membership and RTO scope.
+   User adjusts membership and RTO scope (via YAML overrides / config in v0.1).
 
 5. User enters, for the stack:
    target Region
@@ -1538,7 +1585,7 @@ The first genuinely usable release is achieved when this workflow works:
    RPO
    budget
 
-6. User clicks:
+6. User clicks (or runs in CLI):
    Simulate Region Failure
 
 7. Perpetual shows:
@@ -1553,22 +1600,24 @@ The first genuinely usable release is achieved when this workflow works:
    estimated RTO with its breakdown and buffer
    estimated RPO
 
-9. Perpetual compares candidate architectures (deterministic in v0.1;
-   LLM-proposed candidates join in v0.2) and the user approves a DR spec:
+9. Perpetual compares 3–4 discrete stack presets (Backup/Restore, Pilot Light,
+   Warm Standby) using StaticCostProvider in v0.1 (full combinatorial search +
+   AWSPricingProvider in v0.2; LLM-proposed candidates in v0.3) and the user
+   approves a DR spec:
    current vs target architecture
    RTO, RPO, total steady-state DR cost and incremental cost
 
-10. Perpetual generates companion Terraform for new DR resources and
+10. Perpetual generates companion Terraform for new ECS + RDS DR resources and
     suggested edits for resources the user's IaC already manages,
     verifies the design by re-simulating a saved plan the user supplies,
     and delivers a branch or PR with deployment prerequisites and
-    stage-specific results. In-place edits by the transformation agent
-    arrive in v0.2.
+    stage-specific results. (EKS/P2c follow in v0.2; in-place edits by the
+    transformation agent arrive in v0.3.)
 
 11. Perpetual generates, from one recovery DAG:
     failover and failback runbooks (explanatory)
     prerequisite scripts and SOPs
-    recovery scripts, or an ARC Region switch plan
+    laptop-run Python recovery scripts (ARC Region switch plans arrive in v0.2)
 
 12. After the user deploys and completes prerequisites, a fresh scan
     establishes observed readiness; design verification alone cannot.
@@ -1743,26 +1792,23 @@ Then create the canonical ECS fixtures: broken (section 87) and remediated (sect
 
 # 105. First Vertical Slice
 
-The first complete vertical slice should use:
+The first complete vertical slice (`v0.1` / `M1`–`M2`) uses the **ECS + RDS slice**:
 
 ```text
 Route53
-WAF
 ALB
 ECS
-EC2 / Auto Scaling
-Lambda
-SQS
-SNS
 ECR
 Secrets Manager / SSM
 KMS
 IAM
-RDS
+RDS / Aurora
 S3
-CloudWatch Logs
+CloudWatch Logs (scope-aware)
 VPC/Subnets/SG
 ```
+
+(`WAF`, `EC2 / Auto Scaling`, `Lambda`, `SQS`, `SNS`, `CloudFront`, `EBS / EFS`, and `DynamoDB` follow as `P2c` in `M3 Expansion / v0.2`.)
 
 Implement this fully before broadening service support.
 
@@ -1771,18 +1817,20 @@ The vertical slice must support:
 ```text
 discover
 graph
-review and correct the graph (YAML overrides, then the graph editor)
+review and correct the graph (YAML overrides in P0-10, then read-only UI confirm/reject in P1b; interactive UI editor in M3)
 assess
 simulate Region failure
 show blockers
 calculate basic recovery path
 ```
 
-Only after this works should the equivalent EKS vertical slice be completed.
+Only after this works should `P2c` and the equivalent EKS vertical slice (`§106`) be completed.
 
 ---
 
 # 106. Second Vertical Slice — EKS
+
+> **Scope note:** **Post-v0.1 (`P7`, `M3 Expansion / v0.2`).** Preserved intact below.
 
 Reuse the same architecture.
 

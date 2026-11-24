@@ -1,6 +1,6 @@
 # Architecture as built
 
-The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists and how the existing pieces connect. Updated with every task that changes connections.
+The target pipeline is in IMPL_PLAN §3.1. This page shows how much of it exists and how the existing pieces connect. Updated at phase boundaries during active M0/M1 iteration (end of `P0`, `P1`, `P1c`, `P2`, etc.) and in the same change from M2 onward.
 
 ## The pipeline, and what exists
 
@@ -135,4 +135,4 @@ Which package may import which is enforced by import-linter on every lint run; s
 
 ## Next connections
 
-P0-11 builds the NetworkX graph from source records plus the applied override result, preserving dependency groups and rejected-edge context. P0-15 adds immutable manifests before P0-12 wires `perpetual graph --fixture` and override YAML commands.
+P0-11 builds the NetworkX graph from source records plus the applied override result, preserving dependency groups and rejected-edge context. Minimal P0-15 adds lightweight canonical hashes, immutable manifests, and versioned fixture inputs before P0-12 wires `perpetual graph --fixture` and override YAML commands (the payload schema-migration upgrade registry moves to post-v0.1 `M3` as `P0-15b`).

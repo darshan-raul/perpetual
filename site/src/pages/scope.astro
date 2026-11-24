@@ -1,49 +1,64 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-const serviceMatrix = [
+const v01ServiceMatrix = [
   {
-    category: 'Containers & Compute (§5.1–§5.4)',
-    services: 'Amazon ECS (Fargate & EC2), Amazon EKS, EC2 Instances, Auto Scaling Groups, AWS Lambda',
+    category: 'Containers & Images (§5.1)',
+    services: 'Amazon ECS (Fargate & EC2), Amazon ECR',
     checks:
-      'Task definition parity, cross-Region ECR image availability, ASG launch templates & AMIs in DR Region, Lambda code/layer replication, event source mapping readiness, DR Region vCPU quotas.',
+      'Task definition parity, cross-Region ECR image replication and availability, KMS decrypt permissions for DR task execution roles, DR Region compute quotas.',
   },
   {
-    category: 'Relational & NoSQL Data (§6.1–§6.3)',
-    services: 'Amazon RDS, Amazon Aurora (Provisioned & Serverless v2), Amazon DynamoDB',
+    category: 'Relational Data & Object Storage (§6.1, §7)',
+    services: 'Amazon RDS, Amazon Aurora (Provisioned & Serverless v2), Amazon S3, AWS Backup',
     checks:
-      'Cross-Region read replicas, Aurora Global Database secondary clusters, DynamoDB Global Tables, automated snapshot copy & PITR windows, target RPO calculation, replica KMS encryption keys.',
+      'Cross-Region read replicas, Aurora Global Database secondary clusters, automated snapshot copy & PITR windows, S3 Cross-Region Replication (CRR), target RPO calculation, replica KMS encryption keys.',
   },
   {
-    category: 'Storage & Messaging (§7–§7.1)',
-    services: 'Amazon S3, Amazon EBS, Amazon EFS, Amazon SQS (incl. stateful queues), Amazon SNS',
+    category: 'Edge, DNS & VPC Networking (§8)',
+    services: 'ALB / NLB, Route 53 (zones, records, health checks, Accelerated Recovery), Route 53 ARC (read-only inspection), ACM, VPC Networking',
     checks:
-      'S3 Cross-Region Replication (CRR) & KMS policies, EBS snapshot copy & volume restore durations, EFS cross-Region replication, stateful SQS message RPO impact, SNS topic/subscription parity.',
+      'ALB/NLB target group readiness, Route 53 health checks & ARC routing controls, ACM certificates issued in DR Region, VPC subnets/NAT/IGW/endpoints/TGW topology & security groups in DR Region.',
   },
   {
-    category: 'Edge, DNS & Networking (§8)',
-    services: 'Route 53, Route 53 ARC, CloudFront, AWS WAF, ALB / NLB, ACM, VPC Networking',
+    category: 'Security, Secrets & Cross-Cutting (§8, §28.1)',
+    services: 'AWS KMS, Secrets Manager, SSM Parameter Store, IAM Roles & Policies, CloudWatch Logs (scope-aware), Service Quotas',
     checks:
-      'Route 53 health checks & ARC routing controls, ACM certificates issued in DR Region, WAF WebACL parity, VPC subnets/NAT/endpoints/peering/TGW topology in DR Region.',
+      'Multi-Region KMS keys & decrypt grants, Secrets Manager replica status, SSM Parameter Store cross-Region parity (SSM-PARITY-001), hardcoded primary-Region ARNs in IAM (XREG-*), control-plane independence (CTRL-PLANE-001), operator break-glass access.',
+  },
+];
+
+const v02ExpansionMatrix = [
+  {
+    category: 'EC2, ASG & Serverless (§5.3–§5.4 · P2c)',
+    services: 'EC2 Instances, Auto Scaling Groups, AWS Lambda',
+    checks:
+      'ASG launch templates & AMI cross-Region copy, encrypted EBS snapshot KMS parity, Lambda code/layer replication, event source mapping readiness, and DR concurrency/vCPU quotas.',
   },
   {
-    category: 'Security, Secrets & Governance (§8, §28.1)',
-    services: 'AWS KMS, Secrets Manager, SSM Parameter Store, IAM Roles & Policies, Service Quotas',
-    checks:
-      'Multi-Region KMS keys & decrypt grants, Secrets Manager replica status, SSM Parameter Store cross-Region parity (SSM-PARITY-001), hardcoded primary-Region ARNs in IAM (XREG-*), control-plane independence (CTRL-PLANE-001).',
-  },
-  {
-    category: 'Kubernetes / EKS Deep Pack (§33–§40)',
+    category: 'Kubernetes / EKS Deep Pack (§33–§40 · P7)',
     services: 'EKS Control Plane, Managed Node Groups, Karpenter, Add-ons, IRSA, Pod Identity, PVCs',
     checks:
-      'Cluster version parity, EBS/EFS CSI driver add-ons, CoreDNS/VPC CNI readiness, OIDC issuer & IRSA/Pod Identity role trust in DR cluster, StorageClass & PVC topology constraints.',
+      'Cluster version parity, EBS/EFS CSI driver add-ons, CoreDNS/VPC CNI readiness, OIDC issuer & IRSA/Pod Identity role trust in DR cluster, StorageClass & PVC topology constraints, and rendered Kubernetes manifest checks.',
+  },
+  {
+    category: 'NoSQL, Block/File & Messaging (§6.3–§7.1 · P2c)',
+    services: 'Amazon DynamoDB, Amazon EBS, Amazon EFS, Amazon SQS (incl. stateful queues), Amazon SNS',
+    checks:
+      'DynamoDB Global Tables & PITR, EBS snapshot copy & volume restore durations, EFS cross-Region replication, stateful SQS message RPO impact, SNS topic/subscription parity.',
+  },
+  {
+    category: 'Edge Protection, Flow Logs & ARC Compiler (§8, §14.1, §63.3)',
+    services: 'Amazon CloudFront, AWS WAF (WAFv2), VPC Flow Logs, ARC Region Switch Plan Compilation',
+    checks:
+      'CloudFront origin failover, WAF WebACL parity (REGIONAL + CLOUDFRONT), time-aware ENI resolution & ambiguous candidate-set review UI, and compiled aws_arcregionswitch_plan execution artifacts (P11-07).',
   },
 ];
 ---
 
 <BaseLayout
   title="AWS Service Scope & Checkout Benchmark — Perpetual"
-  description="First-release AWS service matrix (ECS, EKS, EC2, Lambda, RDS, Aurora, DynamoDB, S3, KMS, IAM, Route 53), cross-cutting DR rule packs, and checkout stack evaluation."
+  description="v0.1 AWS service scope (ECS + RDS end-to-end: ECS, RDS, S3, ECR, Secrets/SSM, KMS, IAM, ALB, Route 53, VPC) and v0.2 post-v0.1 expansion matrix (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB, EKS)."
 >
   <main id="main-content" class="page-container">
     <div class="wrap">
@@ -56,13 +71,13 @@ const serviceMatrix = [
 
         <div class="headline-row">
           <div>
-            <p class="kicker"><span>//</span> spec §4–§8.1 · §28–§42 · service coverage &amp; sample evaluation</p>
+            <p class="kicker"><span>//</span> spec §4–§8.1 · §28–§42 · v0.1 ecs+rds scope &amp; v0.2 expansion</p>
             <h1 class="page-title">AWS Scope &amp; Rules</h1>
           </div>
         </div>
 
         <p class="page-sub">
-          What Perpetual models in its first release across ECS, EKS, EC2, Serverless, Data, Storage, and Networking stacks—plus an illustrative end-to-end evaluation of a production <code>checkout</code> stack.
+          v0.1 ships end-to-end deterministic DR assessment, simulation, and companion Terraform + recovery scripts for <strong>ECS + RDS</strong> stacks (<code>ECS, RDS/Aurora, S3, ECR, Secrets/SSM, KMS, IAM, ALB, Route 53, VPC</code>), with <code>P2c</code> services, <code>EKS</code>, VPC Flow Logs, and compiled ARC Region switch plans landing in <strong>v0.2 (M3 Expansion)</strong>.
         </p>
       </header>
 
@@ -107,14 +122,14 @@ Deployment        Pending; fresh scan required for observed READY</pre>
         <div class="section-header" style="margin-bottom:20px;">
           <div class="section-title-wrap">
             <span class="section-kicker">// spec §5–§8 · §28–§42</span>
-            <h2 class="section-title">In-Scope AWS Services &amp; DR Rule Pack Checks</h2>
+            <h2 class="section-title">v0.1 Scope (ECS + RDS) &amp; Post-v0.1 Expansion</h2>
           </div>
-          <p class="section-desc">Evaluated deterministically in v0.1</p>
+          <p class="section-desc">100% deterministic in v0.1 and v0.2</p>
         </div>
 
-        <div class="pnl">
+        <div class="pnl" style="margin-bottom:24px;">
           <div class="pnl-h">
-            <span><b>aws service matrix</b> · 25+ core services &amp; cross-cutting rules</span>
+            <span><b>v0.1 (M2 MVP)</b> · ECS + RDS end-to-end slice &amp; cross-cutting rules</span>
             <span class="mark mark--read">v0.1 Scope</span>
           </div>
           <div class="tbl-wrap">
@@ -122,12 +137,39 @@ Deployment        Pending; fresh scan required for observed READY</pre>
               <thead>
                 <tr>
                   <th>Domain</th>
-                  <th>In-Scope AWS Services</th>
+                  <th>v0.1 In-Scope AWS Services</th>
                   <th>Key Readiness &amp; Simulation Checks</th>
                 </tr>
               </thead>
               <tbody>
-                {serviceMatrix.map((row) => (
+                {v01ServiceMatrix.map((row) => (
+                  <tr>
+                    <td><b style="color:var(--amber)">{row.category}</b></td>
+                    <td style="white-space:normal;min-width:220px;color:var(--txt);font-weight:500;">{row.services}</td>
+                    <td style="white-space:normal;min-width:340px;line-height:1.55;">{row.checks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pnl">
+          <div class="pnl-h">
+            <span><b>v0.2 (M3 Expansion)</b> · P2c services, EKS deep pack, Flow Logs &amp; ARC compiler</span>
+            <span class="mark mark--write">Post-v0.1 Roadmap</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th>Post-v0.1 Target Services</th>
+                  <th>Planned Readiness, Evidence &amp; Execution Checks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {v02ExpansionMatrix.map((row) => (
                   <tr>
                     <td><b style="color:var(--amber)">{row.category}</b></td>
                     <td style="white-space:normal;min-width:220px;color:var(--txt);font-weight:500;">{row.services}</td>
@@ -150,8 +192,8 @@ Deployment        Pending; fresh scan required for observed READY</pre>
             </div>
             <h3 style="font-size:16px;color:var(--txt);margin-bottom:10px;">Deliverables &amp; RTO Scope Rules</h3>
             <ul style="margin-left:18px;font-size:12.5px;color:var(--txt-2);display:flex;flex-direction:column;gap:8px;">
-              <li><b>v0.1 IaC delivery:</b> Companion Terraform for new DR resources + suggested edits for existing Terraform &amp; Kubernetes manifests, delivered as a pull request.</li>
-              <li><b>v0.2 IaC delivery:</b> In-place edits to Terraform, plain Kubernetes manifests, Kustomize overlays, and Helm values in an isolated runner.</li>
+              <li><b>v0.1 (M2) deliverables:</b> Companion Terraform for new ECS + RDS DR resources + suggested edits by Terraform address (verified with supplied saved plans), plus failover/failback runbooks, prerequisite scripts, and laptop-run Python recovery scripts.</li>
+              <li><b>v0.2 (M3) &amp; v0.3 (M4) deliverables:</b> <code>v0.2</code> adds <code>P2c</code> &amp; <code>EKS</code> manifest support, interactive UI graph editing, full combinatorial optimizer + live AWS pricing, and compiled ARC Region switch plans; <code>v0.3</code> adds agentic in-place edits to Terraform, Kubernetes manifests, Kustomize overlays, and Helm values in an isolated runner.</li>
               <li><b>Checked but out of RTO scope by default:</b> Monitoring, logging (CloudWatch Logs), and CI/CD pipelines are assessed and displayed, but never block or inflate the critical-path RTO unless explicitly opted in.</li>
             </ul>
           </div>
@@ -165,7 +207,7 @@ Deployment        Pending; fresh scan required for observed READY</pre>
             <ul style="margin-left:18px;font-size:12.5px;color:var(--txt-2);display:flex;flex-direction:column;gap:8px;">
               <li><b>No live mutations:</b> Never runs <code>terraform apply</code>, <code>kubectl apply</code>, automatic live failover, or automated destructive DR drills.</li>
               <li><b>Single-cloud &amp; local first:</b> Focused exclusively on AWS Region recovery running locally on your machine (no hosted multi-tenant SaaS in v0.1).</li>
-              <li><b>IaC formats outside v0.1/v0.2:</b> Code generation for CloudFormation, AWS CDK, or Pulumi is outside the first release.</li>
+              <li><b>IaC formats outside v0.1–v0.3:</b> Code generation for CloudFormation, AWS CDK, or Pulumi is outside the release scope.</li>
             </ul>
           </div>
         </div>

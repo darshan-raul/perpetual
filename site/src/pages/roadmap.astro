@@ -6,50 +6,64 @@ const milestones = [
     id: 'M0 PoC',
     badge: 'IN PROGRESS',
     badgeClass: 'mark--write',
-    title: 'M0 Proof of Concept — Core Engine & First Generated Fix',
+    title: 'M0 Proof of Concept — Core Engine & Fixture Loop',
     delivers:
-      'Normalized resource models, dependency graph, two-pass failure simulator, and critical-path recovery planning on canonical test fixtures (ecs-broken, ecs-remediated), plus a first generated Terraform fix and laptop recovery script.',
+      'Finish P0-11 -> P1 -> P1c on canonical test fixtures (ecs-broken, ecs-remediated), with lightweight P0-15 (canonical hashes, immutable evaluation/snapshot manifests, versioned fixture inputs; schema-migration upgrade registry deferred to v0.2), plus a first generated Terraform fix and laptop recovery script.',
     highlights: [
       'Repo layout, mise toolchain, ruff/mypy/pytest/import-linter CI gates (task-level progress in TRACKER.md)',
-      'NetworkX dependency graph with ALL / ANY / quorum groups and cycle termination',
-      'Two-pass simulator (Impact Pass + DR Overlay Recovery Pass) and FailureReasonChain',
-      'Phase-template + refinement Recovery DAG and catalog-backed RTO/RPO calculation',
+      'P0-11 NetworkX dependency graph with ALL / ANY / quorum groups, cycle termination, and lightweight P0-15 hashes/manifests',
+      'P1 two-pass simulator (Impact Pass + DR Overlay Recovery Pass), FailureReasonChain, and catalog-backed RTO',
+      'P1c PoC compile loop: generated companion Terraform (fmt + validate) and Python recovery script (moto dry run) re-simulated to ecs-remediated',
     ],
   },
   {
     id: 'M1 Alpha',
-    badge: 'PLANNED',
+    badge: 'CLI-FIRST AWS SLICE',
     badgeClass: 'mark--read',
-    title: 'M1 Alpha — Live AWS Scanning, Terraform Import & Local Web UI',
+    title: 'M1 Alpha — CLI-First Real-AWS Vertical Slice (ECS + RDS)',
     delivers:
-      'Terraform saved-plan/state import, local FastAPI + React Flow web UI and interactive graph editor, live AWS scanning with CloudTrail and VPC Flow Log evidence, stack grouping, DR rule packs, and RTO/RPO on real AWS accounts.',
+      'CLI-only P2 + P4 ECS + RDS vertical slice (perpetual scan -> simulate -> plan) validated against a real sandbox AWS account before building FastAPI and the React UI, using CloudTrail-only P2b observation (no VPC Flow Logs or UI yet).',
     highlights: [
-      'Read-only boto3 collectors with coverage, freshness, and confirmed-absence tracking (§76.1)',
-      'CloudTrail & VPC Flow Log aggregation + shared-role/ENI candidate set handling (§14.1)',
-      'Interactive React Flow graph workbench with persistent GraphOverride review gates (§23)',
-      'ECS + RDS slice: ECS, RDS, ECR, KMS, Secrets Manager, SSM, Route 53, and cross-cutting rule packs (§28–§32, §41)',
+      'Normalizers & cross-source identity resolution (P1b-02/03) feeding read-only boto3 collectors for ECS, RDS/Aurora, S3, ECR, Secrets/SSM, KMS, IAM, ALB/NLB, Route 53, ACM, CloudWatch Logs, and VPC',
+      'CloudTrail-only P2b observation (S3 + LookupEvents) with contradiction and unobserved edge reporting (VPC Flow Logs deferred to v0.2)',
+      'ECS + RDS + cross-cutting DR rule packs (§28–§32, §41), stack grouping, live simulation, recovery DAG RTO, and RPO in the CLI',
+      '3-tier verification skeleton: botocore.stub.Stubber / moto unit tests, aws/aws-emulator integration, and opt-in real-AWS contract suite',
     ],
   },
   {
-    id: 'v0.1',
-    badge: 'DETERMINISTIC RELEASE',
+    id: 'v0.1 (M2 MVP)',
+    badge: 'DETERMINISTIC MVP',
     badgeClass: 'mark--read',
-    title: 'v0.1 — EKS Readiness, Budget Optimizer, Companion Terraform & Runbooks (No LLM)',
+    title: 'v0.1 — ECS + RDS End-to-End, Read-Only UI, Preset Optimizer & Runbooks (No LLM)',
     delivers:
-      'Full Amazon EKS deep readiness pack (§33–§40), Pareto DR design optimizer within monthly budget, companion Terraform and suggested edits delivered as a PR, explanatory runbook, prerequisite scripts, recovery scripts, and optional ARC Region switch plans. 100% deterministic.',
+      'End-to-end deterministic v0.1 release for ECS + RDS stacks (ECS, RDS/Aurora, S3, ECR, Secrets/SSM, KMS, IAM, ALB/NLB, Route 53, ACM, CloudWatch Logs, VPC): Terraform saved-plan import, read-only React Flow viewer + review/confirm/reject panel (structural edits in YAML overrides), preset-based Optimizer, companion Terraform + suggested edits, runbooks, and laptop-run Python recovery scripts.',
     highlights: [
-      'EC2/Auto Scaling, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS and DynamoDB collectors and rule packs',
-      'EKS control plane, node groups, EBS/EFS CSI add-ons, IRSA/Pod Identity, and PVC validation',
-      'Pareto optimizer scoring Backup & Restore, Pilot Light, Warm Standby, and Hot Standby (§54–§60)',
-      'Immutable EvaluationInput SHA-256 digests binding scans, overrides, and DRSpec approvals (§56.3)',
-      '4-stage verification separating modeled design verification from live observed READY (§61.1)',
+      'Read-only React Flow graph viewer + evidence/review/confirm/reject panel (structural graph edits stay in P0-10 YAML overrides)',
+      'Preset-based Optimizer: StaticCostProvider + 3–4 discrete stack presets (Backup/Restore, Pilot Light, Warm Standby) evaluated through the simulator (§54–§60)',
+      'Companion Terraform for new DR resources + suggested edits by Terraform address, verified via supplied saved-plan JSON (§15.4, §61.1)',
+      'Explanatory failover/failback runbooks, prerequisite scripts, and laptop-run Python recovery scripts from one DAG (§63)',
+      'Immutable EvaluationInput SHA-256 digests binding scans, overrides, and DRSpec approvals (§56.3); 100% deterministic (no EKS, P2c, Flow Logs, or ARC compiler)',
     ],
   },
   {
-    id: 'v0.2',
+    id: 'v0.2 (M3 Expansion)',
+    badge: 'DETERMINISTIC EXPANSION',
+    badgeClass: 'mark--read',
+    title: 'v0.2 — EKS, Expanded Services, Flow Logs, ARC Compiler & Full Optimizer',
+    delivers:
+      'Full multi-service deterministic expansion adding the Amazon EKS readiness pack (P7), P2c services (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB), VPC Flow Logs + time-aware ENI resolution + ambiguous candidate-set review UI (P2b-04/09), interactive structural UI graph editor (P1b-10), full combinatorial Optimizer + AWSPricingProvider, ARC Region switch plan compiler (P11-07), and schema-migration upgrade registry (P0-15b).',
+    highlights: [
+      'EKS readiness pack (§33–§40): control plane, node groups/Karpenter, EBS/EFS CSI add-ons, IRSA/Pod Identity, PVCs, and §89 EKS demo',
+      'Expanded P2c collectors, rule packs, RPO estimators, and companion templates (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB)',
+      'VPC Flow Logs + time-aware ENI resolution, ambiguous candidate-set review UI (§14.1), and interactive structural graph editor (P1b-10)',
+      'Full combinatorial candidate search + live AWSPricingProvider, ARC Region switch plan compiler (P11-07), and P0-15b schema-migration upgrade registry',
+    ],
+  },
+  {
+    id: 'v0.3 (M4 Agents)',
     badge: 'OPT-IN LLM AGENTS',
     badgeClass: 'mark--read',
-    title: 'v0.2 — LangGraph Advisor, Candidate Planner & Sandboxed In-Place IaC Edits',
+    title: 'v0.3 — LangGraph Advisor, Candidate Planner & Sandboxed In-Place IaC Edits',
     delivers:
       'Opt-in LangGraph workflows for advisory review and candidate DR planning, plus in-place edits to your existing Terraform modules, plain Kubernetes manifests, Kustomize overlays, and Helm values inside an OS/container-isolated worktree runner.',
     highlights: [
@@ -60,10 +74,10 @@ const milestones = [
     ],
   },
   {
-    id: 'v0.3',
+    id: 'v0.4 (M5 Proven)',
     badge: 'OPERATIONAL PROOF',
     badgeClass: 'mark--read',
-    title: 'v0.3 — Proven Readiness from Game Days, ARC Execution Reports & Drift',
+    title: 'v0.4 — Proven Readiness from Game Days, ARC Execution Reports & Drift',
     delivers:
       'Ingestion of game-day drill evidence (DRDrill, §53) and Route 53 ARC execution reports to compare predicted vs. proven RTO/RPO, plus continuous architectural drift detection across rescans (§77).',
     highlights: [
@@ -72,14 +86,14 @@ const milestones = [
     ],
   },
   {
-    id: 'v1.0',
+    id: 'v1.0 (M6 Production)',
     badge: 'GA TARGET',
     badgeClass: 'mark--read',
     title: 'v1.0 — Packaged, Upgradeable, Audited Release',
     delivers:
       'Single-command uv tool installation, schema migration guarantees, comprehensive real-AWS contract test verification, and published AWS service readiness matrix.',
     highlights: [
-      'Full 4-tier test verification (unit fixtures, moto, Floci emulator, opt-in real-AWS contract suite)',
+      'Full verification pyramid: unit fixtures, botocore Stubber / moto, aws/aws-emulator integration, and opt-in real-AWS contract suite',
       'Audited sandbox isolation, versioned duration/pricing catalogs, and production documentation',
     ],
   },
@@ -88,7 +102,7 @@ const milestones = [
 
 <BaseLayout
   title="Roadmap & Milestones (M0 PoC to v1.0) — Perpetual"
-  description="Engine-first development roadmap for Perpetual: M0 PoC, M1 Alpha, v0.1 deterministic engine, v0.2 LangGraph agents, v0.3 operational proof, and v1.0 release."
+  description="Engine-first, CLI-first development roadmap for Perpetual: M0 PoC, M1 Alpha (CLI ECS+RDS), v0.1 MVP, v0.2 Expansion (EKS, P2c, Flow Logs, ARC compiler), v0.3 Agents, v0.4 Proven, and v1.0 release."
 >
   <main id="main-content" class="page-container">
     <div class="wrap">

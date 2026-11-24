@@ -29,12 +29,14 @@ The key idea is that related evidence counts once. The [evidence page](packages/
 
 ## Review before completing a task
 
+Code readability checks apply to every task; wiki updates (`docs/code/` package pages, flows, index, and architecture) apply at **phase boundaries during active M0/M1 iteration** (end of `P0`, `P1`, `P1c`, `P2`, etc.) and **in the same change from M2 onward** (`AGENTS.md`):
+
 - Can a reader identify the inputs, result, decisions, and possible errors without decoding a dense expression or following unnecessary indirection?
 - Are new domain terms and unfamiliar Python/library features explained with a small example?
-- Does the affected package page explain the implementation, its rules, and its tests?
-- Does a new or changed cross-package flow show its entry point, concrete input, function calls, result, and failure path? For library-only paths, label the example as manual composition.
-- Are new pages linked from the wiki index, and are architecture and status descriptions current?
-- Were relevant existing explanations corrected as well as new material added?
+- *(At M0/M1 phase boundaries, or per task from M2 onward)* Does the affected package page explain the implementation, its rules, and its tests?
+- *(At M0/M1 phase boundaries, or per task from M2 onward)* Does a new or changed cross-package flow show its entry point, concrete input, function calls, result, and failure path? For library-only paths, label the example as manual composition.
+- *(At M0/M1 phase boundaries, or per task from M2 onward)* Are new pages linked from the wiki index, and are architecture and status descriptions current?
+- *(At M0/M1 phase boundaries, or per task from M2 onward)* Were relevant existing explanations corrected as well as new material added?
 - Have appropriate lint, type, and behavior checks passed, with limitations recorded?
 
 This is a human review requirement. Lint and typing help, but cannot prove that code is understandable. Apply it to new and changed code, and improve surrounding explanations as needed. The [2026-11-07 audit](readability-audit.md) records the review and refactors of the implemented foundation. It does not certify every line as universally understandable; broader refactors should remain scoped and verified.

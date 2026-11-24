@@ -70,7 +70,7 @@ class RegionSwitchPlanProperties(TypedProperties):
     """Needed for ARC to measure actual recovery time."""
     has_triggers: bool = False
     report_s3_uri: str | None = None
-    """Where execution reports go (drill evidence, imported from v0.3)."""
+    """Where execution reports go (drill evidence, imported from v0.4)."""
     evaluation_status: (
         Literal["passed", "actionRequired", "pendingEvaluation", "unknown"] | None
     ) = None

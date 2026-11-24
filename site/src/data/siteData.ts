@@ -67,9 +67,9 @@ export const DOC_ARTICLES: DocArticle[] = [
             <li><strong>Plans drift:</strong> New services, queues, and configuration changes quietly invalidate yesterday's DR plan.</li>
             <li><strong>Dependencies get missed:</strong> A database replica is little help if the container image in ECR, secret in Secrets Manager, or customer-managed KMS key is unavailable in the DR Region.</li>
             <li><strong>Permissions &amp; capacity block recovery:</strong> IAM policies may still reference the primary Region ARN, or DR service quotas may be too low to run production scale.</li>
-            <li><strong>Kubernetes readiness is incomplete:</strong> A StatefulSet may need an EBS StorageClass while the DR EKS cluster lacks the EBS CSI driver or IRSA bindings.</li>
+            <li><strong>Kubernetes readiness is incomplete (v0.2 EKS):</strong> A StatefulSet may need an EBS StorageClass while the DR EKS cluster lacks the EBS CSI driver or IRSA bindings.</li>
             <li><strong>Recovery estimates omit work:</strong> Detection, failover decisions, manual handoffs, and final validation all add time; other steps can run in parallel along the recovery DAG.</li>
-            <li><strong>Fixes span repositories &amp; resources:</strong> Closing a gap requires coordinated changes across Terraform modules and Kubernetes deployment manifests.</li>
+            <li><strong>Fixes span repositories &amp; resources:</strong> Closing a gap can require coordinated changes across Terraform modules (and Kubernetes deployment manifests in v0.2+).</li>
           </ul>
         `,
       },
@@ -79,7 +79,7 @@ export const DOC_ARTICLES: DocArticle[] = [
           <p>Every stack evaluation in Perpetual is scored against three explicit targets (<code>RecoveryRequirement</code>, <code>spec §26</code>):</p>
           <ul>
             <li><strong>Recovery Time Objective (RTO):</strong> How long the product can be unavailable, computed from the critical path of the stack-level recovery DAG plus explicit plan buffer (<code>spec §49.2, §50</code>).</li>
-            <li><strong>Recovery Point Objective (RPO):</strong> How much recent data the product can afford to lose across all in-scope data stores and stateful SQS queues (<code>spec §51</code>).</li>
+            <li><strong>Recovery Point Objective (RPO):</strong> How much recent data the product can afford to lose across in-scope data stores—RDS/Aurora and S3 in v0.1, plus DynamoDB/EFS/EBS/stateful SQS in v0.2 (<code>spec §51</code>).</li>
             <li><strong>Budget:</strong> Maximum steady-state monthly DR ownership cost; budget <code>PASS</code> requires the high bound of the cost estimate to stay within budget (<code>spec §59.1</code>).</li>
           </ul>
         `,
@@ -108,13 +108,13 @@ export const DOC_ARTICLES: DocArticle[] = [
     title: 'Installation, Local Web UI & CLI Workflow',
     specRef: 'spec §71–§79',
     description:
-      'How to set up Perpetual from source today, and the planned local workbench launch the local single-process FastAPI + React Flow workbench, and run the end-to-end CLI workflow from scan to verified pull request.',
+      'How to set up Perpetual from source today, launch the planned single-process FastAPI + React Flow workbench, and run the end-to-end CLI workflow from scan to verified pull request.',
     keywords: ['install', 'quickstart', 'uv', 'cli', 'ui', 'localhost', 'workflow'],
     sections: [
       {
         heading: 'Local Single-Process Deployment (spec §71.1)',
         bodyHtml: `
-          <p>Perpetual runs 100% locally on your workstation as a single Python 3.13 process serving both the FastAPI REST engine and the static React + React Flow web UI, backed by a local SQLite database.</p>
+          <p>Perpetual runs 100% locally on your workstation as a single Python 3.13 process serving both the FastAPI REST engine and the static React + React Flow web UI, backed by a local SQLite database. The CLI-first real-AWS slice (<code>M1 Alpha</code>) validates <code>scan -&gt; simulate -&gt; plan</code> for ECS + RDS before the FastAPI + read-only React Flow UI lands in <code>v0.1 (M2 MVP)</code>.</p>
           <blockquote><p><strong>Pre-alpha status:</strong> Milestone M0 PoC is in active development. Perpetual is not published on PyPI yet (planned for v1.0), and the <code>perpetual</code> CLI commands on this site are planned, not available. Today you can clone the repository and run the checks.</p></blockquote>
           <pre><code class="language-bash"># Set up from source (all tooling is pinned in mise.toml)
 git clone https://github.com/darshan-raul/perpetual
@@ -122,15 +122,15 @@ cd perpetual
 mise install
 mise run check   # lint + typecheck + tests
 
-# Planned: launch the local web console &amp; graph workbench on http://127.0.0.1:8000
+# Planned (v0.1 / M2): launch the local web console &amp; read-only graph viewer on http://127.0.0.1:8000
 uv run perpetual ui</code></pre>
         `,
       },
       {
         heading: 'End-to-End CLI Workflow (spec §79)',
         bodyHtml: `
-          <p><strong>Planned workflow.</strong> None of these commands exist yet; the first one to ship is the M0 demo, <code>perpetual poc fix --fixture ecs-broken</code>. Perpetual will use your existing read-only AWS credentials and local Terraform / Kubernetes repositories:</p>
-          <pre><code class="language-bash"># 1. Scan live AWS account + CloudTrail / Flow Logs across primary &amp; DR Regions
+          <p><strong>Planned workflow.</strong> None of these commands exist yet; the first one to ship is the M0 demo, <code>perpetual poc fix --fixture ecs-broken</code>. In <code>v0.1</code>, Perpetual scans your read-only AWS credentials, CloudTrail, and Terraform saved plans for ECS + RDS stacks (with VPC Flow Logs and <code>--k8s</code> EKS support arriving in <code>v0.2</code>):</p>
+          <pre><code class="language-bash"># 1. Scan live AWS account + CloudTrail across primary &amp; DR Regions (Flow Logs &amp; --k8s in v0.2)
 perpetual scan --profile production --region ap-south-1 --dr-region ap-south-2
 
 # 2. Inspect the evidence-backed dependency graph and unreviewed low-confidence edges
@@ -139,14 +139,14 @@ perpetual graph --stack checkout --unreviewed
 # 3. Simulate losing the primary Region and trace failure chains
 perpetual simulate checkout --failure region:ap-south-1
 
-# 4. Compare DR designs against RTO, RPO, and monthly budget constraints
+# 4. Compare DR presets (v0.1) or full Pareto designs (v0.2) against RTO, RPO, and budget
 perpetual optimize checkout --rto 30m --rpo 5m --budget 1200
 
 # 5. Approve the chosen digest-bound DR Spec
 perpetual dr-spec checkout --approve
 
-# 6. Transform Terraform &amp; K8s manifests in an isolated git worktree, verify, and open a PR
-perpetual transform checkout --terraform ./infra/prod --k8s ./deploy/prod --open-pr</code></pre>
+# 6. Deliver companion Terraform + suggested edits (v0.1) or in-place PRs (v0.3)
+perpetual transform checkout --terraform ./infra/prod --open-pr   # add --k8s in v0.2+</code></pre>
         `,
       },
       {
@@ -181,7 +181,7 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
     title: 'Evidence-Backed Discovery & Dependency Graph',
     specRef: 'spec §9–§26',
     description:
-      'How Perpetual ingests AWS APIs, Terraform saved plans, Kubernetes manifests, CloudTrail, and VPC Flow Logs into a normalized NetworkX graph with Permitted, Referenced, and Observed evidence.',
+      'How Perpetual ingests AWS APIs, Terraform saved plans, CloudTrail (v0.1), plus Kubernetes manifests and VPC Flow Logs (v0.2) into a normalized NetworkX graph with Permitted, Referenced, and Observed evidence.',
     keywords: ['discovery', 'graph', 'evidence', 'permitted', 'referenced', 'observed', 'cloudtrail', 'flow logs', 'override'],
     sections: [
       {
@@ -189,11 +189,11 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
         bodyHtml: `
           <p>Perpetual never guesses dependencies. Every directed edge (<code>dependent -&gt; dependency</code>) in the NetworkX graph snapshot carries structured evidence items from three distinct tiers:</p>
           <ul>
-            <li><strong>Permitted:</strong> Security groups, Kubernetes NetworkPolicies, and IAM policies establish that a network or API connection is <em>allowed</em>.</li>
-            <li><strong>Referenced:</strong> Terraform expressions, ECS task definitions, Lambda environment variables (matched facts only), and K8s ConfigMaps establish that configuration <em>names</em> a dependency.</li>
-            <li><strong>Observed:</strong> CloudTrail events and VPC Flow Logs establish that runtime traffic or API calls <em>actually happen</em>.</li>
+            <li><strong>Permitted:</strong> Security groups and IAM policies (<code>v0.1</code>), plus Kubernetes NetworkPolicies (<code>v0.2</code>), establish that a network or API connection is <em>allowed</em>.</li>
+            <li><strong>Referenced:</strong> Terraform expressions and ECS task definitions (<code>v0.1</code>), plus Lambda environment variables and K8s ConfigMaps (<code>v0.2</code>), establish that configuration <em>names</em> a dependency.</li>
+            <li><strong>Observed:</strong> CloudTrail events (<code>v0.1</code>) and VPC Flow Logs with time-aware ENI resolution (<code>v0.2</code>) establish that runtime traffic or API calls <em>actually happen</em>.</li>
           </ul>
-          <p>Confidence scores combine evidence across independent correlation groups so multiple signals from the same source do not artificially inflate confidence (<code>spec §22</code>). Ambiguous shared-role or shared-ENI observations remain candidate sets without exact-edge confidence uplift (<code>spec §14.1</code>).</p>
+          <p>Confidence scores combine evidence across independent correlation groups so multiple signals from the same source do not artificially inflate confidence (<code>spec §22</code>). Ambiguous shared-role or shared-ENI observations remain candidate sets without exact-edge confidence uplift, with interactive candidate-set review UI landing in <code>v0.2</code> (<code>spec §14.1</code>).</p>
         `,
       },
       {
@@ -207,7 +207,7 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
         heading: 'User Review Gate & GraphOverride Layer (spec §23)',
         bodyHtml: `
           <p>A stack cannot reach <code>READY</code> while any low-confidence edge on a required recovery path remains unreviewed—it displays <code>UNKNOWN</code> with reason <code>graph_not_reviewed</code>. Negative findings (<code>NOT_READY</code>) are never held back.</p>
-          <p>When an engineer confirms, rejects, or adds a dependency in the UI or CLI, Perpetual stores an immutable <code>GraphOverride</code> record applied on top of subsequent scans—never mutating raw discovered data.</p>
+          <p>In <code>v0.1</code>, the React Flow UI provides a read-only viewer and confirm/reject review panel while structural edits (<code>add_edge</code>, <code>edit_edge</code>, <code>add_node</code>) live in YAML overrides (<code>P0-10</code> / CLI); interactive structural UI graph editing arrives in <code>v0.2 (P1b-10)</code>. Every decision stores an immutable <code>GraphOverride</code> record applied on top of subsequent scans—never mutating raw discovered data.</p>
         `,
       },
     ],
@@ -228,10 +228,10 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
         bodyHtml: `
           <p>Rule packs evaluate normalized resources and graph edges to emit both structured <code>Finding</code> records and candidate <code>RecoveryMechanism</code> overlays:</p>
           <ul>
-            <li><strong>Cross-Cutting Rules (<code>§28.1</code>):</strong> Cross-Region hardcodes (<code>XREG-*</code>), AWS control-plane dependencies during outage (<code>CTRL-PLANE-001</code>), DR Region service quotas (<code>QUOTA-DR-001</code>), Regional service parity (<code>REGION-SVC-001</code>), Route 53 ARC readiness (<code>ARC-RS-001</code>), SSM/Secrets parity (<code>SSM-PARITY-001</code>), and operator break-glass access (<code>OPS-ACCESS-*</code>).</li>
-            <li><strong>ECS, EC2 &amp; Serverless Packs (<code>§32</code>):</strong> Task definitions, ECR cross-Region replication, KMS decrypt permissions for DR execution roles, ALB/NLB target groups, and ASG launch templates.</li>
-            <li><strong>EKS Deep Readiness Pack (<code>§33–§40</code>):</strong> Control plane, node groups/Karpenter, core add-ons (CoreDNS, VPC CNI, kube-proxy, EBS/EFS CSI drivers), IRSA &amp; Pod Identity OIDC parity, container images, and PVC/StorageClass topology.</li>
-            <li><strong>Data Gravity &amp; RDS/Aurora/DynamoDB Packs (<code>§41–§42</code>):</strong> Cross-Region read replicas, Aurora Global Database, DynamoDB Global Tables, PITR/snapshot availability, and KMS key replication.</li>
+            <li><strong>Cross-Cutting Rules (<code>§28.1</code>, v0.1):</strong> Cross-Region hardcodes (<code>XREG-*</code>), AWS control-plane dependencies during outage (<code>CTRL-PLANE-001</code>), DR Region service quotas (<code>QUOTA-DR-001</code>), Regional service parity (<code>REGION-SVC-001</code>), Route 53 ARC readiness (<code>ARC-RS-001</code>), SSM/Secrets parity (<code>SSM-PARITY-001</code>), and operator break-glass access (<code>OPS-ACCESS-*</code>).</li>
+            <li><strong>ECS, S3, Network &amp; Supporting Packs (<code>§32</code>, v0.1):</strong> ECS task definitions, ECR cross-Region replication, KMS decrypt permissions for DR execution roles, ALB/NLB target groups, Route 53, ACM, S3 CRR, and VPC topology.</li>
+            <li><strong>Data Gravity &amp; RDS/Aurora Pack (<code>§41–§42</code>, v0.1):</strong> Cross-Region RDS read replicas, Aurora Global Database secondary clusters, PITR/snapshot availability, and KMS key replication.</li>
+            <li><strong>Expanded Services &amp; EKS Deep Pack (<code>§33–§40</code>, v0.2):</strong> EC2/ASG launch templates, Lambda, SQS/SNS, CloudFront/WAF, EBS/EFS, DynamoDB Global Tables, plus EKS control plane, node groups/Karpenter, core add-ons (CoreDNS, VPC CNI, EBS/EFS CSI drivers), IRSA/Pod Identity OIDC parity, and PVC/StorageClass topology.</li>
           </ul>
         `,
       },
@@ -271,17 +271,17 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
           <p>DR results exist only per stack: one recovery plan, one RTO, and one RPO per stack and failure scenario. Perpetual builds the recovery DAG using a <strong>Phase Template + Refinement</strong> algorithm (<code>spec §47.1</code>):</p>
           <ol>
             <li><strong>Detection &amp; Decision:</strong> Outage verification, failover declaration, and operator authentication.</li>
-            <li><strong>Prerequisites &amp; Data Promotion:</strong> KMS/IAM activation, RDS/Aurora replica promotion or snapshot restore, DynamoDB table readiness.</li>
-            <li><strong>Compute &amp; Service Bring-Up:</strong> ECS task scaling, EKS workload rollouts, Lambda concurrency provisioning.</li>
-            <li><strong>Traffic Cutover &amp; Validation:</strong> Route 53 DNS / ARC Region switch and synthetic health validation.</li>
+            <li><strong>Prerequisites &amp; Data Promotion:</strong> KMS/IAM activation, RDS/Aurora replica promotion or snapshot restore (plus DynamoDB/EFS in <code>v0.2</code>).</li>
+            <li><strong>Compute &amp; Service Bring-Up:</strong> ECS task scaling (<code>v0.1</code>), plus EC2/ASG, EKS workload rollouts, and Lambda concurrency provisioning (<code>v0.2</code>).</li>
+            <li><strong>Traffic Cutover &amp; Validation:</strong> Route 53 DNS cutover / ARC Region switch (compiled ARC plans in <code>v0.2</code>) and synthetic health validation.</li>
           </ol>
           <p>Every action duration comes from the versioned YAML catalog (<code>apps/api/perpetual/config/defaults/</code>). An action with no catalog entry makes the RTO <code>UNKNOWN</code>, never zero (<code>spec §49.1</code>). Critical-path traversal plus explicit plan buffer yields the low/high RTO range (<code>spec §49.2, §50</code>).</p>
         `,
       },
       {
-        heading: 'Pareto Optimizer & Steady-State Costing (spec §54–§60)',
+        heading: 'Preset Optimizer (v0.1) & Pareto Search (v0.2) (spec §54–§60)',
         bodyHtml: `
-          <p>When a stack misses its targets, the optimizer searches combinations of recovery options—from <em>Backup &amp; Restore</em> and <em>Pilot Light</em> to <em>Warm Standby</em> and <em>Hot Standby</em>—and scores every candidate with the deterministic engine.</p>
+          <p>In <code>v0.1</code>, the optimizer evaluates 3–4 discrete stack presets—<em>Backup &amp; Restore</em>, <em>Pilot Light</em>, and <em>Warm Standby</em>—through the deterministic simulator using <code>StaticCostProvider</code>. Full combinatorial candidate search across all service variants and live AWS pricing (<code>AWSPricingProvider</code>) arrive in <code>v0.2</code>.</p>
           <p>Steady-state DR cost (<code>spec §58–§59.1</code>) includes standby compute, replica instances, storage duplication, cross-Region data transfer, and KMS/Secrets overhead. A candidate passes the budget constraint only if its <strong>high bound</strong> is within budget.</p>
         `,
       },
@@ -301,17 +301,17 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
     title: 'Isolated IaC Transformation, 4-Stage Verification & Runbooks',
     specRef: 'spec §61–§64',
     description:
-      'How Perpetual compiles approved DR Specs into Terraform and Kubernetes PRs inside a sandboxed worktree, verifies planned snapshots across 4 stages, and generates digest-matched runbooks and scripts.',
+      'How Perpetual delivers companion Terraform and suggested edits in v0.1 (and agentic Terraform/Kubernetes PRs in v0.3), verifies planned snapshots across 4 stages, and generates digest-matched runbooks and scripts.',
     keywords: ['terraform', 'kubernetes', 'iac', 'worktree', 'verification', 'runbook', 'arc', 'recovery scripts', 'pr'],
     sections: [
       {
         heading: 'Sandboxed Git Worktree Transformation (spec §61–§62)',
         bodyHtml: `
-          <p>Code changes happen exclusively in an isolated git worktree on a <code>perpetual/dr/&lt;stack&gt;/&lt;date&gt;</code> branch. Before any repository tool runs, mandatory OS/container isolation enforces:</p>
+          <p>Code changes happen on a dedicated <code>perpetual/dr/&lt;stack&gt;/&lt;date&gt;</code> branch. In <code>v0.1</code>, Perpetual never executes repository tools (<code>terraform plan</code>, etc.) itself—it generates companion Terraform modules and suggested edits verified against your supplied saved plan. In <code>v0.3 (M4 Agents)</code>, when repository tools run inside an isolated git worktree, mandatory OS/container isolation enforces:</p>
           <ul>
-            <li><strong>Strict command allowlist:</strong> Only read/validate/plan tools (<code>terraform init -backend=false</code>, <code>terraform fmt</code>, <code>terraform validate</code>, <code>kubectl kustomize</code>, <code>helm template</code>) are permitted.</li>
+            <li><strong>Strict command allowlist:</strong> Only read/validate/plan tools (<code>terraform init -backend=false</code>, <code>terraform fmt</code>, <code>terraform validate</code>, <code>kubectl kustomize</code>, <code>helm template</code>) are permitted inside the runner.</li>
             <li><strong>Destructive commands unreachable:</strong> <code>terraform apply|destroy|import|state</code> and <code>kubectl apply|delete</code> are blocked by policy and sandbox boundaries.</li>
-            <li><strong>Companion Terraform (v0.1) &amp; In-Place Edits (v0.2):</strong> v0.1 generates deterministic companion Terraform modules and suggested edits; v0.2 adds LangGraph-driven in-place edits across Terraform, Kustomize, and Helm.</li>
+            <li><strong>Companion Terraform (v0.1) &amp; In-Place Edits (v0.3):</strong> <code>v0.1</code> generates deterministic companion Terraform modules and suggested edits by address for ECS + RDS; <code>v0.2</code> expands template coverage to <code>P2c</code> and EKS; <code>v0.3</code> adds LangGraph-driven in-place edits across Terraform, Kustomize, and Helm.</li>
           </ul>
         `,
       },
@@ -319,21 +319,21 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
         heading: '4-Stage Verification Pipeline (spec §61.1)',
         bodyHtml: `
           <ol>
-            <li><strong>Stage 1 — Static Validation:</strong> Formatting, syntax, schema, and <code>terraform validate</code> / manifest rendering checks.</li>
-            <li><strong>Stage 2 — Planned Snapshot Import:</strong> Imports saved-plan <code>terraform show -json</code> and rendered manifests into a planned resource snapshot, stripping obsolete live operational proof on modified/replaced resources (<code>spec §15.4</code>).</li>
+            <li><strong>Stage 1 — Static Validation:</strong> Formatting, syntax, and schema checks (<code>terraform fmt</code> / <code>validate</code>; plus manifest rendering in <code>v0.2+</code>).</li>
+            <li><strong>Stage 2 — Planned Snapshot Import:</strong> Imports supplied saved-plan <code>terraform show -json</code> (and rendered Kubernetes manifests in <code>v0.2+</code>) into a planned resource snapshot, stripping obsolete live operational proof on modified/replaced resources (<code>spec §15.4</code>).</li>
             <li><strong>Stage 3 — Modeled Design Verification:</strong> Re-runs all DR rule packs and the two-pass simulator on the planned graph to verify that RTO, RPO, and budget targets are met.</li>
             <li><strong>Stage 4 — Deployment Prerequisites vs. Observed Readiness:</strong> Explicitly lists post-merge prerequisites (e.g., initial snapshot copy completion, secret population). Design verification never claims live observed <code>READY</code>; only a fresh scan after deployment establishes <code>READY</code>.</li>
           </ol>
         `,
       },
       {
-        heading: 'One Recovery DAG -> Three Synchronized Artifacts (spec §63–§64)',
+        heading: 'One Recovery DAG -> Synchronized Artifacts (spec §63–§64)',
         bodyHtml: `
-          <p>From the single approved recovery DAG—sharing the exact same digest and step numbers—Perpetual compiles three artifacts and never executes them:</p>
+          <p>From the single approved recovery DAG—sharing the exact same digest and step numbers—Perpetual compiles synchronized artifacts and never executes them:</p>
           <ul>
-            <li><strong>Explanatory Markdown Runbook:</strong> Human-readable operator guide with preconditions, verification commands, and failback notes.</li>
-            <li><strong>Laptop-Run Recovery Scripts:</strong> Idempotent, dry-runnable CLI scripts (default execution method) with step-by-step confirmation gates.</li>
-            <li><strong>Optional ARC Region Switch Plan:</strong> Compiled AWS Application Recovery Controller Region switch configuration when selected in the DR Spec.</li>
+            <li><strong>Explanatory Markdown Runbook (v0.1):</strong> Human-readable operator guide with preconditions, verification commands, and failback notes.</li>
+            <li><strong>Prerequisite &amp; Laptop-Run Python Recovery Scripts (v0.1):</strong> Idempotent, dry-runnable <code>uv run</code> scripts (the v0.1 execution method) with step-by-step confirmation gates.</li>
+            <li><strong>Optional ARC Region Switch Plan (v0.2):</strong> Compiled AWS Application Recovery Controller Region switch configuration (<code>P11-07</code>) when selected in the DR Spec.</li>
           </ul>
         `,
       },
@@ -356,14 +356,14 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
           <ul>
             <li><strong>Never reads secret values:</strong> Perpetual inspects metadata and ARNs only. It never calls <code>secretsmanager:GetSecretValue</code> or reads decrypted SSM SecureStrings.</li>
             <li><strong>No invasive AWS mutations:</strong> Never enables CloudTrail trails, data events, or VPC Flow Logs on your behalf.</li>
-            <li><strong>Matched facts &amp; aggregates only:</strong> From environment variables and ConfigMaps, Perpetual persists only matched resource references—never raw secret or config strings. From CloudTrail and Flow Logs, it persists only aggregated dependency counters.</li>
+            <li><strong>Matched facts &amp; aggregates only:</strong> From environment variables (and ConfigMaps in <code>v0.2</code>), Perpetual persists only matched resource references—never raw secret or config strings. From CloudTrail (<code>v0.1</code>) and Flow Logs (<code>v0.2</code>), it persists only aggregated dependency counters.</li>
           </ul>
         `,
       },
       {
         heading: 'LLM Proposes, Engine Verifies (spec §2, §69)',
         bodyHtml: `
-          <p>LLM features (arriving in v0.2, opt-in per project) attach at three strictly bounded points via LangGraph workflows:</p>
+          <p>LLM features (arriving in <code>v0.3 / M4 Agents</code>, opt-in per project; <code>v0.1</code> and <code>v0.2</code> are 100% deterministic) attach at three strictly bounded points via LangGraph workflows:</p>
           <ol>
             <li><strong>Advisory Reviewer (<code>§28.2</code>):</strong> Flags subtle risks rule packs might miss (e.g., primary-Region endpoints in config). Can hold a stack from <code>READY</code> (<code>advisory_unresolved</code>), but can never upgrade a state.</li>
             <li><strong>Candidate Planner (<code>§56.1</code>):</strong> Proposes multi-resource DR designs inside the optimizer loop using AWS guidance and your runbooks; every proposal is scored by the deterministic engine.</li>
@@ -395,11 +395,11 @@ Deployment        Pending; fresh scan required for observed READY</code></pre>
       {
         heading: 'Planned CLI Commands Reference (spec §79)',
         bodyHtml: `
-          <p><strong>Not available yet.</strong> These commands follow the suggested CLI in spec §79 and will land over milestones M0 to v0.2. The first to ship is the M0 demo, <code>perpetual poc fix --fixture ecs-broken</code>.</p>
-          <pre><code class="language-bash"># Launch local FastAPI + React Flow UI workbench
+          <p><strong>Not available yet.</strong> These commands follow the suggested CLI in spec §79 and land across M0–M4 (with the CLI-first ECS+RDS vertical slice in <code>M1 Alpha</code>, read-only UI + presets + scripts in <code>v0.1</code>, EKS/Flow Logs/ARC compiler in <code>v0.2</code>, and agentic in-place edits in <code>v0.3</code>). The first demo command is <code>perpetual poc fix --fixture ecs-broken</code>.</p>
+          <pre><code class="language-bash"># Launch local FastAPI + read-only React Flow UI workbench (v0.1 / M2; interactive edit UI in v0.2)
 perpetual ui [--host 127.0.0.1] [--port 8000]
 
-# Discover AWS resources, Terraform plans/state, K8s manifests, and log evidence
+# Discover AWS resources, Terraform plans/state, and CloudTrail (--k8s &amp; Flow Logs in v0.2)
 perpetual scan --profile &lt;aws-profile&gt; --region &lt;primary&gt; --dr-region &lt;dr&gt; [--terraform &lt;dir&gt;] [--k8s &lt;dir&gt;]
 
 # Inspect dependency graph and review low-confidence edges
@@ -408,14 +408,14 @@ perpetual graph --stack &lt;name&gt; [--unreviewed] [--fixture &lt;fixture-name&
 # Run deterministic two-pass failure simulation and critical-path RTO/RPO
 perpetual simulate &lt;stack&gt; --failure region:&lt;region&gt; [--fixture &lt;fixture-name&gt;]
 
-# Search Pareto-optimal DR architectures within RTO, RPO, and monthly budget
+# Compare DR presets (v0.1) or full Pareto designs (v0.2) within RTO, RPO, and monthly budget
 perpetual optimize &lt;stack&gt; --rto 30m --rpo 5m --budget 1200
 
 # Inspect or approve a digest-bound DR Spec
 perpetual dr-spec &lt;stack&gt; [--approve]
 
-# Generate verified Terraform/K8s changes, runbook, and recovery scripts in a git worktree
-perpetual transform &lt;stack&gt; --terraform ./infra/prod --k8s ./deploy/prod [--open-pr]</code></pre>
+# Generate companion Terraform + suggested edits + scripts (v0.1) or in-place PRs (v0.3)
+perpetual transform &lt;stack&gt; --terraform ./infra/prod [--k8s ./deploy/prod] [--open-pr]</code></pre>
         `,
       },
       {
@@ -457,16 +457,16 @@ export const SEARCH_INDEX: SearchEntry[] = [
     badge: 'Spec',
     category: 'architecture · pipeline & invariants',
     description:
-      'End-to-end architecture pipeline from AWS/Terraform/Kubernetes evidence collectors to two-pass simulation, recovery DAG, optimizer, and 4-stage verified IaC PR delivery.',
+      'End-to-end architecture pipeline from AWS/Terraform/CloudTrail collectors (plus EKS/Flow Logs in v0.2) to two-pass simulation, recovery DAG, optimizer, and 4-stage verified IaC delivery.',
     keywords: 'architecture pipeline diagram svg invariants import-linter layers spec index',
   },
   {
     title: 'AWS Service Scope & checkout Stack Benchmark',
     url: '/scope',
     badge: 'Spec',
-    category: 'scope · 25+ aws services & rules',
+    category: 'scope · v0.1 ecs+rds & v0.2+ expansion',
     description:
-      'Complete matrix of in-scope AWS services (ECS, EKS, EC2, Lambda, RDS, Aurora, DynamoDB, S3, KMS, IAM, Route 53, ARC) and illustrative checkout stack DR evaluation.',
+      'v0.1 ECS + RDS end-to-end scope (ECS, RDS, S3, ECR, Secrets/SSM, KMS, IAM, ALB, Route 53, VPC), v0.2 expansion matrix (EC2, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB, EKS), and checkout stack DR evaluation.',
     keywords: 'scope aws services ecs eks rds aurora dynamodb kms iam route53 arc benchmark checkout',
   },
   {
@@ -475,7 +475,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
     badge: 'Roadmap',
     category: 'roadmap · pre-alpha to v1.0',
     description:
-      'Engine-first development roadmap: M0 PoC, M1 Alpha, v0.1 deterministic engine, v0.2 LangGraph advisor & planner, v0.3 game days & drift, and v1.0 release.',
-    keywords: 'roadmap changelog milestones m0 m1 v0.1 v0.2 v0.3 v1.0 status pre-alpha',
+      'Engine-first, CLI-first roadmap: M0 PoC, M1 Alpha (CLI ECS+RDS), v0.1 deterministic MVP, v0.2 expansion (EKS, P2c, Flow Logs, ARC compiler), v0.3 LangGraph agents, v0.4 game days & drift, and v1.0 release.',
+    keywords: 'roadmap changelog milestones m0 m1 v0.1 v0.2 v0.3 v0.4 v1.0 status pre-alpha',
   },
 ];

@@ -7,9 +7,9 @@
 
 Perpetual implements an approved DR spec by changing the user's own infrastructure code. It does not write a separate DR codebase unless there is no code to change (section 62.1).
 
-This section ships in v0.2 (decision 2026-10-27). v0.1 delivers companion Terraform and suggested edits (62.1) and never runs repository tools.
+This section (agentic in-place IaC transformation) ships in v0.3 (`M4 Agents`; shifted from `v0.2` when deterministic `M3 Expansion` was inserted on 2026-11-24; original LLM decision 2026-10-27). `v0.1` delivers ECS + RDS companion Terraform and suggested edits (62.1) and never runs repository tools; `v0.2` (`M3 Expansion`) extends companion Terraform and suggested-edit coverage to EKS (`P7`) and `P2c` services.
 
-In scope for v0.2:
+In scope for v0.3 (`M4 Agents`):
 
 ```text
 Terraform       .tf and .tfvars files in the declared root modules and local modules
@@ -90,7 +90,7 @@ When backend credentials or an enforceable runner are unavailable, or a supplied
 
 In v0.1 Perpetual runs only `terraform fmt`, `init -backend=false` and `validate` on the companion code it generated, with pinned, checksum-verified providers. It never runs `plan` or any tool against the user's existing code. Full design verification uses a saved plan that the user produces in their own environment (`terraform show -json <saved_plan>` for the root that includes the companion module) and supplies with matching provenance (56.3). Without one, the result is "static checks only" and design verification is UNKNOWN.
 
-The supplied plan must come from the root with the companion module added and the suggested edits applied. For EKS stacks the user also supplies the rendered Kubernetes objects (`kustomize build` or `helm template` output) after applying suggested manifest edits, because v0.1 does not render them. A DR spec change that is absent from the supplied plan or manifests stays unverified, and the report names it.
+The supplied plan must come from the root with the companion module added and the suggested edits applied (for the `v0.1` ECS + RDS slice). In `M3 Expansion / v0.2`, when EKS (`P7`) ships, the user also supplies the rendered Kubernetes objects (`kustomize build` or `helm template` output) after applying suggested manifest edits, because deterministic delivery does not render them. A DR spec change that is absent from the supplied plan or manifests stays unverified, and the report names it.
 
 Failures go back to the agent as sanitized structured feedback (which check failed, on which resource, with the finding or simulation path). If retries run out, a reviewable branch may still be produced but is marked **unverified**, with failed/unknown checks and prerequisites listed. Security or approval invalidation stops execution; it must not be retried with weaker controls. Only design-pass artifacts carry a design-verified label; delivery retains the exact tree/report digest from 56.3.
 
@@ -112,13 +112,13 @@ Terraform owns steady-state DR configuration: replication rules (ECR, S3, Secret
 
 # 62.1 Companion Fallback
 
-In v0.1 companion Terraform is the delivery path. From v0.2 it is the fallback when no IaC repository is declared or LLM features are disabled. Perpetual generates deterministic companion DR Terraform from templates:
+In `v0.1` (ECS + RDS slice) and `v0.2` (`M3 Expansion`: adding `P2c` templates and `P7` EKS suggested edits), companion Terraform + suggested edits are the deterministic delivery path. From `v0.3` (`M4 Agents`) it is the fallback when no IaC repository is declared or LLM features are disabled. Perpetual generates deterministic companion DR Terraform from templates:
 
 ```text
 generated/
   dr/
-    versions.tf  providers.tf  network.tf  rds.tf  ecs.tf  ec2.tf  lambda.tf
-    sqs_sns.tf   ecr.tf        secrets.tf  waf.tf  logs.tf route53.tf  outputs.tf
+    versions.tf  providers.tf  network.tf  rds.tf  ecs.tf  ecr.tf  secrets.tf  route53.tf  logs.tf  outputs.tf
+    # post-v0.1 (M3 Expansion / P2c): ec2.tf  lambda.tf  sqs_sns.tf  waf.tf
 ```
 
 Generated configuration:
@@ -130,7 +130,7 @@ Generated configuration:
 - references existing values through variables;
 - lists its assumptions.
 
-Companion code creates new resources only. A change to a resource the user's IaC already manages, such as enabling versioning on an existing bucket or a registry-wide ECR replication configuration, is delivered as a suggested edit: the Terraform address from the imported state or plan, or the Kubernetes object identity (kind, namespace, name), with the change and a snippet, for the user to apply in their own code. Perpetual never generates a second owner for a managed resource.
+Companion code creates new resources only. A change to a resource the user's IaC already manages, such as enabling versioning on an existing bucket or a registry-wide ECR replication configuration, is delivered as a suggested edit: the Terraform address from the imported state or plan (in `v0.1` ECS + RDS), or the Kubernetes object identity (kind, namespace, name) once EKS ships in `M3 Expansion / v0.2`, with the change and a snippet, for the user to apply in their own code. Perpetual never generates a second owner for a managed resource.
 
 The same templates are given to the transformation agent as reference patterns through the skills (section 69.4).
 
@@ -141,9 +141,9 @@ The same templates are given to the transformation agent as reference patterns t
 One recovery DAG (47) per stack and scenario compiles into:
 
 ```text
-runbook                 explains the flow; not an execution method
-recovery scripts        default execution method (63.2)
-ARC Region switch plan  optional execution method (63.3)
+runbook                 explains the flow; not an execution method (v0.1)
+recovery scripts        default execution method (63.2; v0.1)
+ARC Region switch plan  optional execution method (63.3; post-v0.1 M3 Expansion / P11-07)
 ```
 
 plus prerequisite scripts and SOPs for deployment (63.1). All are generated from the same DAG, carry the same evaluation digest (56.3) and use the same step numbers. Regenerating one regenerates all of them. Perpetual generates and statically checks these artifacts; it never runs them.
@@ -247,6 +247,8 @@ Perpetual checks the scripts with a linter and a dry run against fixtures. It ne
 ---
 
 # 63.3 ARC Region Switch Plan
+
+> **Scope note:** The ARC Region switch plan compiler (`P11-07`) is **post-v0.1 (`M3 Expansion / v0.2`)**; `v0.1` (`M2 MVP`) uses laptop-run Python recovery scripts (`§63.2`, `P11-06`), prerequisite scripts/SOPs (`§63.1`, `P11-05`), and explanatory runbooks (`§63`, `P11-02/03`). The full compiler specification below is preserved intact.
 
 When the DR spec selects `arc_region_switch`, the DAG compiles into an `aws_arcregionswitch_plan` Terraform resource in the PR: two Regions, active/passive, the stack's target RTO, an application health alarm, a failover workflow (activate DR), a failback workflow, and a post-recovery workflow where needed.
 

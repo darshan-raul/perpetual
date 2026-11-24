@@ -71,7 +71,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <div class="wrap service-marquee-head">
         <div class="smh-left">
           <span class="status-dot"></span>
-          <span class="smh-title">Full-stack evaluation across 25+ AWS services, Terraform &amp; Kubernetes</span>
+          <span class="smh-title">Engine-first AWS DR evaluation: ECS + RDS in v0.1, expanding to 25+ services &amp; EKS in v0.2</span>
         </div>
         <a class="text-link" href="/scope">Explore the AWS scope <span aria-hidden="true">↗</span></a>
       </div>
@@ -207,8 +207,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
                 <span class="node-icon" aria-hidden="true">↗</span>
                 <div class="node-text">
                   <small>DNS Failover Switch</small>
-                  <strong>Route 53 ARC</strong>
-                  <span class="node-detail">Routing control rule → ap-south-2</span>
+                  <strong>Route 53 DNS</strong>
+                  <span class="node-detail">Failover record → ap-south-2</span>
                 </div>
                 <span class="plan-mech-pill chip-cutover">CUTOVER</span>
               </div>
@@ -453,7 +453,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       plan: {
         step: '03 / PLAN RECOVERY',
         title: 'Analysis places 3 concrete recovery mechanisms.',
-        copy: 'Perpetual transforms the 3 outage blockers into concrete Terraform and Kubernetes changes: placing an RDS cross-Region read replica, an ECR replication rule, and a multi-Region KMS key with DR execution role permissions in ap-south-2.',
+        copy: 'Perpetual turns the 3 outage blockers into concrete Terraform changes (companion modules + suggested edits in v0.1, in-place PRs in v0.3): placing an RDS cross-Region read replica, an ECR replication rule, and a multi-Region KMS key with DR execution role permissions in ap-south-2.',
         facts: [
           'Mechanism 01: RDS read replica in ap-south-2 (1–3m RPO, 6–9m promotion)',
           'Mechanism 02: ECR cross-Region replication rule (pre-cached images)',
