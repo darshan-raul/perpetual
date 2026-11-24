@@ -36,22 +36,22 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `config` | Typed config loading + versioned defaults | Evidence weights and groups, review threshold, scoring, RTO-scope defaults, buffer, freshness, limits and cost units, with project overrides (P0-06) | [packages/config.md](packages/config.md) |
 | `ids` | Canonical resource IDs | Live, global, planned (`tf:`) and external IDs: build, parse, validate (P0-05) | [packages/ids.md](packages/ids.md) |
 | `fixtures` | Fixture format, loader, validator | Format v1, ID-derived fields, model and cross-reference checks with paths, lookup by name, JSON Schema, versioned inputs & workload profiles, canonical fixtures (`ecs-broken`, `ecs-remediated`, `cycle`, `shared-node`, `deep-path`) (P0-08, P0-13, P0-15) | [packages/fixtures.md](packages/fixtures.md) |
-| `persistence` | SQLAlchemy models, repositories, migrations | 17 tables (projects, scans, snapshots, coverage, resources and versions, evidence, edges, groups, observations, mechanisms, stacks, overrides, evaluation inputs), `ProjectRepository`, initial migration (P0-07) | [packages/persistence.md](packages/persistence.md) |
+| `persistence` | SQLAlchemy models, repositories, migrations | 20 tables (17 P0 foundation tables + `recovery_requirements`, `simulations`, `recovery_plans` in P1-15), `ProjectRepository`, migrations `0001`–`0002` (P0-07, P1-15) | [packages/persistence.md](packages/persistence.md) |
 | `collectors` | AWS, Kubernetes, CloudTrail, flow-log readers | stub | — |
 | `importers` | Terraform JSON, recorded AWS responses | stub | — |
 | `normalization` | Raw facts to typed resource nodes | stub | — |
 | `evidence` | Edge resolvers, confidence combination | Combination with correlation groups (pluggable, config-driven) and evidence fingerprints (P0-09); explicit grouping and stable-hash regression after readability review; resolvers in P2b | [packages/evidence.md](packages/evidence.md) |
 | `graph` | Graph snapshots, overrides, traversal, manifests | Override replay, rescan merge, orphan/reproposal diagnostics and versioned YAML (P0-10); NetworkX `MultiDiGraph` snapshot, group validation & cycle-safe traversal (P0-11); canonical SHA-256 digests & `SnapshotManifest` (P0-15) | [packages/graph.md](packages/graph.md) |
-| `stacks` | Stack grouping, services, RTO scope | stub | — |
-| `rules` | DR rule packs | stub | — |
-| `simulator` | Failure simulation | stub | — |
-| `recovery` | Recovery DAG, RTO, RPO | stub | — |
+| `stacks` | Stack grouping, services, RTO scope | RTO scope classification from config defaults and per-resource overrides (P1-03) | [packages/stacks.md](packages/stacks.md) |
+| `rules` | DR rule packs | `DRRulePack` protocol, `RulePackRegistry`, `rules/cross/` skeleton (P1-01); 9 first-slice ECS + RDS mechanism resolvers with strict §27.1 reproducibility (P1-02) | [packages/rules.md](packages/rules.md) |
+| `simulator` | Failure simulation | Scenario hierarchy & dispatch, two-pass impact + cycle-safe recovery engine, ordered §31 readiness composition, reason chains (P1-04..P1-08) | [packages/simulator.md](packages/simulator.md) |
+| `recovery` | Recovery DAG, RTO, RPO | Versioned duration catalog v1, first-slice + generic fallback actions, phase-template + refined DAG builder, buffer, critical-path RTO, target comparison, bounded ALL/ANY/quorum path selection (P1-09..P1-14, P1-18) | [packages/recovery.md](packages/recovery.md) |
 | `optimizer` | DR design candidates | stub | — |
 | `costing` | Cost providers | stub | — |
 | `iac` | Companion Terraform, suggested edits, delivery | stub | — |
 | `runbooks` | Runbook, scripts (`v0.1`), ARC plan compiler (`v0.2` M3) | stub | — |
 | `llm`, `knowledge` | LLM agents and knowledge base (`v0.3` M4) | stub | — |
-| `cli` | Typer commands | `perpetual fixtures validate|schema` (P0-08) and `perpetual graph` + `perpetual graph overrides export|apply` (P0-12) | [packages/cli.md](packages/cli.md) |
+| `cli` | Typer commands | `perpetual fixtures validate|schema` (P0-08), `perpetual graph` + `overrides export|apply` (P0-12), `perpetual simulate` & `perpetual plan` (P1-16) | [packages/cli.md](packages/cli.md) |
 | `api` | FastAPI routes | stub | — |
 
 ## Flows

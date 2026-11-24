@@ -32,6 +32,9 @@ EXPECTED_TABLES = {
     "stack_services",
     "graph_overrides",
     "evaluation_inputs",
+    "recovery_requirements",
+    "simulations",
+    "recovery_plans",
 }
 
 

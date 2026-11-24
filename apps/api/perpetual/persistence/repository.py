@@ -24,6 +24,7 @@ from perpetual.models import (
     GraphOverride,
     OverrideStatus,
     RecoveryMechanism,
+    RecoveryRequirement,
     ResolvedObservation,
     ResourceNode,
     ScanCoverage,
@@ -41,10 +42,13 @@ from perpetual.persistence.tables import (
     ObservationRow,
     Project,
     RecoveryMechanismRow,
+    RecoveryPlanRow,
+    RecoveryRequirementRow,
     ResourceRow,
     ResourceVersionRow,
     Scan,
     ScanCoverageRow,
+    SimulationRow,
     Snapshot,
     StackResourceRow,
     StackRow,
@@ -523,6 +527,140 @@ class ProjectRepository:
         if row is None:
             raise PersistenceError(f"no evaluation input {evaluation_id!r}")
         return EvaluationInput.model_validate(row.payload)
+
+    # --- recovery requirements, simulations and plans (P1-15) ----------------------
+
+    def save_requirement(self, requirement: RecoveryRequirement, *, created_at: datetime) -> None:
+        existing = self.session.scalar(
+            select(RecoveryRequirementRow)
+            .where(RecoveryRequirementRow.project_id == self.project_id)
+            .where(RecoveryRequirementRow.requirement_id == requirement.id)
+            .where(RecoveryRequirementRow.revision == requirement.revision)
+        )
+        if existing is not None:
+            raise PersistenceError(
+                f"requirement {requirement.id!r} revision {requirement.revision} already exists"
+            )
+        self.session.add(
+            RecoveryRequirementRow(
+                project_id=self.project_id,
+                requirement_id=requirement.id,
+                revision=requirement.revision,
+                stack_id=requirement.stack_id,
+                failure_scope=requirement.failure_scope.value,
+                target_region=requirement.target_region,
+                created_at=created_at,
+                payload=_dump(requirement),
+            )
+        )
+        self.session.flush()
+
+    def requirement(
+        self, requirement_id: str, *, revision: int | None = None
+    ) -> RecoveryRequirement:
+        query = (
+            select(RecoveryRequirementRow)
+            .where(RecoveryRequirementRow.project_id == self.project_id)
+            .where(RecoveryRequirementRow.requirement_id == requirement_id)
+        )
+        if revision is not None:
+            query = query.where(RecoveryRequirementRow.revision == revision)
+        else:
+            query = query.order_by(RecoveryRequirementRow.revision.desc()).limit(1)
+        row = self.session.scalar(query)
+        if row is None:
+            raise PersistenceError(f"no requirement {requirement_id!r}")
+        return RecoveryRequirement.model_validate(row.payload)
+
+    def save_simulation(
+        self,
+        simulation_id: str,
+        snapshot_id: str,
+        *,
+        stack_id: str,
+        scenario_kind: str,
+        stack_state: str,
+        readiness: str,
+        created_at: datetime,
+        payload: dict[str, Any],
+    ) -> None:
+        self._snapshot(snapshot_id)
+        existing = self.session.scalar(
+            select(SimulationRow)
+            .where(SimulationRow.project_id == self.project_id)
+            .where(SimulationRow.simulation_id == simulation_id)
+        )
+        if existing is not None:
+            raise PersistenceError(f"simulation {simulation_id!r} already exists")
+        self.session.add(
+            SimulationRow(
+                project_id=self.project_id,
+                simulation_id=simulation_id,
+                snapshot_id=snapshot_id,
+                stack_id=stack_id,
+                scenario_kind=scenario_kind,
+                stack_state=stack_state,
+                readiness=readiness,
+                created_at=created_at,
+                payload=payload,
+            )
+        )
+        self.session.flush()
+
+    def simulation(self, simulation_id: str) -> dict[str, Any]:
+        row = self.session.scalar(
+            select(SimulationRow)
+            .where(SimulationRow.project_id == self.project_id)
+            .where(SimulationRow.simulation_id == simulation_id)
+        )
+        if row is None:
+            raise PersistenceError(f"no simulation {simulation_id!r}")
+        return dict(row.payload)
+
+    def save_recovery_plan(
+        self,
+        plan_id: str,
+        snapshot_id: str,
+        *,
+        stack_id: str,
+        requirement_id: str,
+        requirement_revision: int,
+        rto_comparison: str | None,
+        created_at: datetime,
+        payload: dict[str, Any],
+    ) -> None:
+        self._snapshot(snapshot_id)
+        existing = self.session.scalar(
+            select(RecoveryPlanRow)
+            .where(RecoveryPlanRow.project_id == self.project_id)
+            .where(RecoveryPlanRow.plan_id == plan_id)
+        )
+        if existing is not None:
+            raise PersistenceError(f"recovery plan {plan_id!r} already exists")
+        self.session.add(
+            RecoveryPlanRow(
+                project_id=self.project_id,
+                plan_id=plan_id,
+                snapshot_id=snapshot_id,
+                stack_id=stack_id,
+                requirement_id=requirement_id,
+                requirement_revision=requirement_revision,
+                rto_comparison=rto_comparison,
+                created_at=created_at,
+                payload=payload,
+            )
+        )
+        self.session.flush()
+
+    def recovery_plan(self, plan_id: str) -> dict[str, Any]:
+        row = self.session.scalar(
+            select(RecoveryPlanRow)
+            .where(RecoveryPlanRow.project_id == self.project_id)
+            .where(RecoveryPlanRow.plan_id == plan_id)
+        )
+        if row is None:
+            raise PersistenceError(f"no recovery plan {plan_id!r}")
+        return dict(row.payload)
 
     # --- helpers -------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · **P1 in progress** · next tasks **P1-15** (persist simulation/plan/requirements) & **P1-18** (selected-path regressions), then **P1c** (PoC compile loop).
+**Current focus:** M0 PoC · **P1 complete** · next phase **P1c** (PoC compile loop: `P1c-01..P1c-05`).
 
 ## Milestones
 
@@ -25,7 +25,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | Phase | Milestone | Status | Exit criterion |
 |---|---|---|---|
 | P0 Engine foundation | M0 | [x] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
-| P1 Simulation and recovery core | M0 | [~] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
+| P1 Simulation and recovery core | M0 | [x] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
 | P1c PoC compile loop | M0 | [ ] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
 | P1b-02/03 Normalization & identity | M1 | [ ] | recorded-AWS normalizers + identity resolution feed P2 collectors |
 | P2 AWS discovery (ECS + RDS slice, CLI) | M1 | [ ] | `perpetual scan` on sandbox → normalized graph |
@@ -182,10 +182,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P1-12 Buffer
 - [x] P1-13 RTO (low/expected/high, UNKNOWN, breakdown)
 - [x] P1-14 Target comparison
-- [ ] P1-15 Persist simulation + plan + recovery requirements
+- [x] P1-15 Persist simulation + plan + recovery requirements
 - [x] P1-16 `perpetual simulate` / `perpetual plan`
 - [x] P1-17 Spec §92/§93 + simulation tests
-- [ ] P1-18 ALL/ANY/quorum selection, shared prerequisites and readiness decision-table regressions
+- [x] P1-18 ALL/ANY/quorum selection, shared prerequisites and readiness decision-table regressions
 
 ### P1c PoC compile loop
 
@@ -575,6 +575,15 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P1-15 persistence, P1-18 selected-path regressions & end-of-P1 wiki (P1 complete)
+
+- Added `RecoveryRequirementRow`, `SimulationRow`, and `RecoveryPlanRow` tables (`tables.py`), Alembic migration `0002_p1_simulation_and_plans.py` (SQLite + PostgreSQL verified, downgrade clean), and project-scoped `ProjectRepository` methods (`save_requirement`, `requirement`, `save_simulation`, `simulation`, `save_recovery_plan`, `recovery_plan`).
+- Added `perpetual.recovery.selection` (`SelectedPathResult`, `select_recovery_paths`): bounded deterministic search over ALL/ANY/quorum groups capped by `config.limits.alternative_selection_cap`, deduplicating shared prerequisites and excluding unselected alternatives from plan actions (§19.1).
+- Added 3 regression tests in `apps/api/tests/recovery/test_selected_paths_and_persistence.py` and updated `tests/persistence/test_schema_and_migrations.py` for the 20 tables.
+- Completed end-of-P1 phase-boundary `docs/code/` update: updated `docs/code/README.md` and added package pages for `stacks`, `rules`, `simulator`, and `recovery`.
+- Validation: `mise run check` passes (477 tests, 9/9 import contracts kept, strict mypy clean on 134 files, ruff check & format clean).
+- **Carry-over:** Start **P1c PoC compile loop** (`P1c-01` modeled DR change set on `ecs-broken`, `P1c-02` companion Terraform templates with `fmt` + `validate`, `P1c-03` re-simulation matching `ecs-remediated`, `P1c-04` Python recovery script with dry-run test, `P1c-05` `perpetual poc fix` CLI).
 
 ### 2026-11-24 — P1-09..P1-14, P1-16, P1-17 recovery DAG, buffer, RTO & CLI
 

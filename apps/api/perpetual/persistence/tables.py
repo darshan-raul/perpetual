@@ -338,3 +338,56 @@ class EvaluationInputRow(Base):
     stack_id: Mapped[str] = mapped_column(ID)
     evaluated_at: Mapped[datetime]
     payload: Mapped[dict[str, Any]]
+
+
+class RecoveryRequirementRow(Base):
+    """Revisioned stack DR targets (spec §26, §75, P1-15)."""
+
+    __tablename__ = "recovery_requirements"
+    __table_args__ = (UniqueConstraint("project_id", "requirement_id", "revision"),)
+
+    row_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    requirement_id: Mapped[str] = mapped_column(ID)
+    revision: Mapped[int] = mapped_column(Integer)
+    stack_id: Mapped[str] = mapped_column(ID, index=True)
+    failure_scope: Mapped[str] = mapped_column(SHORT)
+    target_region: Mapped[str | None] = mapped_column(SHORT)
+    created_at: Mapped[datetime]
+    payload: Mapped[dict[str, Any]]
+
+
+class SimulationRow(Base):
+    """Persisted failure simulation results (spec §45, §75, P1-15)."""
+
+    __tablename__ = "simulations"
+    __table_args__ = (UniqueConstraint("project_id", "simulation_id"),)
+
+    row_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    simulation_id: Mapped[str] = mapped_column(ID)
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("snapshots.id"), index=True)
+    stack_id: Mapped[str] = mapped_column(ID, index=True)
+    scenario_kind: Mapped[str] = mapped_column(SHORT)
+    stack_state: Mapped[str] = mapped_column(SHORT)
+    readiness: Mapped[str] = mapped_column(SHORT)
+    created_at: Mapped[datetime]
+    payload: Mapped[dict[str, Any]]
+
+
+class RecoveryPlanRow(Base):
+    """Persisted stack recovery plans and RTO breakdowns (spec §47, §75, P1-15)."""
+
+    __tablename__ = "recovery_plans"
+    __table_args__ = (UniqueConstraint("project_id", "plan_id"),)
+
+    row_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    plan_id: Mapped[str] = mapped_column(ID)
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("snapshots.id"), index=True)
+    stack_id: Mapped[str] = mapped_column(ID, index=True)
+    requirement_id: Mapped[str] = mapped_column(ID)
+    requirement_revision: Mapped[int] = mapped_column(Integer)
+    rto_comparison: Mapped[str | None] = mapped_column(SHORT)
+    created_at: Mapped[datetime]
+    payload: Mapped[dict[str, Any]]

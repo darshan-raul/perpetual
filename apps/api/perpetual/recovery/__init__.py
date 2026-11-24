@@ -23,6 +23,7 @@ from perpetual.recovery.planner import (
     compare_target,
     plan_stack_recovery,
 )
+from perpetual.recovery.selection import SelectedPathResult, select_recovery_paths
 
 __all__ = [
     "DECIDE_ACTION_ID",
@@ -37,9 +38,11 @@ __all__ = [
     "RecoveryPhase",
     "RecoveryPlan",
     "RtoBreakdown",
+    "SelectedPathResult",
     "actions_for_mechanism",
     "build_recovery_dag",
     "compare_target",
     "load_duration_catalog",
     "plan_stack_recovery",
+    "select_recovery_paths",
 ]
