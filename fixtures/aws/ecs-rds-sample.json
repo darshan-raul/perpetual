@@ -1,0 +1,368 @@
+{
+  "account_id": "123456789012",
+  "collected_at": "2026-11-24T12:00:00Z",
+  "global": {
+    "iam_roles": [
+      {
+        "RoleName": "checkout-task-exec",
+        "Path": "/",
+        "Arn": "arn:aws:iam::123456789012:role/checkout-task-exec",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "ecs-tasks.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Tags": [{ "Key": "Stack", "Value": "checkout" }],
+        "_attached_policy_arns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        ],
+        "_inline_policy_documents": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["kms:Decrypt", "secretsmanager:GetSecretValue"],
+                "Resource": [
+                  "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555",
+                  "arn:aws:secretsmanager:ap-south-1:123456789012:secret:checkout/db-password-AbCdEf"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "iam_policies": [
+      {
+        "PolicyName": "checkout-s3-read",
+        "Arn": "arn:aws:iam::123456789012:policy/checkout-s3-read",
+        "DefaultVersionId": "v1",
+        "AttachmentCount": 1,
+        "_policy_document": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::checkout-receipts-123456789012/*"
+            }
+          ]
+        }
+      }
+    ],
+    "route53_hosted_zones": [
+      {
+        "Id": "/hostedzone/Z0123456789ABCDEF",
+        "Name": "example.com.",
+        "ResourceRecordSetCount": 4,
+        "Config": { "PrivateZone": false },
+        "_accelerated_recovery_enabled": false
+      }
+    ],
+    "route53_record_sets": [
+      {
+        "_hosted_zone_id": "Z0123456789ABCDEF",
+        "Name": "checkout.example.com.",
+        "Type": "A",
+        "SetIdentifier": "primary-ap-south-1",
+        "Failover": "PRIMARY",
+        "HealthCheckId": "hc-0001",
+        "AliasTarget": {
+          "DNSName": "checkout-alb-123456.ap-south-1.elb.amazonaws.com.",
+          "HostedZoneId": "ZP97RAFLXTNZK",
+          "EvaluateTargetHealth": true
+        }
+      }
+    ]
+  },
+  "regions": {
+    "ap-south-1": {
+      "vpcs": [
+        {
+          "VpcId": "vpc-0a1b2c3d",
+          "CidrBlock": "10.0.0.0/16",
+          "IsDefault": false,
+          "Tags": [{ "Key": "Name", "Value": "checkout-vpc" }]
+        }
+      ],
+      "subnets": [
+        {
+          "SubnetId": "subnet-0111",
+          "VpcId": "vpc-0a1b2c3d",
+          "CidrBlock": "10.0.1.0/24",
+          "AvailabilityZone": "ap-south-1a",
+          "MapPublicIpOnLaunch": false,
+          "Tags": [{ "Key": "Name", "Value": "checkout-private-a" }]
+        }
+      ],
+      "security_groups": [
+        {
+          "GroupId": "sg-0ecs",
+          "GroupName": "checkout-ecs-sg",
+          "VpcId": "vpc-0a1b2c3d",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 8080,
+              "ToPort": 8080,
+              "UserIdGroupPairs": [{ "GroupId": "sg-0alb" }]
+            }
+          ],
+          "IpPermissionsEgress": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 5432,
+              "ToPort": 5432,
+              "UserIdGroupPairs": [{ "GroupId": "sg-0rds" }]
+            }
+          ]
+        }
+      ],
+      "load_balancers": [
+        {
+          "LoadBalancerName": "checkout-alb",
+          "LoadBalancerArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:loadbalancer/app/checkout-alb/1234567890abcdef",
+          "Type": "application",
+          "Scheme": "internet-facing",
+          "DNSName": "checkout-alb-123456.ap-south-1.elb.amazonaws.com",
+          "VpcId": "vpc-0a1b2c3d",
+          "AvailabilityZones": [{ "SubnetId": "subnet-0111" }],
+          "SecurityGroups": ["sg-0alb"],
+          "State": { "Code": "active" }
+        }
+      ],
+      "listeners": [
+        {
+          "ListenerArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:listener/app/checkout-alb/1234567890abcdef/abcdef1234567890",
+          "LoadBalancerArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:loadbalancer/app/checkout-alb/1234567890abcdef",
+          "Protocol": "HTTPS",
+          "Port": 443,
+          "Certificates": [
+            {
+              "CertificateArn": "arn:aws:acm:ap-south-1:123456789012:certificate/aaaa-bbbb-cccc"
+            }
+          ],
+          "DefaultActions": [
+            {
+              "Type": "forward",
+              "TargetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:targetgroup/checkout-tg/9876543210fedcba"
+            }
+          ]
+        }
+      ],
+      "target_groups": [
+        {
+          "TargetGroupName": "checkout-tg",
+          "TargetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:targetgroup/checkout-tg/9876543210fedcba",
+          "TargetType": "ip",
+          "Protocol": "HTTP",
+          "Port": 8080,
+          "VpcId": "vpc-0a1b2c3d",
+          "HealthCheckProtocol": "HTTP",
+          "HealthCheckPath": "/health",
+          "LoadBalancerArns": [
+            "arn:aws:elasticloadbalancing:ap-south-1:123456789012:loadbalancer/app/checkout-alb/1234567890abcdef"
+          ]
+        }
+      ],
+      "ecs_clusters": [
+        {
+          "clusterName": "checkout-prod",
+          "clusterArn": "arn:aws:ecs:ap-south-1:123456789012:cluster/checkout-prod",
+          "status": "ACTIVE",
+          "capacityProviders": ["FARGATE"],
+          "tags": [{ "key": "Stack", "value": "checkout" }]
+        }
+      ],
+      "ecs_services": [
+        {
+          "serviceName": "checkout-api",
+          "serviceArn": "arn:aws:ecs:ap-south-1:123456789012:service/checkout-prod/checkout-api",
+          "clusterArn": "arn:aws:ecs:ap-south-1:123456789012:cluster/checkout-prod",
+          "taskDefinition": "arn:aws:ecs:ap-south-1:123456789012:task-definition/checkout-api:12",
+          "launchType": "FARGATE",
+          "schedulingStrategy": "REPLICA",
+          "desiredCount": 2,
+          "status": "ACTIVE",
+          "networkConfiguration": {
+            "awsvpcConfiguration": {
+              "subnets": ["subnet-0111"],
+              "securityGroups": ["sg-0ecs"],
+              "assignPublicIp": "DISABLED"
+            }
+          },
+          "loadBalancers": [
+            {
+              "targetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:123456789012:targetgroup/checkout-tg/9876543210fedcba",
+              "containerName": "api",
+              "containerPort": 8080
+            }
+          ]
+        }
+      ],
+      "ecs_task_definitions": [
+        {
+          "family": "checkout-api",
+          "revision": 12,
+          "taskDefinitionArn": "arn:aws:ecs:ap-south-1:123456789012:task-definition/checkout-api:12",
+          "executionRoleArn": "arn:aws:iam::123456789012:role/checkout-task-exec",
+          "networkMode": "awsvpc",
+          "requiresCompatibilities": ["FARGATE"],
+          "cpu": "512",
+          "memory": "1024",
+          "status": "ACTIVE",
+          "containerDefinitions": [
+            {
+              "name": "api",
+              "image": "123456789012.dkr.ecr.ap-south-1.amazonaws.com/checkout-api:1.4.2",
+              "essential": true,
+              "portMappings": [{ "containerPort": 8080 }],
+              "environment": [
+                {
+                  "name": "DB_HOST",
+                  "value": "CANARY-ENV-VALUE-MUST-NEVER-BE-STORED"
+                }
+              ],
+              "secrets": [
+                {
+                  "name": "DB_PASSWORD",
+                  "valueFrom": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:checkout/db-password-AbCdEf"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "rds_instances": [
+        {
+          "DBInstanceIdentifier": "checkout-db",
+          "DBInstanceArn": "arn:aws:rds:ap-south-1:123456789012:db:checkout-db",
+          "Engine": "postgres",
+          "EngineVersion": "16.3",
+          "DBInstanceClass": "db.r6g.large",
+          "DBInstanceStatus": "available",
+          "AllocatedStorage": 200,
+          "StorageType": "gp3",
+          "MultiAZ": true,
+          "AvailabilityZone": "ap-south-1a",
+          "BackupRetentionPeriod": 7,
+          "LatestRestorableTime": "2026-11-24T11:55:00Z",
+          "StorageEncrypted": true,
+          "KmsKeyId": "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555",
+          "DeletionProtection": true,
+          "VpcSecurityGroups": [{ "VpcSecurityGroupId": "sg-0rds" }],
+          "DBSubnetGroup": { "DBSubnetGroupName": "checkout-db-subnets" },
+          "Endpoint": {
+            "Address": "checkout-db.c1234567890.ap-south-1.rds.amazonaws.com",
+            "Port": 5432
+          },
+          "TagList": [{ "Key": "Stack", "Value": "checkout" }]
+        }
+      ],
+      "rds_snapshots": [
+        {
+          "DBSnapshotIdentifier": "rds:checkout-db-2026-11-24",
+          "DBSnapshotArn": "arn:aws:rds:ap-south-1:123456789012:snapshot:rds:checkout-db-2026-11-24",
+          "DBInstanceIdentifier": "checkout-db",
+          "SnapshotType": "automated",
+          "Status": "available",
+          "SnapshotCreateTime": "2026-11-24T04:00:00Z",
+          "Encrypted": true,
+          "KmsKeyId": "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555",
+          "AllocatedStorage": 200
+        }
+      ],
+      "s3_buckets": [
+        {
+          "Name": "checkout-receipts-123456789012",
+          "_versioning": { "Status": "Enabled" },
+          "_encryption": {
+            "ServerSideEncryptionConfiguration": {
+              "Rules": [
+                {
+                  "ApplyServerSideEncryptionByDefault": {
+                    "SSEAlgorithm": "aws:kms",
+                    "KMSMasterKeyID": "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555"
+                  },
+                  "BucketKeyEnabled": true
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "ecr_repositories": [
+        {
+          "repositoryName": "checkout-api",
+          "repositoryArn": "arn:aws:ecr:ap-south-1:123456789012:repository/checkout-api",
+          "repositoryUri": "123456789012.dkr.ecr.ap-south-1.amazonaws.com/checkout-api",
+          "imageTagMutability": "IMMUTABLE",
+          "encryptionConfiguration": { "encryptionType": "AES256" }
+        }
+      ],
+      "ecr_registry": {
+        "registryId": "123456789012",
+        "replicationConfiguration": { "rules": [] }
+      },
+      "secrets": [
+        {
+          "Name": "checkout/db-password",
+          "ARN": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:checkout/db-password-AbCdEf",
+          "KmsKeyId": "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555",
+          "RotationEnabled": true,
+          "LastChangedDate": "2026-11-20T09:00:00Z",
+          "ReplicationStatus": []
+        }
+      ],
+      "ssm_parameters": [
+        {
+          "Name": "/checkout/feature-flags",
+          "Type": "String",
+          "Version": 3,
+          "Tier": "Standard",
+          "LastModifiedDate": "2026-11-22T10:30:00Z"
+        }
+      ],
+      "kms_keys": [
+        {
+          "KeyMetadata": {
+            "KeyId": "11111111-2222-3333-4444-555555555555",
+            "Arn": "arn:aws:kms:ap-south-1:123456789012:key/11111111-2222-3333-4444-555555555555",
+            "KeyState": "Enabled",
+            "KeyManager": "CUSTOMER",
+            "KeyUsage": "ENCRYPT_DECRYPT",
+            "MultiRegion": false
+          },
+          "_aliases": ["alias/checkout-primary"]
+        }
+      ],
+      "log_groups": [
+        {
+          "logGroupName": "/ecs/checkout-api",
+          "arn": "arn:aws:logs:ap-south-1:123456789012:log-group:/ecs/checkout-api:*",
+          "retentionInDays": 30,
+          "storedBytes": 1048576
+        }
+      ],
+      "acm_certificates": [
+        {
+          "CertificateArn": "arn:aws:acm:ap-south-1:123456789012:certificate/aaaa-bbbb-cccc",
+          "DomainName": "checkout.example.com",
+          "SubjectAlternativeNames": ["checkout.example.com"],
+          "Status": "ISSUED",
+          "Type": "AMAZON_ISSUED",
+          "NotAfter": "2027-11-24T00:00:00Z",
+          "InUseBy": [
+            "arn:aws:elasticloadbalancing:ap-south-1:123456789012:loadbalancer/app/checkout-alb/1234567890abcdef"
+          ]
+        }
+      ]
+    }
+  }
+}

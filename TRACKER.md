@@ -6,14 +6,14 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** **M0 PoC COMPLETE!** · next milestone **M1 Alpha (CLI-first ECS + RDS)** starting at **P1b-02/03** (identity resolution & recorded-AWS normalizers) → **P2** (live AWS discovery).
+**Current focus:** **M1 Alpha (CLI-first ECS + RDS)** — **P1b-02/03** (identity resolution & recorded-AWS normalizers) DONE; next is **P2** (live AWS discovery for ECS + RDS slice).
 
 ## Milestones
 
 | Milestone | Release | Phases | Status | Exit (demo) |
 |---|---|---|---|---|
 | M0 PoC | — | P0 (minimal P0-15), P1, P1c | [x] | `perpetual poc fix --fixture ecs-broken`: generated Terraform + recovery script, re-simulated stack matches `ecs-remediated` |
-| M1 Alpha | — | P1b-02/03, CLI-only P2 (ECS + RDS slice), P2b (CloudTrail-only), P3, P4 (ECS + RDS + cross-cutting), P5, P6 (CLI), P8 (CLI) | [ ] | `perpetual scan -> simulate -> plan` on a real sandbox ECS + RDS stack produces its normalized graph, blockers, RTO and RPO in the CLI |
+| M1 Alpha | — | P1b-02/03, CLI-only P2 (ECS + RDS slice), P2b (CloudTrail-only), P3, P4 (ECS + RDS + cross-cutting), P5, P6 (CLI), P8 (CLI) | [~] | `perpetual scan -> simulate -> plan` on a real sandbox ECS + RDS stack produces its normalized graph, blockers, RTO and RPO in the CLI |
 | M2 MVP | v0.1 | P1b (P1b-01, P1b-15, P1b-04..09, P1b-11..14 + deferred M1 UI views incl. P6-04), P9 (StaticCostProvider + 3–4 discrete presets), P10 (ECS + RDS companion Terraform + suggested edits + supplied-plan verification), P11 (runbooks + prereq/Python recovery scripts), P12 | [ ] | spec §100 workflow, deterministic, for ECS + RDS: read-only React Flow viewer + review/confirm/reject panel (structural edits in YAML overrides) -> preset DR spec -> companion Terraform + suggested edits + runbooks/scripts on a branch or PR -> verified with a supplied saved plan -> observed READY after deploy |
 | M3 Expansion | v0.2 | P0-15b, P1b-10, P2b-04/09, P2c (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB), P7 (EKS), P9 (combinatorial search + AWSPricingProvider), P11-07 (ARC Region switch plan compiler) | [ ] | full multi-service deterministic coverage incl. EKS (§89), Flow Logs, interactive structural UI editor, combinatorial optimizer + live AWS pricing, and ARC Region switch plan compiler |
 | M4 Agents | v0.3 | P3b, P4-07, P9-07, P10 (agentic PR tasks), P13 | [ ] | LLM advisor, planner and in-place IaC transformation in an isolated runner; v0.3 gates pass |
@@ -27,7 +27,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | P0 Engine foundation | M0 | [x] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
 | P1 Simulation and recovery core | M0 | [x] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
 | P1c PoC compile loop | M0 | [x] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
-| P1b-02/03 Normalization & identity | M1 | [ ] | recorded-AWS normalizers + identity resolution feed P2 collectors |
+| P1b-02/03 Normalization & identity | M1 | [x] | recorded-AWS normalizers + identity resolution feed P2 collectors |
 | P2 AWS discovery (ECS + RDS slice, CLI) | M1 | [ ] | `perpetual scan` on sandbox → normalized graph |
 | P2b Observed evidence (CloudTrail-only, CLI) | M1 | [ ] | every edge shows basis; contradictions listed |
 | P3 Stack discovery (CLI) | M1 | [ ] | "checkout" is one stack with services |
@@ -199,8 +199,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ### P1b Normalizers and identity (CLI foundation; API/UI in M2)
 
-- [ ] P1b-02 Identity resolution across sources
-- [ ] P1b-03 Recorded-AWS normalizers + importer (`perpetual import-aws-fixture`)
+- [x] P1b-02 Identity resolution across sources
+- [x] P1b-03 Recorded-AWS normalizers + importer (`perpetual import-aws-fixture`)
 
 ### P2 AWS discovery (ECS + RDS slice, CLI-only)
 

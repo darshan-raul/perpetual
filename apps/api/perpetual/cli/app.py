@@ -2,6 +2,7 @@
 
 import typer
 
+from perpetual.cli.aws_fixture import import_aws_fixture_command
 from perpetual.cli.fixtures import fixtures_app
 from perpetual.cli.graph import graph_app
 from perpetual.cli.poc import poc_app
@@ -18,6 +19,7 @@ app.add_typer(graph_app, name="graph")
 app.add_typer(poc_app, name="poc")
 app.command("simulate")(simulate_cmd)
 app.command("plan")(plan_cmd)
+app.command("import-aws-fixture")(import_aws_fixture_command)
 
 
 def main() -> None:
