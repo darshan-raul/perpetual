@@ -3,6 +3,7 @@
 import typer
 
 from perpetual.cli.fixtures import fixtures_app
+from perpetual.cli.graph import graph_app
 
 app = typer.Typer(
     name="perpetual",
@@ -11,6 +12,7 @@ app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(fixtures_app, name="fixtures")
+app.add_typer(graph_app, name="graph")
 
 
 def main() -> None:

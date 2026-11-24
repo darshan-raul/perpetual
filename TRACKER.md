@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-12** (`perpetual graph` CLI).
+**Current focus:** M0 PoC · next task **P0-13** (canonical fixtures).
 
 ## Milestones
 
@@ -162,7 +162,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-10 Graph overrides (apply, merge, orphan, YAML)
 - [x] P0-11 NetworkX snapshot + traversal helpers
 - [x] P0-15 Lightweight immutable evaluation/snapshot manifests, canonical hashes, and versioned fixture inputs (before P0-12/13; payload schema-migration upgrade registry deferred to M3 `P0-15b`)
-- [ ] P0-12 `perpetual graph` CLI
+- [x] P0-12 `perpetual graph` CLI
 - [ ] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
 - [ ] P0-14 CLAUDE.md commands updated
 
@@ -575,6 +575,14 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P0-12 `perpetual graph` CLI
+
+- Added `perpetual.cli.graph` (`perpetual graph --fixture NAME [--stack S] [--unreviewed] [--json]` and `perpetual graph overrides export|apply`) and registered it on `perpetual.cli.app`.
+- Applies fixture overrides, builds the validated `DependencyGraph` and `SnapshotManifest`, detects cycles, highlights unreviewed edges below `review_confidence_threshold`, and prints Rich tables (resources, dependency edges, DR overlay mechanisms, cycles, orphaned overrides) or structured JSON.
+- Added 6 CLI tests in `apps/api/tests/cli/test_cli_graph.py`.
+- Validation: `mise run check` passes (453 tests, 9/9 import contracts kept, strict mypy clean on 115 files, ruff check & format clean).
+- **Carry-over:** P0-13 (canonical fixtures: `ecs-broken`, `ecs-remediated`, `cycle`, `shared-node`, `deep-path`), then P0-14 (update `CLAUDE.md` + P0 phase-boundary `docs/code/` update).
 
 ### 2026-11-24 — P0-15 lightweight manifests & canonical hashes
 
