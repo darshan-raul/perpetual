@@ -31,6 +31,7 @@ from perpetual.models import (
     Stack,
     StackResource,
     StackService,
+    WorkloadProfile,
 )
 
 FORMAT = "perpetual-fixture"
@@ -40,8 +41,22 @@ DERIVED_FIELDS: dict[str, tuple[str, ...]] = {
     "ResourceNode": ("provider", "service", "resource_type", "discovered_at"),
     "Evidence": ("collected_at",),
     "GraphOverride": ("project_id", "created_at"),
+    "WorkloadQuantity": ("collected_at",),
 }
 """Fields the loader can fill in, per model. The JSON Schema marks them optional."""
+
+
+class FixtureInputVersions(DomainModel):
+    """Pinned revision and catalog versions for reproducible fixture evaluations (spec §56.3)."""
+
+    graph_revision: int = Field(default=0, ge=0)
+    override_revision: int = Field(default=0, ge=0)
+    group_revision: int = Field(default=0, ge=0)
+    requirement_revision: int = Field(default=1, ge=1)
+    engine_version: NonEmptyStr = "0.0.0-fixture"
+    freshness_policy_version: NonEmptyStr = "v1"
+    duration_catalog_version: NonEmptyStr = "v1"
+    price_catalog_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +91,8 @@ class Fixture(DomainModel):
     """User edits applied on top of the graph (spec §23)."""
     facts: list[FactRecord] = Field(default_factory=list)
     coverage: list[ScanCoverage] = Field(default_factory=list)
+    workload_profiles: list[WorkloadProfile] = Field(default_factory=list)
+    input_versions: FixtureInputVersions | None = None
 
 
 def fixture_json_schema() -> dict[str, Any]:

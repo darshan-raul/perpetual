@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-15** (lightweight manifests & canonical hashes).
+**Current focus:** M0 PoC · next task **P0-12** (`perpetual graph` CLI).
 
 ## Milestones
 
@@ -61,7 +61,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | §88 remediated ECS demo: RECOVERABLE (fixture) | [ ] |
 | §93 RTO tests (40 / 48 / 49.5) | [ ] |
 | PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [ ] |
-| Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [ ] |
+| Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [x] |
 | Import contracts green | [~] |
 
 ### M1 Alpha (CLI)
@@ -161,7 +161,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-09 Evidence combination + fingerprints
 - [x] P0-10 Graph overrides (apply, merge, orphan, YAML)
 - [x] P0-11 NetworkX snapshot + traversal helpers
-- [ ] P0-15 Lightweight immutable evaluation/snapshot manifests, canonical hashes, and versioned fixture inputs (before P0-12/13; payload schema-migration upgrade registry deferred to M3 `P0-15b`)
+- [x] P0-15 Lightweight immutable evaluation/snapshot manifests, canonical hashes, and versioned fixture inputs (before P0-12/13; payload schema-migration upgrade registry deferred to M3 `P0-15b`)
 - [ ] P0-12 `perpetual graph` CLI
 - [ ] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
 - [ ] P0-14 CLAUDE.md commands updated
@@ -575,6 +575,14 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P0-15 lightweight manifests & canonical hashes
+
+- Added `perpetual.graph.manifest` (`canonical_json`, `canonical_digest`, `config_digest`, `evaluation_input_digest`, `SnapshotManifest`, `build_snapshot_manifest`): deterministic SHA-256 hashing over normalized JSON (UTC ISO-8601 timestamps, normalized Decimals, `timedelta` seconds, sorted keys, explicit `null` distinct from `unknown_fields`).
+- Extended `perpetual.fixtures` (`FixtureInputVersions`, `Fixture.workload_profiles`, `Fixture.input_versions`, `WorkloadQuantity.collected_at` defaulting, stack/resource cross-reference checks) and regenerated `fixtures/schema/fixture-v1.schema.json`.
+- Added 7 tests in `apps/api/tests/graph/test_manifest.py` covering canonicalization, absent/unknown/null distinction, config/snapshot/evaluation digests, and versioned fixture inputs.
+- Validation: `mise run check` passes (447 tests, 9/9 import contracts kept, strict mypy clean on 113 files, ruff check & format clean).
+- **Carry-over:** P0-12 (`perpetual graph` CLI), then P0-13 (canonical fixtures: `ecs-broken`, `ecs-remediated`, `cycle`, `shared-node`, `deep-path`) and P0-14 (update `CLAUDE.md` + P0 phase-boundary `docs/code/` update).
 
 ### 2026-11-24 — Roadmap alignment commit + P0-11 NetworkX snapshot and traversal
 

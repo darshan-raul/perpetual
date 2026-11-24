@@ -15,6 +15,7 @@ from perpetual.fixtures.schema import (
     FORMAT,
     VERSION,
     Fixture,
+    FixtureInputVersions,
     FixtureIssue,
     fixture_json_schema,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "VERSION",
     "Fixture",
     "FixtureError",
+    "FixtureInputVersions",
     "FixtureIssue",
     "check_references",
     "expand",

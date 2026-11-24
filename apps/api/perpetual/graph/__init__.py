@@ -1,5 +1,13 @@
 """Graph snapshots, overrides and traversal helpers (spec §17, §18, §19.1, §23)."""
 
+from perpetual.graph.manifest import (
+    SnapshotManifest,
+    build_snapshot_manifest,
+    canonical_digest,
+    canonical_json,
+    config_digest,
+    evaluation_input_digest,
+)
 from perpetual.graph.overrides import (
     GraphData,
     OverrideError,
@@ -30,13 +38,19 @@ __all__ = [
     "OverrideError",
     "OverrideResult",
     "Reproposal",
+    "SnapshotManifest",
     "ancestors_of",
     "apply_overrides",
     "build_graph",
+    "build_snapshot_manifest",
+    "canonical_digest",
+    "canonical_json",
+    "config_digest",
     "dependency_closure",
     "detect_cycles",
     "dump_overrides",
     "edge_target",
+    "evaluation_input_digest",
     "has_cycles",
     "load_overrides",
     "merge_overrides",

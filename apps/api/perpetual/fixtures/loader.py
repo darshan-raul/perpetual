@@ -94,6 +94,17 @@ def expand(raw: dict[str, Any]) -> tuple[dict[str, Any], list[FixtureIssue]]:
             with_timestamp = _default(with_project, "created_at", captured_at)
             expanded_overrides.append(with_timestamp)
         data["overrides"] = expanded_overrides
+
+    workload_profiles = data.get("workload_profiles")
+    if isinstance(workload_profiles, list):
+        for profile in workload_profiles:
+            if not isinstance(profile, dict):
+                continue
+            quantities = profile.get("quantities")
+            if isinstance(quantities, list):
+                profile["quantities"] = [
+                    _default(item, "collected_at", captured_at) for item in quantities
+                ]
     return data, issues
 
 

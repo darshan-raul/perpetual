@@ -67,6 +67,9 @@ class _Checker:
             "overrides": (item.id for item in fixture.overrides),
             "facts": (item.id for item in fixture.facts),
             "coverage": (item.id for item in fixture.coverage),
+            "workload_profiles": (
+                f"{item.id}@{item.revision}" for item in fixture.workload_profiles
+            ),
         }
         for name, ids in collections.items():
             for item, count in sorted(Counter(ids).items()):
@@ -151,3 +154,10 @@ class _Checker:
         for i, fact in enumerate(self.fixture.facts):
             if fact.coverage_id is not None and fact.coverage_id not in coverage:
                 self.add(f"facts[{i}].coverage_id", f"no coverage {fact.coverage_id!r}")
+        for i, profile in enumerate(self.fixture.workload_profiles):
+            if profile.stack_id not in self.stacks_by_id:
+                self.add(f"workload_profiles[{i}].stack_id", f"no stack {profile.stack_id!r}")
+            for j, quantity in enumerate(profile.quantities):
+                self.need(
+                    f"workload_profiles[{i}].quantities[{j}].resource_id", quantity.resource_id
+                )

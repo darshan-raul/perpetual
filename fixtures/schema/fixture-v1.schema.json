@@ -3336,6 +3336,68 @@
       "title": "FailureScope",
       "type": "string"
     },
+    "FixtureInputVersions": {
+      "additionalProperties": false,
+      "description": "Pinned revision and catalog versions for reproducible fixture evaluations (spec \u00a756.3).",
+      "properties": {
+        "duration_catalog_version": {
+          "default": "v1",
+          "minLength": 1,
+          "title": "Duration Catalog Version",
+          "type": "string"
+        },
+        "engine_version": {
+          "default": "0.0.0-fixture",
+          "minLength": 1,
+          "title": "Engine Version",
+          "type": "string"
+        },
+        "freshness_policy_version": {
+          "default": "v1",
+          "minLength": 1,
+          "title": "Freshness Policy Version",
+          "type": "string"
+        },
+        "graph_revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Graph Revision",
+          "type": "integer"
+        },
+        "group_revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Group Revision",
+          "type": "integer"
+        },
+        "override_revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Override Revision",
+          "type": "integer"
+        },
+        "price_catalog_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price Catalog Version"
+        },
+        "requirement_revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Requirement Revision",
+          "type": "integer"
+        }
+      },
+      "title": "FixtureInputVersions",
+      "type": "object"
+    },
     "GenericResourceProperties": {
       "additionalProperties": false,
       "description": "Fallback for an AWS resource type with no typed model. Not allowed when one exists.",
@@ -5210,6 +5272,32 @@
       ],
       "title": "PolicyStatement",
       "type": "object"
+    },
+    "QuantityKind": {
+      "description": "Workload quantities that cost formulas can require (spec \u00a759.1).",
+      "enum": [
+        "requests",
+        "invocations",
+        "duration",
+        "concurrency",
+        "messages",
+        "stored_gb",
+        "write_gb_per_month",
+        "replication_gb_per_month",
+        "egress_gb_per_month",
+        "serving_capacity"
+      ],
+      "title": "QuantityKind",
+      "type": "string"
+    },
+    "QuantitySource": {
+      "enum": [
+        "measured",
+        "user_estimate",
+        "forecast"
+      ],
+      "title": "QuantitySource",
+      "type": "string"
     },
     "QuotaFact": {
       "additionalProperties": false,
@@ -8881,6 +8969,180 @@
       ],
       "title": "WebACLProperties",
       "type": "object"
+    },
+    "WorkloadProfile": {
+      "additionalProperties": false,
+      "description": "Versioned, stack-scoped workload inputs for cost formulas (spec \u00a759.1).\n\nA quantity that is not listed is unknown; it is never assumed idle.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "quantities": {
+          "items": {
+            "$ref": "#/$defs/WorkloadQuantity"
+          },
+          "title": "Quantities",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "stack_id": {
+          "minLength": 1,
+          "title": "Stack Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "stack_id"
+      ],
+      "title": "WorkloadProfile",
+      "type": "object"
+    },
+    "WorkloadQuantity": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "collected_at": {
+          "format": "date-time",
+          "title": "Collected At",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/EstimateConfidence"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "high": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "High"
+        },
+        "kind": {
+          "$ref": "#/$defs/QuantityKind"
+        },
+        "low": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Low"
+        },
+        "observed_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed From"
+        },
+        "observed_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed To"
+        },
+        "resource_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource Id"
+        },
+        "source": {
+          "$ref": "#/$defs/QuantitySource"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "unit",
+        "source",
+        "confidence"
+      ],
+      "title": "WorkloadQuantity",
+      "type": "object"
     }
   },
   "$id": "https://github.com/darshan-raul/perpetual/fixtures/schema/fixture-v1.json",
@@ -8958,6 +9220,17 @@
       "title": "Groups",
       "type": "array"
     },
+    "input_versions": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FixtureInputVersions"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "mechanisms": {
       "items": {
         "$ref": "#/$defs/RecoveryMechanism"
@@ -9023,6 +9296,13 @@
       "const": 1,
       "title": "Version",
       "type": "integer"
+    },
+    "workload_profiles": {
+      "items": {
+        "$ref": "#/$defs/WorkloadProfile"
+      },
+      "title": "Workload Profiles",
+      "type": "array"
     }
   },
   "required": [
