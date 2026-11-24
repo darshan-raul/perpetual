@@ -25,7 +25,7 @@ It evaluates the whole **stack**: the services, databases, networking, secrets a
 - **Recovery point objective (RPO):** how much recent data the product can afford to lose.
 - **Budget:** how much the DR setup can cost.
 
-> **Pre-alpha — milestone M0 (proof of concept) in progress.** The engine foundation is being built: domain models, canonical IDs, config, persistence, fixtures, evidence combination and graph overrides exist; graph construction, simulation and recovery planning come next. Progress is tracked in [TRACKER.md](TRACKER.md). The capabilities below describe the planned product; only `perpetual fixtures validate|schema` runs today.
+> **Pre-alpha — milestone M0 (proof of concept) complete; M1 Alpha next.** Graph construction, DR rule packs, Region-outage simulation, recovery planning (with RTO/RPO math), and the PoC compile loop (`perpetual graph`, `perpetual simulate`, `perpetual plan`, `perpetual poc fix`) run locally on canonical fixtures today. Progress is tracked in [TRACKER.md](TRACKER.md). Live AWS discovery arrives in M1 Alpha and the local web UI in M2 MVP.
 
 ## What Perpetual will do
 
@@ -153,6 +153,20 @@ Deployment        Pending; fresh scan required for observed READY
 - Applying infrastructure changes, automatic failover or automated DR drills.
 - Code changes to CloudFormation, CDK or Pulumi.
 
+## Try the M0 PoC demo
+
+You can run the end-to-end M0 proof of concept locally against the bundled `ecs-broken` fixture (no AWS account required):
+
+```bash
+uv sync
+uv run perpetual graph --fixture ecs-broken
+uv run perpetual simulate --fixture ecs-broken
+uv run perpetual plan --fixture ecs-broken
+uv run perpetual poc fix --fixture ecs-broken --out /tmp/perpetual-poc
+```
+
+`perpetual poc fix` simulates `ecs-broken` (baseline `NOT_READY`), applies the modeled DR change set (multi-Region KMS key, ECR replication, cross-Region RDS read replica), renders companion Terraform under `/tmp/perpetual-poc/terraform/` plus a standalone resumable Python failover script at `/tmp/perpetual-poc/runbooks/failover.py`, and re-simulates the planned topology to confirm `DESIGN_MEETS_TARGETS`.
+
 ## Planned usage
 
 These commands are a preview of the intended interface and are not available yet.
@@ -177,7 +191,7 @@ perpetual transform checkout --terraform ./infra/prod --k8s ./deploy/prod --open
 
 ## Status
 
-Perpetual is pre-alpha: the design is complete and M0 PoC implementation is in progress. Development is engine-first and CLI-first, ECS + RDS before EKS and expanded services:
+Perpetual is pre-alpha: M0 PoC is complete and M1 Alpha (live AWS discovery for ECS + RDS) is next. Development is engine-first and CLI-first, ECS + RDS before EKS and expanded services:
 
 | Milestone | Delivers |
 |---|---|

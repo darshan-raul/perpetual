@@ -1,0 +1,23 @@
+# Companion Terraform: RDS cross-Region read replica in DR Region (spec §62.1, P1c-02).
+variable "primary_rds_arn" {
+  type        = string
+  description = "ARN of the primary RDS DB instance to replicate."
+}
+
+variable "dr_db_subnet_group_name" {
+  type        = string
+  description = "Name of the DB subnet group in {{ target_region }}."
+}
+
+resource "aws_db_instance" "dr_replica" {
+  provider                = aws.dr
+  identifier              = "{{ db_identifier }}-dr"
+  replicate_source_db     = var.primary_rds_arn
+  instance_class          = "{{ db_instance_class }}"
+  db_subnet_group_name    = var.dr_db_subnet_group_name
+  kms_key_id              = aws_kms_replica_key.dr_replica.arn
+  storage_encrypted       = true
+  multi_az                = true
+  skip_final_snapshot     = false
+  backup_retention_period = 7
+}

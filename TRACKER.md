@@ -6,13 +6,13 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · **P1 complete** · next phase **P1c** (PoC compile loop: `P1c-01..P1c-05`).
+**Current focus:** **M0 PoC COMPLETE!** · next milestone **M1 Alpha (CLI-first ECS + RDS)** starting at **P1b-02/03** (identity resolution & recorded-AWS normalizers) → **P2** (live AWS discovery).
 
 ## Milestones
 
 | Milestone | Release | Phases | Status | Exit (demo) |
 |---|---|---|---|---|
-| M0 PoC | — | P0 (minimal P0-15), P1, P1c | [~] | `perpetual poc fix --fixture ecs-broken`: generated Terraform + recovery script, re-simulated stack matches `ecs-remediated` |
+| M0 PoC | — | P0 (minimal P0-15), P1, P1c | [x] | `perpetual poc fix --fixture ecs-broken`: generated Terraform + recovery script, re-simulated stack matches `ecs-remediated` |
 | M1 Alpha | — | P1b-02/03, CLI-only P2 (ECS + RDS slice), P2b (CloudTrail-only), P3, P4 (ECS + RDS + cross-cutting), P5, P6 (CLI), P8 (CLI) | [ ] | `perpetual scan -> simulate -> plan` on a real sandbox ECS + RDS stack produces its normalized graph, blockers, RTO and RPO in the CLI |
 | M2 MVP | v0.1 | P1b (P1b-01, P1b-15, P1b-04..09, P1b-11..14 + deferred M1 UI views incl. P6-04), P9 (StaticCostProvider + 3–4 discrete presets), P10 (ECS + RDS companion Terraform + suggested edits + supplied-plan verification), P11 (runbooks + prereq/Python recovery scripts), P12 | [ ] | spec §100 workflow, deterministic, for ECS + RDS: read-only React Flow viewer + review/confirm/reject panel (structural edits in YAML overrides) -> preset DR spec -> companion Terraform + suggested edits + runbooks/scripts on a branch or PR -> verified with a supplied saved plan -> observed READY after deploy |
 | M3 Expansion | v0.2 | P0-15b, P1b-10, P2b-04/09, P2c (EC2/ASG, Lambda, SQS/SNS, CloudFront, WAF, EBS/EFS, DynamoDB), P7 (EKS), P9 (combinatorial search + AWSPricingProvider), P11-07 (ARC Region switch plan compiler) | [ ] | full multi-service deterministic coverage incl. EKS (§89), Flow Logs, interactive structural UI editor, combinatorial optimizer + live AWS pricing, and ARC Region switch plan compiler |
@@ -26,7 +26,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 |---|---|---|---|
 | P0 Engine foundation | M0 | [x] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
 | P1 Simulation and recovery core | M0 | [x] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
-| P1c PoC compile loop | M0 | [ ] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
+| P1c PoC compile loop | M0 | [x] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
 | P1b-02/03 Normalization & identity | M1 | [ ] | recorded-AWS normalizers + identity resolution feed P2 collectors |
 | P2 AWS discovery (ECS + RDS slice, CLI) | M1 | [ ] | `perpetual scan` on sandbox → normalized graph |
 | P2b Observed evidence (CloudTrail-only, CLI) | M1 | [ ] | every edge shows basis; contradictions listed |
@@ -60,7 +60,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | §87 broken ECS demo: NOT DR READY with blockers (fixture) | [x] |
 | §88 remediated ECS demo: RECOVERABLE (fixture) | [x] |
 | §93 RTO tests (40 / 48 / 49.5) | [x] |
-| PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [ ] |
+| PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [x] |
 | Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [x] |
 | Import contracts green | [x] |
 
@@ -189,11 +189,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ### P1c PoC compile loop
 
-- [ ] P1c-01 Modeled DR change set applied to `ecs-broken` (ECR replication, RDS cross-Region replica, multi-Region KMS key)
-- [ ] P1c-02 Companion Terraform templates for the three changes; fmt + validate
-- [ ] P1c-03 Re-simulate the modeled snapshot; match `ecs-remediated`
-- [ ] P1c-04 One Python recovery script (RDS promote, ECS scale, DR health check); `moto` dry run (plus `aws/aws-emulator` integration once wired)
-- [ ] P1c-05 `perpetual poc fix` CLI + README demo
+- [x] P1c-01 Modeled DR change set applied to `ecs-broken` (ECR replication, RDS cross-Region replica, multi-Region KMS key)
+- [x] P1c-02 Companion Terraform templates for the three changes; fmt + validate
+- [x] P1c-03 Re-simulate the modeled snapshot; match `ecs-remediated`
+- [x] P1c-04 One Python recovery script (RDS promote, ECS scale, DR health check); `moto` dry run (plus `aws/aws-emulator` integration once wired)
+- [x] P1c-05 `perpetual poc fix` CLI + README demo
 
 ## M1 Alpha (CLI-only ECS + RDS vertical slice)
 
@@ -575,6 +575,17 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P1c PoC compile loop (Milestone M0 PoC COMPLETE!)
+
+- Added `jinja2` (runtime) and `boto3` + `moto` (dev) dependencies.
+- Added `perpetual.iac.poc` (`apply_poc_change_set`, `render_poc_terraform`, `run_poc_fix`, `PocFixResult`) and Jinja2 templates (`versions.tf.j2`, `kms.tf.j2`, `ecr.tf.j2`, `rds.tf.j2`): applies the modeled DR change set as a planned snapshot (`planned_id(...)` canonical IDs), re-resolves mechanisms through `default_registry()`, re-simulates under `EvaluationKind.DESIGN` (`UNAVAILABLE` → `RECOVERABLE` matching `ecs-remediated` §88), and renders companion Terraform passing `terraform fmt -check`.
+- Added `perpetual.runbooks.poc_script` (`render_poc_recovery_script` + `failover.py.j2`): self-contained `uv run --script` Python failover script (promote RDS replica, scale DR ECS service, check DR health) supporting `--dry-run`, verify-before-acting, and resumable state checkpoints.
+- Added `perpetual poc fix --fixture ecs-broken --out DIR [--json]` CLI in `perpetual.cli.poc` wired into `perpetual.cli.app`.
+- Added 4 end-to-end tests in `apps/api/tests/iac/test_poc_compile_loop.py` verifying re-simulation parity, `terraform fmt -check`, `moto` (`@mock_aws`) dry-run + live execution + resumable second run, and CLI error handling.
+- Completed end-of-P1c `docs/code/` update (`README.md`, `packages/iac.md`, `packages/runbooks.md`).
+- Validation: `mise run check` passes cleanly (481 tests, 9/9 import contracts kept, strict mypy clean on 138 files, ruff check & format clean).
+- **Carry-over:** Milestone **M0 PoC** is 100% complete! Next milestone is **M1 Alpha (CLI-first real-AWS ECS + RDS)** starting at **P1b-02** (identity resolution) and **P1b-03** (recorded-AWS normalizers) → **P2** (AWS discovery for the ECS + RDS slice with `aws/aws-emulator` integration tests).
 
 ### 2026-11-24 — P1-15 persistence, P1-18 selected-path regressions & end-of-P1 wiki (P1 complete)
 

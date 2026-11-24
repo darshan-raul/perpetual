@@ -4,6 +4,7 @@ import typer
 
 from perpetual.cli.fixtures import fixtures_app
 from perpetual.cli.graph import graph_app
+from perpetual.cli.poc import poc_app
 from perpetual.cli.simulate import plan_cmd, simulate_cmd
 
 app = typer.Typer(
@@ -14,6 +15,7 @@ app = typer.Typer(
 )
 app.add_typer(fixtures_app, name="fixtures")
 app.add_typer(graph_app, name="graph")
+app.add_typer(poc_app, name="poc")
 app.command("simulate")(simulate_cmd)
 app.command("plan")(plan_cmd)
 

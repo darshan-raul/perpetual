@@ -1,0 +1,18 @@
+# Companion Terraform: ECR cross-Region replication rule (spec §62.1, P1c-02).
+resource "aws_ecr_replication_configuration" "dr" {
+  provider = aws.primary
+
+  replication_configuration {
+    rule {
+      destination {
+        region      = "{{ target_region }}"
+        registry_id = "{{ account_id }}"
+      }
+
+      repository_filter {
+        filter      = "{{ ecr_repository_name }}"
+        filter_type = "PREFIX_MATCH"
+      }
+    }
+  }
+}

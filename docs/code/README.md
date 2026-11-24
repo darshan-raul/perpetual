@@ -48,10 +48,10 @@ All Python code lives in `apps/api/perpetual/`, one subpackage per pipeline stag
 | `recovery` | Recovery DAG, RTO, RPO | Versioned duration catalog v1, first-slice + generic fallback actions, phase-template + refined DAG builder, buffer, critical-path RTO, target comparison, bounded ALL/ANY/quorum path selection (P1-09..P1-14, P1-18) | [packages/recovery.md](packages/recovery.md) |
 | `optimizer` | DR design candidates | stub | — |
 | `costing` | Cost providers | stub | — |
-| `iac` | Companion Terraform, suggested edits, delivery | stub | — |
-| `runbooks` | Runbook, scripts (`v0.1`), ARC plan compiler (`v0.2` M3) | stub | — |
+| `iac` | Companion Terraform, suggested edits, delivery | PoC modeled DR change set, Jinja2 companion Terraform (`versions.tf`, `kms.tf`, `ecr.tf`, `rds.tf`), and re-simulation loop (P1c-01..03); full v0.1 templates in P10 | [packages/iac.md](packages/iac.md) |
+| `runbooks` | Runbook, scripts (`v0.1`), ARC plan compiler (`v0.2` M3) | Self-contained, resumable, dry-run Python failover script generator (`failover.py.j2`) verified on `moto` (P1c-04); full runbooks in P11 | [packages/runbooks.md](packages/runbooks.md) |
 | `llm`, `knowledge` | LLM agents and knowledge base (`v0.3` M4) | stub | — |
-| `cli` | Typer commands | `perpetual fixtures validate|schema` (P0-08), `perpetual graph` + `overrides export|apply` (P0-12), `perpetual simulate` & `perpetual plan` (P1-16) | [packages/cli.md](packages/cli.md) |
+| `cli` | Typer commands | `perpetual fixtures validate|schema` (P0-08), `perpetual graph` + `overrides export|apply` (P0-12), `perpetual simulate` & `perpetual plan` (P1-16), `perpetual poc fix` (P1c-05) | [packages/cli.md](packages/cli.md) |
 | `api` | FastAPI routes | stub | — |
 
 ## Flows

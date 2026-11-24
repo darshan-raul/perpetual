@@ -1,0 +1,21 @@
+# Companion Terraform: Multi-Region KMS primary key + DR replica (spec §62.1, P1c-02).
+resource "aws_kms_key" "dr_primary" {
+  provider                = aws.primary
+  description             = "Perpetual DR multi-Region KMS key for {{ stack_name }}"
+  multi_region            = true
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+}
+
+resource "aws_kms_replica_key" "dr_replica" {
+  provider                = aws.dr
+  description             = "Perpetual DR replica KMS key for {{ stack_name }} in {{ target_region }}"
+  primary_key_arn         = aws_kms_key.dr_primary.arn
+  deletion_window_in_days = 30
+}
+
+resource "aws_kms_alias" "dr_replica" {
+  provider      = aws.dr
+  name          = "alias/{{ kms_alias }}-dr"
+  target_key_id = aws_kms_replica_key.dr_replica.key_id
+}

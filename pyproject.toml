@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 authors = [{ name = "Darshan Raul" }]
 dependencies = [
     "alembic>=1.14",
+    "jinja2>=3.1.6",
     "networkx>=3.7",
     "pydantic>=2.14.1",
     "pyyaml>=6.0.2",
@@ -20,7 +21,9 @@ perpetual = "perpetual.cli:main"
 
 [dependency-groups]
 dev = [
+    "boto3>=1.44.10",
     "import-linter>=2.15",
+    "moto>=5.2.6",
     "mypy",
     "pytest",
     "ruff",
