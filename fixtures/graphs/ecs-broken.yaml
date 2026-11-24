@@ -307,6 +307,7 @@ mechanisms:
     counterpart_resource_id: aws://123456789012/ap-south-2/ecs/service/checkout-api-dr
     dr_dependency_ids:
       - aws://123456789012/ap-south-2/elasticloadbalancing/loadbalancer/checkout-alb-dr
+      - aws://123456789012/ap-south-2/s3/bucket/checkout-assets-dr
     control_plane_dependent: true
     confidence: 0.95
 

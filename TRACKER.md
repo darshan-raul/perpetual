@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · **P0 complete** · next task **P1-01** (Rule-pack protocol + registry).
+**Current focus:** M0 PoC · **P1 in progress** · next task **P1-03** (RTO scope classification).
 
 ## Milestones
 
@@ -25,7 +25,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 | Phase | Milestone | Status | Exit criterion |
 |---|---|---|---|
 | P0 Engine foundation | M0 | [x] | `perpetual graph --fixture ecs-broken` prints graph + overlay; minimal P0-15 hashes/manifests |
-| P1 Simulation and recovery core | M0 | [ ] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
+| P1 Simulation and recovery core | M0 | [~] | §87 reproduced on fixtures; remediated fixture RECOVERABLE |
 | P1c PoC compile loop | M0 | [ ] | fixture fix → Terraform + script → re-simulated RECOVERABLE |
 | P1b-02/03 Normalization & identity | M1 | [ ] | recorded-AWS normalizers + identity resolution feed P2 collectors |
 | P2 AWS discovery (ECS + RDS slice, CLI) | M1 | [ ] | `perpetual scan` on sandbox → normalized graph |
@@ -168,8 +168,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 ### P1 Simulation and recovery core
 
-- [ ] P1-01 Rule-pack protocol + registry
-- [ ] P1-02 First-slice mechanism resolution on real `DRRulePack` classes (strict "reproducible")
+- [x] P1-01 Rule-pack protocol + registry
+- [x] P1-02 First-slice mechanism resolution on real `DRRulePack` classes (strict "reproducible")
 - [ ] P1-03 RTO scope classification
 - [ ] P1-04 FailureScenario dispatch
 - [ ] P1-05 Impact pass
@@ -575,6 +575,14 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P1-01 rule-pack protocol & P1-02 first-slice mechanism resolution
+
+- Added `perpetual.rules.protocol` (`DRRulePack`, `AssessmentContext`, `ReproducibilityEvidence`, `RulePackRegistry`, `RulePackError`) and `perpetual.rules.cross` (`CrossCuttingRule`, `CROSS_CUTTING_RULE_IDS`), enforcing strict §27.1 reproducibility for `rebuild_from_iac` and falling back to `unknown` for unmodeled services.
+- Added `perpetual.rules.first_slice` with 9 real `DRRulePack` classes (`Route53RulePack`, `ELBRulePack`, `ECSRulePack`, `ECRRulePack`, `SecretsManagerRulePack`, `KMSRulePack`, `RDSRulePack`, `S3RulePack`, `LogsRulePack`) and `default_registry()`.
+- Added 5 tests in `apps/api/tests/rules/test_rule_packs_and_mechanisms.py` verifying registry contracts, exact DR-overlay parity against both `ecs-broken.yaml` and `ecs-remediated.yaml`, strict §27.1 reproducibility, external resources, and RDS `backed_up_by` snapshot restore. (Fixed `mech-ecs.dr_dependency_ids` in `ecs-broken.yaml` to include `checkout-assets-dr`.)
+- Validation: `mise run check` passes (458 tests, 9/9 import contracts kept, strict mypy clean on 119 files, ruff check & format clean).
+- **Carry-over:** P1-03 (RTO scope classification), P1-04 (`FailureScenario` dispatch), P1-05 (Impact pass), P1-06 (Recovery pass).
 
 ### 2026-11-24 — P0-13 canonical fixtures & P0-14 wrap-up (P0 complete)
 
