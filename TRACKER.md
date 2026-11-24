@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · next task **P0-11**.
+**Current focus:** M0 PoC · next task **P0-15** (lightweight manifests & canonical hashes).
 
 ## Milestones
 
@@ -160,7 +160,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P0-08 Fixture format v1, loader, validator, JSON Schema
 - [x] P0-09 Evidence combination + fingerprints
 - [x] P0-10 Graph overrides (apply, merge, orphan, YAML)
-- [ ] P0-11 NetworkX snapshot + traversal helpers
+- [x] P0-11 NetworkX snapshot + traversal helpers
 - [ ] P0-15 Lightweight immutable evaluation/snapshot manifests, canonical hashes, and versioned fixture inputs (before P0-12/13; payload schema-migration upgrade registry deferred to M3 `P0-15b`)
 - [ ] P0-12 `perpetual graph` CLI
 - [ ] P0-13 Fixtures: ecs-broken, ecs-remediated, cycle, shared-node, deep-path
@@ -575,6 +575,17 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — Roadmap alignment commit + P0-11 NetworkX snapshot and traversal
+
+- Committed and pushed the roadmap, scope, governance, and `aws/aws-emulator` updates (`69cc9e2`).
+- Added `networkx` (3.7) and `types-networkx` to `pyproject.toml` / `uv.lock`.
+- Added `perpetual.graph.snapshot` (`DependencyGraph`, `GraphError`, `GroupMember`, `build_graph`, `from_graph_data`, `from_override_result`): builds a validated `nx.MultiDiGraph` keyed by `edge.id` preserving parallel typed edges, enforces canonical node-vs-ID consistency, validates primary and DR-overlay dependency groups (§19.1), and keeps rejected edges out of active traversal while preserving rejected-member context without lowering quorums.
+- Added `perpetual.graph.traversal` (`project_graph`, `dependency_closure`, `ancestors_of`, `shortest_dependency_path`, `has_cycles`, `detect_cycles`): derived `nx.DiGraph` projections preserving parallel `edge_ids`, operational/optional/confidence/type filters, and cycle-safe NetworkX traversal that never raises on cycles and canonicalizes cycle order.
+- Added 10 tests in `apps/api/tests/graph/test_snapshot_and_traversal.py` covering parallel edges, projection filters, deep shared graphs, cycles, quorum preservation with `apply_overrides`, DR mechanism groups, validation errors, and fixture integration.
+- Readability review: focused `_index_*` helpers, explicit loops/errors, NetworkX delegation, and spec citations. Per M0/M1 phase-boundary cadence, `docs/code/` updates batch at the end of P0.
+- Validation: `mise run check` passes (440 tests, 9/9 import contracts kept, strict mypy clean on 111 files, ruff check & format clean).
+- **Carry-over:** P0-15 (lightweight canonical hashes, immutable snapshot/evaluation manifests, and versioned fixture inputs; schema-migration upgrade registry stays deferred to M3 `P0-15b`), then P0-12 (`perpetual graph` CLI), P0-13 (canonical fixtures), and P0-14 (update `CLAUDE.md` + P0 phase-boundary `docs/code/` update).
 
 ### 2026-11-07 — P0-10 graph overrides
 
