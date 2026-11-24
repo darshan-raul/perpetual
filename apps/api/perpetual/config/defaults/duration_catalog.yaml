@@ -1,0 +1,141 @@
+# Versioned duration catalog v1 (spec §49.1, IMPL_PLAN D12).
+# All durations are in seconds and cover the action only (buffer is added once in §49.2).
+catalog_version: "2026-11-24-v1"
+
+actions:
+  decide_default:
+    phase: decide
+    low: 300
+    expected: 600
+    high: 1200
+    confidence: low
+    basis: "default human detection and failover decision time; override per requirement"
+
+  handoff_default:
+    phase: decide
+    low: 180
+    expected: 300
+    high: 600
+    confidence: low
+    basis: "default operator handoff time before manual or semi-automatic actions"
+
+  stack_validation_default:
+    phase: traffic
+    low: 180
+    expected: 300
+    high: 600
+    confidence: low
+    basis: "default end-to-end stack smoke test before traffic switch"
+
+  elb_verify_ready:
+    phase: foundation
+    low: 30
+    expected: 60
+    high: 120
+    confidence: medium
+    basis: "verify DR load balancer listeners and target groups"
+
+  ecr_verify_image:
+    phase: foundation
+    low: 30
+    expected: 60
+    high: 120
+    confidence: medium
+    basis: "verify replicated container image digest in DR ECR"
+
+  secrets_verify_replica:
+    phase: foundation
+    low: 30
+    expected: 60
+    high: 120
+    confidence: medium
+    basis: "verify replicated Secrets Manager entry in DR Region"
+
+  kms_verify_key:
+    phase: foundation
+    low: 30
+    expected: 60
+    high: 120
+    confidence: medium
+    basis: "verify multi-Region KMS replica key policy and state in DR Region"
+
+  rds_promote_read_replica:
+    phase: data
+    confidence: medium
+    basis: "AWS documented RDS read-replica promotion behaviour; not yet drill-verified"
+    buckets:
+      - when: { allocated_storage_gb: "<500" }
+        low: 300
+        expected: 600
+        high: 900
+      - when: { allocated_storage_gb: ">=500" }
+        low: 600
+        expected: 900
+        high: 1500
+
+  rds_restore_from_snapshot:
+    phase: data
+    confidence: low
+    basis: "heuristic RDS snapshot restore duration; scales with storage size"
+    buckets:
+      - when: { allocated_storage_gb: "<100" }
+        low: 900
+        expected: 1500
+        high: 2700
+      - when: { allocated_storage_gb: "100-1000" }
+        low: 1800
+        expected: 3600
+        high: 7200
+      - when: { allocated_storage_gb: ">1000" }
+        low: 3600
+        expected: 7200
+        high: 14400
+
+  s3_verify_replica:
+    phase: data
+    low: 30
+    expected: 60
+    high: 120
+    confidence: medium
+    basis: "verify DR S3 bucket availability and replication target"
+
+  ecs_scale_service:
+    phase: compute
+    low: 120
+    expected: 240
+    high: 480
+    confidence: medium
+    basis: "scale DR ECS Fargate/EC2 service to target desired count and pass health checks"
+
+  route53_failover_switch:
+    phase: traffic
+    low: 60
+    expected: 120
+    high: 300
+    confidence: medium
+    basis: "Route 53 health-check failover convergence and DNS TTL expiry"
+
+  # Conservative generic fallback actions for user-confirmed mechanisms on unmodeled resources (§49.1).
+  generic_promote_counterpart:
+    phase: data
+    low: 300
+    expected: 600
+    high: 1200
+    confidence: low
+    basis: "conservative generic fallback for promoting a DR counterpart"
+
+  generic_restore_from_backup:
+    phase: data
+    low: 900
+    expected: 2400
+    high: 5400
+    confidence: low
+    basis: "conservative generic fallback for restoring from a DR backup"
+
+  generic_rebuild_from_iac:
+    phase: compute
+    low: 600
+    expected: 1200
+    high: 2400
+    confidence: low
+    basis: "conservative generic fallback for rebuilding a reproducible resource from IaC"

@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · **P1 in progress** · next task **P1-09** (Duration catalog v1 → Recovery DAG, Buffer, RTO, CLI).
+**Current focus:** M0 PoC · **P1 in progress** · next tasks **P1-15** (persist simulation/plan/requirements) & **P1-18** (selected-path regressions), then **P1c** (PoC compile loop).
 
 ## Milestones
 
@@ -59,7 +59,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 |---|---|
 | §87 broken ECS demo: NOT DR READY with blockers (fixture) | [x] |
 | §88 remediated ECS demo: RECOVERABLE (fixture) | [x] |
-| §93 RTO tests (40 / 48 / 49.5) | [ ] |
+| §93 RTO tests (40 / 48 / 49.5) | [x] |
 | PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [ ] |
 | Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [x] |
 | Import contracts green | [x] |
@@ -176,15 +176,15 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 - [x] P1-06 Recovery pass
 - [x] P1-07 Stack state + readiness composition, target/evidence/review gates and evaluation kind
 - [x] P1-08 Reason chains
-- [ ] P1-09 Duration catalog v1 (incl. generic fallback action types + per-resource duration overrides)
-- [ ] P1-10 First-slice recovery actions (+ fallback actions for user-accepted unmodeled mechanisms)
-- [ ] P1-11 DAG builder (template, refinement, decide, stack validation)
-- [ ] P1-12 Buffer
-- [ ] P1-13 RTO (low/expected/high, UNKNOWN, breakdown)
-- [ ] P1-14 Target comparison
+- [x] P1-09 Duration catalog v1 (incl. generic fallback action types + per-resource duration overrides)
+- [x] P1-10 First-slice recovery actions (+ fallback actions for user-accepted unmodeled mechanisms)
+- [x] P1-11 DAG builder (template, refinement, decide, stack validation)
+- [x] P1-12 Buffer
+- [x] P1-13 RTO (low/expected/high, UNKNOWN, breakdown)
+- [x] P1-14 Target comparison
 - [ ] P1-15 Persist simulation + plan + recovery requirements
-- [ ] P1-16 `perpetual simulate` / `perpetual plan`
-- [ ] P1-17 Spec §92/§93 + simulation tests
+- [x] P1-16 `perpetual simulate` / `perpetual plan`
+- [x] P1-17 Spec §92/§93 + simulation tests
 - [ ] P1-18 ALL/ANY/quorum selection, shared prerequisites and readiness decision-table regressions
 
 ### P1c PoC compile loop
@@ -575,6 +575,16 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P1-09..P1-14, P1-16, P1-17 recovery DAG, buffer, RTO & CLI
+
+- Added versioned `apps/api/perpetual/config/defaults/duration_catalog.yaml` and `perpetual.recovery.catalog` (`DurationCatalog`, `load_duration_catalog`) with volumetric bucket matching, generic fallback action types (`generic_promote_counterpart`, `generic_restore_from_backup`, `generic_rebuild_from_iac`), per-resource duration overrides, and `None` (UNKNOWN, never zero) for missing entries (§49.1).
+- Added `perpetual.recovery.actions` (`RecoveryAction`, `RecoveryPhase`, `AutomationLevel`, `actions_for_mechanism`) synthesizing first-slice recovery actions plus generic fallbacks (§48).
+- Added `perpetual.recovery.planner` (`build_recovery_dag`, `plan_stack_recovery`, `compare_target`, `RecoveryPlan`, `RtoBreakdown`, `PlanError`): phase-template default edges + refined prerequisites, `decide` and `stack_validation` actions, handoff + contingency buffer (§49.2), topological longest-path RTO with UNKNOWN propagation (§50), and target comparison (§52).
+- Added `perpetual simulate` and `perpetual plan` CLI commands in `perpetual.cli.simulate` (`--fixture`, `--failure`, `--json`) wired into `perpetual.cli.app`.
+- Added 8 tests in `apps/api/tests/recovery/test_rto_and_plan.py` verifying spec §93 RTO math (`40`, `48`, `49.5` minutes), catalog buckets/overrides/missing entries, UNKNOWN propagation, DAG cycle rejection, target comparison boundaries, and CLI execution on `ecs-broken` and `ecs-remediated`.
+- Validation: `mise run check` passes (474 tests, 9/9 import contracts kept, strict mypy clean on 131 files, ruff check & format clean).
+- **Carry-over:** Finish P1 with **P1-15** (persist simulation, plan & recovery requirements) and **P1-18** (ALL/ANY/quorum selected-path regressions) + end-of-P1 `docs/code/` update, then **P1c** (PoC compile loop: modeled DR change set, companion Terraform, Python recovery script, `perpetual poc fix`).
 
 ### 2026-11-24 — P1-03..P1-08 two-pass failure simulator, readiness & reason chains
 
