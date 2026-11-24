@@ -6,7 +6,7 @@ A task is done when its code, tests, and [readability checklist](docs/code/reada
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a decision-log entry). A task with lettered subtasks (e.g. P0-04a) is done when all its subtasks are done.
 
-**Current focus:** M0 PoC · **P1 in progress** · next task **P1-03** (RTO scope classification).
+**Current focus:** M0 PoC · **P1 in progress** · next task **P1-09** (Duration catalog v1 → Recovery DAG, Buffer, RTO, CLI).
 
 ## Milestones
 
@@ -57,8 +57,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 | Gate | Status |
 |---|---|
-| §87 broken ECS demo: NOT DR READY with blockers (fixture) | [ ] |
-| §88 remediated ECS demo: RECOVERABLE (fixture) | [ ] |
+| §87 broken ECS demo: NOT DR READY with blockers (fixture) | [x] |
+| §88 remediated ECS demo: RECOVERABLE (fixture) | [x] |
 | §93 RTO tests (40 / 48 / 49.5) | [ ] |
 | PoC loop: generated Terraform passes fmt + validate; recovery script passes lint and a `moto` dry run (plus `aws/aws-emulator` integration once wired); re-simulation matches §88 | [ ] |
 | Lightweight `P0-15`: canonical hashes, immutable manifests, and versioned fixture inputs pass | [x] |
@@ -170,12 +170,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (needs a 
 
 - [x] P1-01 Rule-pack protocol + registry
 - [x] P1-02 First-slice mechanism resolution on real `DRRulePack` classes (strict "reproducible")
-- [ ] P1-03 RTO scope classification
-- [ ] P1-04 FailureScenario dispatch
-- [ ] P1-05 Impact pass
-- [ ] P1-06 Recovery pass
-- [ ] P1-07 Stack state + readiness composition, target/evidence/review gates and evaluation kind
-- [ ] P1-08 Reason chains
+- [x] P1-03 RTO scope classification
+- [x] P1-04 FailureScenario dispatch
+- [x] P1-05 Impact pass
+- [x] P1-06 Recovery pass
+- [x] P1-07 Stack state + readiness composition, target/evidence/review gates and evaluation kind
+- [x] P1-08 Reason chains
 - [ ] P1-09 Duration catalog v1 (incl. generic fallback action types + per-resource duration overrides)
 - [ ] P1-10 First-slice recovery actions (+ fallback actions for user-accepted unmodeled mechanisms)
 - [ ] P1-11 DAG builder (template, refinement, decide, stack validation)
@@ -575,6 +575,19 @@ Newest first. Any change to IMPL_PLAN.md, or any deviation from spec.md, goes he
 ## Session log
 
 Newest first. Each entry: date, what was done, carry-over for the next session.
+
+### 2026-11-24 — P1-03..P1-08 two-pass failure simulator, readiness & reason chains
+
+- Added `perpetual.stacks.scope` (`classify_resource_scope`, `classify_stack_scopes`) honoring config defaults (`rto_scope.yaml`) and per-resource `StackResource` overrides (§24.1).
+- Added `perpetual.simulator`:
+  - `scenarios.py` (`FailureScenario`, `RegionFailure`, `AZFailure`, `LogicalCorruption`, `UnsupportedScenarioError`, `parse_scenario`, `seed_failed_resources`) dispatching on `kind` (§43).
+  - `impact.py` (`ImpactRecord`, `run_impact_pass`): fixed-point cycle-safe impact propagation skipping structural/replication/backup edges, respecting out-of-scope boundaries, confidence thresholds, and ALL/ANY/quorum groups (§19.1, §44).
+  - `recovery.py` (`ResourceSimulationResult`, `run_recovery_pass`): memoised, cycle-safe DR-overlay traversal handling `none`, `unknown`, `live_counterpart`, `restore_from_recovery_point`, `rebuild_from_iac`, `global_service` (`CTRL-PLANE-001` for `us-east-1`), `external`, and ALL/ANY/quorum groups (§19.1, §44).
+  - `readiness.py` (`EvaluationKind`, `FindingEffect`, `ReadinessInputs`, `ReadinessResult`, `compose_readiness`): ordered 4-row §31 readiness composition table separating simulation recoverability from target compliance and review/coverage gates.
+  - `engine.py` (`ReasonChain`, `SimulationResult`, `simulate_failure`): end-to-end orchestration and root-to-blocker reason chains (§45, §46).
+- Added 8 tests in `apps/api/tests/simulator/test_simulator_core.py` verifying §87 (`ecs-broken` → `UNAVAILABLE`/`NOT_READY`), §88 (`ecs-remediated` → `RECOVERABLE` despite blocked out-of-scope logs), `cycle.yaml` termination, unsupported scenarios, review gate (`graph_not_reviewed`), quorum groups, and §31 precedence.
+- Validation: `mise run check` passes (466 tests, 9/9 import contracts kept, strict mypy clean on 126 files, ruff check & format clean).
+- **Carry-over:** P1-09 (Duration catalog v1), P1-10 (first-slice recovery actions), P1-11 (DAG builder), P1-12 (Buffer), P1-13 (RTO), P1-14 (Target comparison), P1-16 (`perpetual simulate` / `perpetual plan` CLI), and P1-17/18 (spec §92/§93 tests).
 
 ### 2026-11-24 — P1-01 rule-pack protocol & P1-02 first-slice mechanism resolution
 
